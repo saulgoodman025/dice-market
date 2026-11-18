@@ -124,11 +124,9 @@ export const AUG_TIER_INFO: Record<AugTier, { name: string; color: string }> = {
   prism: { name: '프리즘', color: '#d38cff' },
 };
 
-/** 획득 시점별 등급 확률 (표시, DDA 미적용) — [실버, 골드, 프리즘] */
+/** 획득 시점별 등급 확률 (표시, DDA 미적용) — [실버, 골드, 프리즘]. 막마다 1번, 2층을 마친 뒤 */
 export const AUG_ODDS: { key: string; label: string; w: [number, number, number] }[] = [
-  { key: '1-1', label: '1막 1층', w: [60, 35, 5] },
-  { key: '1-b', label: '1막 보스', w: [30, 55, 15] },
-  { key: '2-1', label: '2막 1층', w: [30, 55, 15] },
-  { key: '2-b', label: '2막 보스', w: [10, 55, 35] },
-  { key: '3-1', label: '3막 1층', w: [10, 50, 40] },
+  { key: '1', label: '1막', w: [50, 40, 10] },
+  { key: '2', label: '2막', w: [20, 55, 25] },
+  { key: '3', label: '3막', w: [5, 50, 45] },
 ];

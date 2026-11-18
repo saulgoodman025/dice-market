@@ -87,11 +87,10 @@ registerSources((run) => {
 const TIERS: AugTier[] = ['silver', 'gold', 'prism'];
 
 /** 이번 획득 시점의 등급 확률 [실버, 골드, 프리즘] */
-export function augmentOdds(run: RunState, point: 'floor' | 'boss'): { label: string; w: [number, number, number]; ceiling: boolean } {
-  const key = `${Math.min(3, run.act)}-${point === 'floor' ? '1' : 'b'}`;
-  const row = AUG_ODDS.find((r) => r.key === key) ?? AUG_ODDS[AUG_ODDS.length - 1];
-  // 프리즘 천장: 3막 1층까지 프리즘을 한 번도 못 봤으면 프리즘 확정
-  const ceiling = run.act >= 3 && point === 'floor' && !run.flags.prismSeen;
+export function augmentOdds(run: RunState): { label: string; w: [number, number, number]; ceiling: boolean } {
+  const row = AUG_ODDS.find((r) => r.key === String(Math.min(3, run.act))) ?? AUG_ODDS[AUG_ODDS.length - 1];
+  // 프리즘 천장: 3막까지 프리즘을 한 번도 못 봤으면 프리즘 확정
+  const ceiling = run.act === 3 && !run.flags.prismSeen;
   return { label: run.act > 3 ? `엔드리스 ${run.act}막` : row.label, w: ceiling ? [0, 0, 100] : row.w, ceiling };
 }
 
@@ -124,9 +123,9 @@ function rollAugIds(ctx: Ctx, tier: AugTier, n: number, keep: string[] = []): st
   return out;
 }
 
-export function offerAugment(ctx: Ctx, point: 'floor' | 'boss', then: AugmentOffer['then']) {
+export function offerAugment(ctx: Ctx, then: AugmentOffer['then']) {
   const run = ctx.run;
-  const odds = augmentOdds(run, point);
+  const odds = augmentOdds(run);
   const tier = rng(ctx, 'augment').weighted(TIERS, (t) => odds.w[TIERS.indexOf(t)]);
   if (tier === 'prism') run.flags.prismSeen = 1;
   const ids = rollAugIds(ctx, tier, 3);
@@ -135,17 +134,17 @@ export function offerAugment(ctx: Ctx, point: 'floor' | 'boss', then: AugmentOff
   run.flags.augOffers = (run.flags.augOffers ?? 0) + 1;
 }
 
-export const AUG_REROLLS = 3;
-
-export function augRerollsLeft(run: RunState): number {
-  return AUG_REROLLS - (run.flags.augRerolls ?? 0);
+/** 이 자리의 증강을 다시 뽑을 수 있는가 (자리마다 1번) */
+export function canRerollAugment(run: RunState, i: number): boolean {
+  const of = run.augmentOffer;
+  return !!of && !!of.ids[i] && !of.rerolled[i];
 }
 
-/** 카드 하나만 다시 뽑기 (등급 유지, 판당 3회) */
+/** 카드 하나만 다시 뽑기 (등급 유지, 왼쪽·가운데·오른쪽 자리마다 1번) */
 export function rerollAugment(ctx: Ctx, i: number): boolean {
   const run = ctx.run;
   const of = run.augmentOffer;
-  if (!of || !of.ids[i] || augRerollsLeft(run) <= 0) return false;
+  if (!of || !canRerollAugment(run, i)) return false;
   const [id] = rollAugIds(ctx, of.tier, 1, of.ids);
   if (!id) return false;
   of.ids[i] = id;

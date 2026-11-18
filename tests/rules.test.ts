@@ -175,15 +175,14 @@ describe('족보 칩 · 잠금 제한 · 약점 눈', () => {
     startCombat(ctx, 'normal', ['golem']);
     const cb = run.combat!;
     cb.hand.forEach((h, i) => { h.pip = [1, 2, 4, 5, 6][i]; h.sticker = undefined; h.material = 'wood'; });
-    confirmHand(ctx); // 노 핸드 → 칩 2
-    expect(cb.handChips).toBe(2);
-    expect(play(ctx, 'slash', [cb.hand[0].key])).toBe(true); // 베기 (1)
+    confirmHand(ctx); // 노 핸드 → 칩 1
     expect(cb.handChips).toBe(1);
-    cb.handChips = 0;
+    expect(play(ctx, 'slash', [cb.hand[0].key])).toBe(true); // 베기 (1)
+    expect(cb.handChips).toBe(0);
     expect(play(ctx, 'guard', [cb.hand[1].key])).toBe(false); // 방패 (1) 불가
   });
 
-  it('남은 칩은 3개까지만 다음 턴으로 넘어간다', () => {
+  it('남은 칩은 1개까지만 다음 턴으로 넘어간다', () => {
     const { run, ctx } = mk(23, 'knight');
     startCombat(ctx, 'normal', ['golem']);
     const cb = run.combat!;
@@ -191,7 +190,7 @@ describe('족보 칩 · 잠금 제한 · 약점 눈', () => {
     confirmHand(ctx);
     cb.handChips = 7;
     endTurn(ctx);
-    expect(cb.handChips).toBeLessThanOrEqual(3);
+    expect(cb.handChips).toBe(1);
   });
 
   it('약점 눈으로 공격하면 피해 1.75배', () => {
@@ -235,7 +234,7 @@ describe('족보 재판정', () => {
     expect(play(ctx, 'bump', [cb.hand[3].key])).toBe(true); // 5 → 6
     expect(cb.hand.filter((h) => !h.gone).map((h) => h.pip).filter((p) => p === 6).length).toBe(4);
     expect(cb.handResult!.id).toBe('four');
-    expect(cb.handChips).toBe(chips0 + 3); // 트리플 4 → 포카드 7 (올리기 비용 0)
+    expect(cb.handChips).toBe(chips0 + 2); // 트리플 3 → 포카드 5 (올리기 비용 0)
   });
 });
 

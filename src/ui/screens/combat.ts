@@ -7,12 +7,12 @@ import { canBurn } from '../../rules/deck';
 import { canCentralBank } from '../../rules/sets';
 import { FACE_BY_ID } from '../../data/faces';
 import { MATERIAL_BY_ID, MATERIALS } from '../../data/materials';
-import { ENEMY_BY_ID, HOUSE_RULES } from '../../data/enemies';
+import { ENEMY_BY_ID, ENEMY_TRAIT, HOUSE_RULES } from '../../data/enemies';
 import { HAND_BY_ID, HANDS } from '../../data/hands';
 import { CHAR_BY_ID } from '../../data/characters';
 import { CONSUMABLE_BY_ID } from '../../data/consumables';
 import { BALANCE } from '../../data/balance';
-import { cardCost, cardUsable, chipsAvailable, describeIntent, gambleOddsBonus, handChipsFor, hasMoves, lockedCount, lockLimit, previewCard, previewHand, previewPips } from '../../rules/combat';
+import { handDrawPending, cardCost, cardUsable, chipsAvailable, describeIntent, gambleOddsBonus, handChipsFor, hasMoves, lockedCount, lockLimit, previewCard, previewHand, previewPips } from '../../rules/combat';
 import { ENEMY_BY_ID as EDEF } from '../../data/enemies';
 import { cardInstFace, dieFace, esc, fmt, handDieHtml, pipsHtml } from '../components/parts';
 import { topbar } from './common';
@@ -76,13 +76,14 @@ export function combatScreen(app: App): string {
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
       <div class="ehp ${e.block && e.hp > 0 ? 'shielded' : ''}" data-hpk="e${e.uid}" data-pct="${hpPct}">${e.block && e.hp > 0 ? `<span class="eshb" data-blk="${e.block}" data-tip="방어도 ${e.block}: 체력보다 먼저 피해를 막습니다. 이 적의 다음 행동 때 사라집니다."><span class="n">${e.block}</span></span>` : ''}<span class="hpc"><s class="trail"></s><i style="width:${hpPct}%;${e.poison && e.hp > 0 ? `--pa:${(Math.max(0, e.hp - e.poison) / e.hp) * 100}%` : ''}"></i></span><b>${e.hp}/${e.maxHp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
+      ${ENEMY_TRAIT[e.id] && e.hp > 0 ? `<button class="etrait" data-act="enemyInfo" data-arg="${e.uid}" data-tip="${esc(`${ENEMY_TRAIT[e.id]}: ${def.desc ?? ''}`)}">${esc(ENEMY_TRAIT[e.id])} <b>?</b></button>` : ''}
     </div>`;
   }).join('');
 
   // ── 족보 ──
   const hr = cb.handResult ?? (roll ? previewHand(ctx) : null);
   const handbar = hr ? `<button class="handbar ${hr.id === 'none' ? 'nohand' : ''}" data-act="modal" data-arg="hands">
-      <span class="hname">${hr.name}</span><span class="hmult">×${hr.mult.toFixed(1)}</span><span class="hchip">🔶${handChipsFor(ctx, hr.id)}</span><span class="hq">?</span>
+      <span class="hname">${hr.name}</span><span class="hmult">×${hr.mult.toFixed(1)}</span><span class="hchip">🔶${handChipsFor(ctx, hr.id)}</span>${handDrawPending(ctx, hr.id) ? '<span class="hdraw" data-tip="투 페어 이상: 족보가 확정되면 카드 1장을 더 뽑습니다">🂠+1</span>' : ''}<span class="hq">?</span>
     </button>` : '<div class="handbar"></div>';
 
   const rules = cb.houseRule ? esc(HOUSE_RULES[cb.houseRule].replace('하우스 룰: ', '🎩 ')) : cb.queenParity ? `👸 이번 턴 ${cb.queenParity === 'odd' ? '홀수' : '짝수'} 눈만 피해` : '';
@@ -127,7 +128,7 @@ export function combatScreen(app: App): string {
     const lift = Math.abs(i - mid) * (n > 6 ? 1.2 : 2.5);
     const desc = cardDesc(def, oddsB);
     const cond = def.cond.k === 'instant' ? '즉발' : condText(def.cond);
-    return `<div class="scard r-${def.rarity} ${state} ${def.unplayable ? 'cursed' : ''} ${ui.selCard === i ? 'chosen' : ''}" data-card="${i}" data-act="cardTap" data-arg="${i}" style="--rot:${rot}deg;--lift:${lift}px;z-index:${10 + i}" data-tip="${esc(`${def.name}${inst.up ? '+' + inst.up : ''} — ${cond}: ${desc}${def.exhaust ? ' (소멸)' : ''}${def.unplayable ? '' : def.target === 'enemy' ? ' (적에게 끌어다 놓기)' : ' (테이블에 끌어다 놓기)'}`)}">
+    return `<div class="scard r-${def.rarity} ${state} ${def.unplayable ? 'cursed' : ''} ${ui.selCard === i ? 'chosen' : ''}" data-cuid="${inst.uid}" data-card="${i}" data-act="cardTap" data-arg="${i}" style="--rot:${rot}deg;--lift:${lift}px;z-index:${10 + i}" data-tip="${esc(`${def.name}${inst.up ? '+' + inst.up : ''} — ${cond}: ${desc}${def.exhaust ? ' (소멸)' : ''}${def.unplayable ? '' : def.target === 'enemy' ? ' (적에게 끌어다 놓기)' : ' (테이블에 끌어다 놓기)'}`)}">
       <span class="ccost ${cost > chipsNow ? 'short' : ''} ${cost < def.cost ? 'cheap' : ''}">${def.unplayable ? '✕' : cost}</span><span class="ccond">${esc(cond)}</span>${badge}
       ${inst.up ? `<span class="cup">${inst.up}</span>` : ''}
       <div class="cart">${def.icon}</div>
@@ -172,7 +173,7 @@ export function combatScreen(app: App): string {
       <div class="enemies n${cb.enemies.filter((x) => x.hp > 0).length}">${enemies}</div>
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}
-      <div class="tray ${app.veil ? 'veiled' : ''} ${cb.turnCounters.yahtzee && !app.veil ? 'yahtzee' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>
+      <div class="tray ${app.veil ? 'veiled' : ''} ${(cb.turnCounters.yahtzee || (roll && previewHand(ctx).id === 'yahtzee')) && !app.veil ? 'yahtzee' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>
       <div class="tablestats">
         <span data-tip="리롤: 잠그지 않은 주사위를 다시 굴림">🎲 <b>${roll ? cb.rerollsLeft : 0}</b></span>
         <span data-tip="잠금: 한 번에 잠글 수 있는 주사위 수">🔒 <b>${roll ? lockedCount(cb) : 0}/${lockLimit(ctx)}</b></span>

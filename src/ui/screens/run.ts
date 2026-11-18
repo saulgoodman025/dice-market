@@ -8,7 +8,7 @@ import { CARD_BY_ID, cardDesc, resolveCard } from '../../data/cards';
 import { COMBOS, COMBO_BY_ID, TAG_TIER_FX } from '../../data/sets';
 import { TAG_INFO, TAGS, type Tag } from '../../data/tags';
 import { AUGMENT_BY_ID, AUG_TIER_INFO } from '../../data/augments';
-import { activeCombos, augmentOdds, augRerollsLeft, nextTierAt, PRISM_ROULETTE, tagCounts, tierOf } from '../../rules/sets';
+import { activeCombos, augmentOdds, canRerollAugment, nextTierAt, PRISM_ROULETTE, tagCounts, tierOf } from '../../rules/sets';
 import { canRemoveMore, canUpgradeCard, removePrice } from '../../rules/run';
 import { gambleOddsBonus } from '../../rules/combat';
 import { RELIC_BY_ID } from '../../data/relics';
@@ -261,6 +261,20 @@ export function restScreen(app: App): string {
   </div>`;
 }
 
+/** 스티커가 붙은 면을 강조한 주사위 전개도 */
+function faceNet(app: App, dieIdx: number, faceIdx: number): string {
+  const run = app.run!;
+  const picks = run.dice.map((d, i) => dieFace(6, undefined, d.material, `small ${i === dieIdx ? 'on' : ''}`)).join('');
+  const die = run.dice[dieIdx];
+  const net = die.faces.map((f, i) => {
+    const sd = f.sticker ? FACE_BY_ID[f.sticker] : undefined;
+    const label = sd?.kind === 'replace' ? (sd.wild ? '🃏' : sd.mirror ? '🪞' : String(sd.pip)) : String(f.pip);
+    const [c, r] = NET_POS[i];
+    return `<div class="face mat-${die.material} ${i === faceIdx ? 'newface' : ''}" style="grid-column:${c};grid-row:${r}">${label}${sd ? `<span class="stk">${sd.emoji}</span>` : ''}</div>`;
+  }).join('');
+  return `<div class="card col"><div class="dicepick">${picks}</div><div class="net">${net}</div></div>`;
+}
+
 // ───────────── 주사위 보기 / 편집 ─────────────
 const NET_POS = [[2, 1], [1, 2], [2, 2], [3, 2], [4, 2], [2, 3]]; // 6면 전개도 (col,row): 1 위, 2 3 4 5 가운데, 6 아래
 
@@ -286,6 +300,18 @@ function pendingModal(app: App): string {
   const run = app.run!;
   const p = run.pending;
   if (!p) return '';
+  if (p.kind === 'faceShow') {
+    const f = FACE_BY_ID[p.id];
+    const die = run.dice[p.dieIdx];
+    const old = p.replaced ? FACE_BY_ID[p.replaced] : null;
+    return `<div class="modal"><div class="box">
+      <h3>${f.emoji} ${f.name} 면을 붙였다 ${rarityTag(f.rarity)}</h3>
+      <div class="small">${esc(fmt(f.desc, f.v))}</div>
+      <div class="card center"><b>${p.dieIdx + 1}번 주사위</b>의 <b class="gold">눈 ${die.faces[p.faceIdx].pip}</b> 면에 붙었습니다${old ? `<br><span class="red small">(원래 있던 ${old.emoji} ${old.name} 면은 사라졌다)</span>` : ''}</div>
+      ${faceNet(app, p.dieIdx, p.faceIdx)}
+      <button class="btn primary big" data-act="cancelPending">확인</button>
+    </div></div>`;
+  }
   if (p.kind === 'face') {
     const f = FACE_BY_ID[p.id];
     return `<div class="modal"><div class="box">
@@ -440,7 +466,7 @@ function augmentModal(app: App): string {
   const of = run.augmentOffer!;
   const sel = app.ui.rewardSel;
   const counts = tagCounts(run);
-  const odds = augmentOdds(run, (run.flags.augOffers ?? 1) % 2 === 1 && run.floor <= 1 ? 'floor' : 'boss');
+  const odds = augmentOdds(run);
   const ti = AUG_TIER_INFO[of.tier];
   const cards = of.ids.map((id, i) => {
     const a = AUGMENT_BY_ID[id];
@@ -450,7 +476,7 @@ function augmentModal(app: App): string {
       <span class="augname">${esc(a.name)}</span>
       ${a.tag ? `<span class="augtag">${TAG_INFO[a.tag].icon} +1</span>` : '<span class="augtag muted">무색</span>'}
       <span class="augdesc">${esc(a.desc)}</span>
-    </button>${a.tag ? tagPreview(counts, a.tag) : ''}<button class="btn ghost small" data-act="augReroll" data-arg="${i}" ${augRerollsLeft(run) > 0 ? '' : 'disabled'}>🔄</button></div>`;
+    </button>${a.tag ? tagPreview(counts, a.tag) : ''}<button class="btn ghost small" data-act="augReroll" data-arg="${i}" ${canRerollAugment(run, i) ? '' : 'disabled'}>${of.rerolled[i] ? '🔄 사용함' : '🔄 1번'}</button></div>`;
   }).join('');
   const prism = of.tier === 'gold' && run.flags.prismRolled !== run.flags.augOffers
     ? `<button class="btn danger" data-act="prismRoll" ${run.chips >= PRISM_ROULETTE.chips ? '' : 'disabled'}>🎰 프리즘 룰렛 (칩 ${PRISM_ROULETTE.chips}) · 25% 프리즘 / 75% 실버</button>` : '';
@@ -460,7 +486,7 @@ function augmentModal(app: App): string {
     <div class="odds center">${esc(odds.label)}: 실버 ${odds.w[0]}% · 골드 ${odds.w[1]}% · 프리즘 ${odds.w[2]}%${odds.ceiling ? ' (천장: 프리즘 확정)' : ''}</div>
     ${owned ? `<div class="row augrow"><b class="small">보유</b>${owned}</div>` : ''}
     <div class="augs">${cards}</div>
-    <div class="small center muted">카드별 🔄 리롤 (등급 유지) · 이번 판 남은 리롤 ${augRerollsLeft(run)}</div>
+    <div class="small center muted">🔄 리롤: 왼쪽·가운데·오른쪽 자리마다 1번 (등급 유지)</div>
     ${prism}
     <button class="btn primary big" data-act="augPick" data-arg="${sel ?? -1}" ${sel === null ? 'disabled' : ''}>${sel === null ? '증강을 고르세요' : `「${esc(AUGMENT_BY_ID[of.ids[sel]].name)}」 선택`}</button>
   </div></div>`;

@@ -204,7 +204,7 @@ describe('증강', () => {
     for (const a of AUGMENTS) expect(others.has(a.id), a.id).toBe(false);
   });
 
-  it('판당 5번 (1층 완료 3 + 보스 2), 엔드리스 진입 시 1번 더', () => {
+  it('막마다 1번(2층을 마친 뒤) = 판당 3번, 엔드리스 진입 시 1번 더', () => {
     const { run, ctx } = mk(31);
     let offers = 0;
     for (let act = 1; act <= 3; act++) {
@@ -216,7 +216,7 @@ describe('증강', () => {
       }
     }
     expect(run.screen).toBe('victory');
-    expect(offers).toBe(5);
+    expect(offers).toBe(3);
     continueEndless(ctx);
     expect(run.augmentOffer).not.toBeNull();
   });
@@ -230,32 +230,37 @@ describe('증강', () => {
       for (let i = 0; i < N; i++) {
         run.augments = [];
         run.flags.prismSeen = 1;
-        offerAugment(ctx, 'floor', 'map');
+        offerAugment(ctx, 'map');
         cnt[run.augmentOffer!.tier]++;
       }
-      const w = augmentOdds(run, 'floor').w;
+      const w = augmentOdds(run).w;
       expect(Math.abs(cnt.silver / N - w[0] / 100)).toBeLessThan(0.02);
       expect(Math.abs(cnt.gold / N - w[1] / 100)).toBeLessThan(0.02);
       expect(Math.abs(cnt.prism / N - w[2] / 100)).toBeLessThan(0.02);
     }
   });
 
-  it('프리즘 천장: 3막 1층까지 프리즘을 못 봤으면 확정', () => {
+  it('프리즘 천장: 3막까지 프리즘을 못 봤으면 확정', () => {
     const { run, ctx } = mk(33);
     run.act = 3;
     run.flags.prismSeen = 0;
-    offerAugment(ctx, 'floor', 'map');
+    offerAugment(ctx, 'map');
     expect(run.augmentOffer!.tier).toBe('prism');
   });
 
-  it('카드별 리롤은 판당 3번, 등급 유지 · 프리즘 룰렛은 골드에서만', () => {
+  it('리롤은 왼쪽·가운데·오른쪽 자리마다 1번, 등급 유지 · 프리즘 룰렛은 골드에서만', () => {
     const { run, ctx } = mk(34);
-    offerAugment(ctx, 'floor', 'map');
+    offerAugment(ctx, 'map');
     const tier = run.augmentOffer!.tier;
     expect(rerollAugment(ctx, 0)).toBe(true);
+    expect(rerollAugment(ctx, 0)).toBe(false); // 같은 자리 두 번은 불가
     expect(rerollAugment(ctx, 1)).toBe(true);
     expect(rerollAugment(ctx, 2)).toBe(true);
-    expect(rerollAugment(ctx, 0)).toBe(false);
+    expect(rerollAugment(ctx, 2)).toBe(false);
+    // 다음 증강에서는 다시 자리마다 1번
+    pickAugment(ctx, 0);
+    offerAugment(ctx, 'map');
+    expect(rerollAugment(ctx, 0)).toBe(true);
     expect(run.augmentOffer!.tier).toBe(tier);
     run.augmentOffer!.tier = 'silver';
     run.chips = 9;

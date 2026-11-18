@@ -23,6 +23,7 @@ const cb = (app: App) => app.run?.combat ?? null;
 export function tutorialHand(run: RunState) {
   const c = run.combat;
   if (!c) return;
+  c.handChips = Math.max(c.handChips, 2); // 튜토리얼 첫 턴: 공격·방어 카드를 둘 다 써 볼 수 있게
   const want = [{ role: 'atk', target: true }, { role: 'def', target: false }];
   for (const w of want) {
     const ok = (id: string) => { const d = CARD_BY_ID[id]; return d.role === w.role && !!d.target === w.target && !d.chance && !d.perCombat && d.rarity === 'basic'; };
@@ -65,7 +66,7 @@ export const COACH: Step[] = [
     doLabel: '리롤을 누르세요', done: (a) => { const c = cb(a); return !!c && (c.phase !== 'roll' || c.rerollsLeft < baseRerolls(a.ctx)); },
   },
   { focus: () => ['.handbar'], title: '⑤ 족보 = 배율', text: '같은 눈이나 이어지는 눈을 모으면 족보가 됩니다. 이번 턴 모든 공격과 방어에 ×배율이 곱해집니다. 누르면 족보표를 볼 수 있습니다.' },
-  { focus: () => ['.chipstat', '.handbar'], title: '⑥ 족보 칩 🔶', text: '카드를 쓰려면 🔶 칩이 필요합니다(카드 왼쪽 위 숫자). 족보가 좋을수록 칩을 많이 받고, 남은 칩은 3개까지 다음 턴으로 넘어갑니다.' },
+  { focus: () => ['.chipstat', '.handbar'], title: '⑥ 족보 칩 🔶', text: '카드를 쓰려면 🔶 칩이 필요합니다(카드 왼쪽 위 숫자). 족보가 좋을수록 칩을 많이 받고, 남은 칩은 1개만 다음 턴으로 넘어가니, 어떤 카드에 칩을 쓸지 골라야 합니다.' },
   {
     focus: (a) => [card(a, 'atk'), '.enemy:not(.dead)'], title: '⑦ 공격 카드', text: '빛나는 🎯 카드를 적에게 끌어다 놓으세요. 카드 오른쪽 위 숫자가 예상 피해입니다. (카드를 탭한 뒤 적을 탭해도 됩니다)',
     doLabel: '카드를 적에게 끌어다 놓으세요', done: (a) => usedKind(a, 'atk'),
@@ -94,11 +95,15 @@ export function drawCoach(app: App) {
   const ui = app.ui;
   if (!coachActive(app)) return;
   if (ui.modal || app.run!.pending || app.run!.offer || ui.picker || app.veil) return;
+  // 이전 단계를 다시 보는 중이면 자동으로 넘기지 않는다 (가장 멀리 간 단계에서만 자동 진행)
+  ui.tutMax = Math.max(ui.tutMax ?? 1, ui.tut);
   let step = COACH[ui.tut - 1];
-  while (step?.done?.(app) && ui.tut < COACH.length) {
+  while (ui.tut >= ui.tutMax && step?.done?.(app) && ui.tut < COACH.length) {
     ui.tut++;
+    ui.tutMax = ui.tut;
     step = COACH[ui.tut - 1];
   }
+  const reviewing = ui.tut < ui.tutMax;
   const targets = step.focus(app).flatMap((sel) => [...app.view.querySelectorAll<HTMLElement>(sel)]);
   if (!targets.length) return;
   // 어둡게 덮고(조작 차단), 설명할 부분만 위로 올린다
@@ -111,10 +116,12 @@ export function drawCoach(app: App) {
   const last = ui.tut === COACH.length;
   const bubble = document.createElement('div');
   bubble.className = 'coach';
-  bubble.innerHTML = `<div class="ctitle">${step.title}</div><div class="ctext">${step.text}</div>
-    ${step.done && !last ? `<div class="cdo">👉 ${step.doLabel}</div>` : ''}
-    <div class="cbtns">${app.run!.flags.tutorial ? '<span></span>' : '<button class="btn ghost" data-act="tutSkip" data-always="1">닫기</button>'}
-    ${step.done && !last ? '' : `<button class="btn primary" data-act="tutNext" data-always="1">${last ? '시작!' : '다음 ▶'}</button>`}</div>
+  const needDo = !!step.done && !last && !reviewing;
+  bubble.innerHTML = `<button class="cx" data-act="tutSkip" data-always="1" aria-label="튜토리얼 나가기">✕</button>
+    <div class="ctitle">${step.title}</div><div class="ctext">${step.text}</div>
+    ${needDo ? `<div class="cdo">👉 ${step.doLabel}</div>` : ''}
+    <div class="cbtns">${ui.tut > 1 ? '<button class="btn ghost" data-act="tutPrev" data-always="1">◀ 이전</button>' : '<span></span>'}
+    ${needDo ? '' : `<button class="btn primary" data-act="tutNext" data-always="1">${last ? '시작!' : reviewing ? '다음 ▶' : '다음 ▶'}</button>`}</div>
     <div class="cprog">${COACH.map((_, i) => `<i class="${i < ui.tut ? 'on' : ''}"></i>`).join('')}</div>`;
   app.view.appendChild(bubble);
   placeBubble(app, bubble, targets);

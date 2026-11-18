@@ -33,7 +33,7 @@ export function handMax(run: RunState): number {
 }
 
 /** 카드 n장 뽑기. 뽑을 더미가 비면 버린 더미를 섞어 새로 만든다. 손패가 가득 차면 바로 버린다 */
-export function drawCards(ctx: Ctx, n: number): CardInst[] {
+export function drawCards(ctx: Ctx, n: number, src: 'turn' | 'hand' | 'card' = 'card'): CardInst[] {
   const cb = cbOf(ctx);
   const got: CardInst[] = [];
   let overflow = 0;
@@ -50,7 +50,7 @@ export function drawCards(ctx: Ctx, n: number): CardInst[] {
   }
   if (overflow) toast(ctx, '손패가 가득 찼다', 'bad');
   if (got.length) {
-    ctx.emit({ t: 'draw', n: got.length });
+    ctx.emit({ t: 'draw', n: got.length, uids: got.map((c) => c.uid), src });
     fire(ctx, 'onDraw', { amount: got.length });
   }
   return got;

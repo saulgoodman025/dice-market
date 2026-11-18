@@ -235,15 +235,13 @@ export function advance(ctx: Ctx) {
       return;
     }
     nextAct(ctx);
-    if (run.act <= 3) offerAugment(ctx, 'boss', 'map');
     return;
   }
-  const first = run.floor === 0;
   run.floor++;
   updateFlow(run);
   run.screen = 'map';
-  // 증강: 1층 노드를 마친 직후
-  if (first && run.act <= 3) offerAugment(ctx, 'floor', 'map');
+  // 증강: 막마다 1번, 2층을 마친 뒤 (3층 지도로 넘어갈 때)
+  if (run.floor === 2 && run.act <= 3) offerAugment(ctx, 'map');
 }
 
 function nextAct(ctx: Ctx) {
@@ -589,5 +587,5 @@ export function continueEndless(ctx: Ctx) {
   if (run.screen !== 'victory') return;
   run.flags.endless = 1;
   nextAct(ctx);
-  offerAugment(ctx, 'boss', 'map');
+  offerAugment(ctx, 'map');
 }

@@ -119,9 +119,12 @@ export function acquire(ctx: Ctx, o: RewardOption, then: RunState['screen']): vo
     case 'relic':
       giveRelic(ctx, o.id);
       break;
-    case 'face':
-      run.pending = { kind: 'face', id: o.id, then };
+    case 'face': {
+      // 면 스티커는 고르기만 하면 무작위 면에 자동으로 붙고, 붙은 위치를 보여준다
+      const at = attachFaceRandom(ctx, o.id);
+      if (at) run.pending = { kind: 'faceShow', id: o.id, ...at, then };
       break;
+    }
     case 'material':
       run.pending = { kind: 'material', id: o.id, then };
       break;
@@ -217,4 +220,18 @@ export function rollCardReward(ctx: Ctx, kind: 'normal' | 'elite' | 'boss'): str
     if (partners.length) out[out.length - 1] = r.pick(partners);
   }
   return out;
+}
+
+/** 면 스티커를 무작위 면에 붙인다 (빈 면 우선, 없으면 아무 면을 덮어씀) */
+export function attachFaceRandom(ctx: Ctx, id: string): { dieIdx: number; faceIdx: number; replaced?: string } | null {
+  const run = ctx.run;
+  const all = run.dice.flatMap((d, di) => d.faces.map((f, fi) => ({ di, fi, f })));
+  if (!all.length) return null;
+  const empty = all.filter((x) => !x.f.sticker);
+  const pick = rng(ctx, 'loot').pick(empty.length ? empty : all);
+  const replaced = pick.f.sticker;
+  pick.f.sticker = id;
+  run.flags['seen_face_' + id] = 1;
+  toast(ctx, `${FACE_BY_ID[id].emoji} ${FACE_BY_ID[id].name} 면 → ${pick.di + 1}번 주사위 ${pick.f.pip} 면`, 'good');
+  return { dieIdx: pick.di, faceIdx: pick.fi, replaced };
 }

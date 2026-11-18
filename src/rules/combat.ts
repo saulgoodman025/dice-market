@@ -158,7 +158,7 @@ export function startTurn(ctx: Ctx) {
   cb.turnCounters = {};
   // 카드 뽑기
   const mini = m.minimalist && run.deck.length <= 12 ? 1 : 0;
-  drawCards(ctx, BALANCE.drawPerTurn + m.drawPerTurn + mini + (cb.turn === 1 ? m.firstTurnDraw : 0));
+  drawCards(ctx, BALANCE.drawPerTurn + m.drawPerTurn + mini + (cb.turn === 1 ? m.firstTurnDraw : 0), 'turn');
   const curseRr = cb.cards.reduce((s2, c) => s2 + (CARD_BY_ID[c.id]?.inHandRerolls ?? 0), 0);
   cb.rerollsLeft = Math.max(0, baseRerolls(ctx) - cb.next.rerollPenalty + curseRr);
   cb.next.rerollPenalty = 0;
@@ -504,6 +504,12 @@ export function confirmHand(ctx: Ctx) {
   refreshIntents(ctx);
 }
 
+/** 이번 턴 족보 드로우를 받을 수 있는가 (손패 바 미리보기용) */
+export function handDrawPending(ctx: Ctx, id: HandResult['id']): boolean {
+  const cb = cbOf(ctx);
+  return !cb.turnCounters.handDraw && HAND_BY_ID[id].rank >= (getMods(ctx.run).handDrawMin ? 1 : 2);
+}
+
 /** 족보가 투 페어(완화 시 원 페어) 이상이면 카드 1장 (턴당 1회) */
 function handDraw(ctx: Ctx) {
   const cb = cbOf(ctx);
@@ -511,7 +517,7 @@ function handDraw(ctx: Ctx) {
   const min = getMods(ctx.run).handDrawMin ? 1 : 2;
   if (HAND_BY_ID[cb.handResult.id].rank >= min) {
     cb.turnCounters.handDraw = 1;
-    drawCards(ctx, 1);
+    if (drawCards(ctx, 1, 'hand').length) toast(ctx, `🃏 ${HAND_BY_ID[cb.handResult.id].name} 보너스: 카드 +1`, 'good');
   }
 }
 

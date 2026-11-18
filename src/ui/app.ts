@@ -3,7 +3,7 @@ import { clearRun, hasStaleRun, loadMeta, loadRun, loadSettings, saveMeta, saveR
 import type { GameEvent, RunState } from '../core/state';
 import type { Ctx } from '../rules/ctx';
 import { finishCombat, newRun, SAVE_VERSION, updateFlow } from '../rules/run';
-import { previewCard } from '../rules/combat';
+import { previewCard, previewHand } from '../rules/combat';
 import { settleRun, type SettleResult } from '../rules/meta';
 import { dailySetup, todayKey } from '../rules/daily';
 import { sfx, setSound, setTempo } from '../audio/sfx';
@@ -65,6 +65,7 @@ export interface Ui {
   /** 연출 중에는 결과가 반영되기 전 숫자를 보여준다 (결과 미리 노출 방지) */
   freeze: { gold: number; chips: number; hp: number } | null;
   tut: number;
+  tutMax: number; // 튜토리얼에서 가장 멀리 간 단계
 }
 
 export class App {
@@ -81,7 +82,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, tableSel: 'classic', achTab: 'ach', scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, rewardSel: null, freeze: null, pickCard: [], upBranch: null, deckSort: 'tag', cardSel: null,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, rewardSel: null, freeze: null, tutMax: 1, pickCard: [], upBranch: null, deckSort: 'tag', cardSel: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
@@ -362,6 +363,7 @@ export class App {
     this.veil = phase;
     if (!opts.noRender) this.render();
     const dur = this.playFx(events, phase ? opts.enemyPhase!.hp0 : null, phase ? opts.enemyPhase!.blk0 : 0);
+    this.checkYahtzeeRoll(events, phase ? dur : 0);
     if (phase && !run?.combat?.result) {
       this.ui.busy = true;
       setTimeout(() => { this.ui.busy = false; if (coachActive(this)) this.render(); }, dur / this.settings.speed);
@@ -627,7 +629,7 @@ export class App {
         case 'gold': at(delay, () => { floatAt(this.el('.st-gold'), `${e.amount > 0 ? '+' : ''}${e.amount}G`, '#f5c542', 16); if (e.amount > 0) sfx.coin(); }); break;
         case 'chips': at(delay, () => { floatAt(this.el('.st-chips'), `${e.amount > 0 ? '+' : ''}${e.amount}🎰`, '#ff9de2', 15); sfx.chip(); }); break;
         case 'hand': at(delay + 650, () => this.handBanner(e.hand.id, e.hand.mult)); break;
-        case 'yahtzee': at(delay + 700, () => this.yahtzeeFx()); break;
+        case 'yahtzee': if (this.yahtzeeKey !== this.turnKey()) { this.yahtzeeKey = this.turnKey(); at(delay + 700, () => this.yahtzeeFx()); } break;
         case 'heat': if (e.heat >= BALANCE.heatMax) at(delay, () => this.toast('🔥 온 파이어! 다음 굴림 주사위 1개 = 6', 'gold')); break;
         case 'jackpotFull': at(delay + 300, () => { sfx.jackpot(); this.toast('💰 잭팟 100%! 다음 턴은 잭팟 턴', 'gold'); vibrate([60, 40, 60]); }); break;
         case 'enemyDie': {
@@ -662,7 +664,13 @@ export class App {
           break;
         }
         case 'toast': { const tx = e.text; const tone = e.tone; at(delay, () => this.toast(tx, tone)); break; }
-        case 'draw': at(delay, () => { sfx.tick(); this.retrigger(this.el('.hand'), 'drew'); }); break;
+        case 'draw': {
+          const uids = e.uids ?? [];
+          const src = e.src ?? 'card';
+          at(delay, () => this.drawFx(uids, src));
+          if (src !== 'turn') delay += 120;
+          break;
+        }
         case 'combo': { const id = e.id; at(delay + 200, () => this.comboFx(id)); delay += 400; break; }
         case 'tierUp': { const tg = e.tag; const tr = e.tier; at(delay + 100, () => this.tierFx(tg, tr)); break; }
         case 'megaJackpot': at(delay + 400, () => this.megaFx()); break;
@@ -974,6 +982,55 @@ export class App {
     sfx.hand(def.rank);
   }
 
+  /** 야찌 연출을 이번 턴에 이미 보여줬는가 */
+  private yahtzeeKey = '';
+  private turnKey(): string {
+    const r = this.run;
+    return r?.combat ? `${r.seed}:${r.nodesReached}:${r.combat.turn}` : '';
+  }
+
+  /** 카드 뽑기 연출: 뽑을 더미에서 카드 뒷면이 날아와 손패에 꽂히고, 새 카드가 빛난다 */
+  private drawFx(uids: number[], src: 'turn' | 'hand' | 'card') {
+    sfx.tick();
+    const pile = this.el('.pile[data-arg="draw"]');
+    const hand = this.el('.hand');
+    if (!pile || !hand) return;
+    const h = this.root.getBoundingClientRect();
+    const a = pile.getBoundingClientRect();
+    uids.forEach((uid, i) => {
+      const target = this.el(`.scard[data-cuid="${uid}"]`);
+      const b = (target ?? hand).getBoundingClientRect();
+      const d = document.createElement('div');
+      d.className = 'flycard';
+      d.style.left = `${a.left - h.left + a.width / 2}px`;
+      d.style.top = `${a.top - h.top + a.height / 2}px`;
+      d.style.setProperty('--dx', `${b.left + b.width / 2 - a.left - a.width / 2}px`);
+      d.style.setProperty('--dy', `${b.top + b.height / 2 - a.top - a.height / 2}px`);
+      d.style.animationDelay = `${(i * 70) / this.settings.speed}ms`;
+      this.root.appendChild(d);
+      setTimeout(() => d.remove(), (480 + i * 70) / this.settings.speed);
+      if (target) {
+        target.classList.remove('drawn');
+        setTimeout(() => { target.classList.add('drawn'); setTimeout(() => target.classList.remove('drawn'), 900); }, (380 + i * 70) / this.settings.speed);
+      }
+    });
+    if (src !== 'turn') {
+      floatAt(hand, `🂠 +${uids.length}장`, '#cfe7ff', 18);
+      this.retrigger(pile, 'pop');
+      vibrate(15);
+    }
+  }
+
+  /** 굴린 직후 야찌면 바로 연출 (족보 확정을 기다리지 않는다) */
+  private checkYahtzeeRoll(events: GameEvent[], delay: number) {
+    const cb = this.run?.combat;
+    if (!cb || cb.phase !== 'roll' || cb.result || !events.some((e) => e.t === 'roll')) return;
+    if (this.yahtzeeKey === this.turnKey()) return;
+    if (previewHand(this.ctx).id !== 'yahtzee') return;
+    this.yahtzeeKey = this.turnKey();
+    setTimeout(() => { shake(this.root, 12); this.yahtzeeFx(); this.render(); }, (delay + 650) / this.settings.speed);
+  }
+
   yahtzeeFx() {
     const black = document.createElement('div');
     black.className = 'blackout';
@@ -985,6 +1042,7 @@ export class App {
       fs.innerHTML = `<div class="row">${[1, 2, 3, 4, 5].map(() => `<div class="die golden">${pipsHtml(this.run?.combat?.hand[0]?.pip ?? 6)}</div>`).join('')}</div><div class="big">YAHTZEE!</div><div class="gold">×7.0 · 열기 +5 · 잭팟 +50%</div>`;
       this.root.appendChild(fs);
       sfx.yahtzee();
+      shake(this.root, 14);
       vibrate([80, 50, 80, 50, 200]);
       this.flash('gold');
       coinRain(50);

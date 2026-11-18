@@ -60,15 +60,21 @@ export function handleAction(app: App, act: string, arg: string) {
     }
     case 'speed': app.settings.speed = app.settings.speed === 1 ? 2 : 1; app.applySettings(); break;
     case 'modal': ui.modal = arg as typeof ui.modal; break;
+    case 'enemyInfo': {
+      const el = app.view.querySelector<HTMLElement>(`[data-act="enemyInfo"][data-arg="${arg}"]`);
+      if (el) app.tipAt(el);
+      return;
+    }
     case 'relicInfo': {
       const el = app.view.querySelector<HTMLElement>(`[data-act="relicInfo"][data-arg="${arg}"]`);
       if (el) app.tipAt(el);
       return;
     }
     case 'helpTab': ui.helpTab = arg as typeof ui.helpTab; break;
-    case 'tutOpen': ui.tut = 1; ui.modal = null; break;
-    case 'tutNext': ui.tut = ui.tut >= TUT_STEPS ? 0 : ui.tut + 1; if (ui.tut === 0) finishTutorial(app); break;
-    case 'tutSkip': ui.tut = 0; finishTutorial(app); break;
+    case 'tutOpen': ui.tut = 1; ui.tutMax = 1; ui.modal = null; break;
+    case 'tutNext': ui.tut = ui.tut >= TUT_STEPS ? 0 : ui.tut + 1; ui.tutMax = Math.max(ui.tutMax, ui.tut); if (ui.tut === 0) { finishTutorial(app); ui.tutMax = 1; } break;
+    case 'tutPrev': ui.tut = Math.max(1, ui.tut - 1); break;
+    case 'tutSkip': ui.tut = 0; ui.tutMax = 1; finishTutorial(app); app.toast('튜토리얼을 닫았습니다 · 오른쪽 위 ? 로 다시 볼 수 있어요', 'info'); break;
     case 'closeModal': ui.modal = null; ui.scratch = null; ui.mystery = null; break;
     case 'quit': ui.modal = 'quit'; break;
     case 'abandon':
@@ -263,7 +269,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
     // ── 증강 ──
     case 'augPick': pickAugment(ctx, n); ui.rewardSel = null; break;
     case 'augSel': ui.rewardSel = n; app.render(); return;
-    case 'augReroll': if (!rerollAugment(ctx, n)) app.toast('리롤이 남지 않았다', 'bad'); ui.rewardSel = null; break;
+    case 'augReroll': if (!rerollAugment(ctx, n)) app.toast('이 자리는 이미 리롤했다', 'bad'); ui.rewardSel = null; break;
     case 'prismRoll': {
       const r = prismRoulette(ctx);
       if (r === null) { app.toast('칩이 부족하다', 'bad'); return; }

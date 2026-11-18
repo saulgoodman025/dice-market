@@ -4,7 +4,7 @@ import type { NodeType, Rarity } from '../core/state';
 export const BALANCE = {
   baseRerolls: 2,
   lockLimit: 2, // 동시에 잠글 수 있는 주사위
-  chipCarryMax: 3, // 다음 턴으로 넘길 수 있는 족보 칩
+  chipCarryMax: 1, // 다음 턴으로 넘길 수 있는 족보 칩
   weakMult: 1.75,
   vulnMult: 1.5, // 취약: 받는 피해 ×1.5
   frailMult: 0.75, // 약화: 주는 피해 ×0.75
@@ -68,8 +68,8 @@ export const BALANCE = {
   casinoEnterChips: 2,
 
   // 적 체력 막 보정 (적 데이터 자체가 막별로 다름. 여기선 전역 배율)
-  enemyHpMult: 1.6,
-  enemyAtkMult: 1.9, // 덱빌딩 업데이트로 방어·드로우가 늘어 적 공격도 올림
+  enemyHpMult: 1.35,
+  enemyAtkMult: 1.6, // 덱빌딩 업데이트로 방어·드로우가 늘어 적 공격도 올림
   bossHealOnWin: 0.25,
 };
 

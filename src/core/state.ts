@@ -224,6 +224,7 @@ export interface CasinoState {
 /** 대기 중인 선택(면 스티커 붙이기, 재질, 스킬 교체 등) */
 export type PendingApply =
   | { kind: 'face'; id: string; then: Screen }
+  | { kind: 'faceShow'; id: string; dieIdx: number; faceIdx: number; replaced?: string; then: Screen }
   | { kind: 'material'; id: string; then: Screen }
   | { kind: 'upgradeCard'; then: Screen }
   | { kind: 'removeCard'; then: Screen; count: number; cost?: number; hpCost?: number; shredder?: boolean }
@@ -319,6 +320,6 @@ export type GameEvent =
   | { t: 'megaJackpot' }
   | { t: 'enemyAct'; uid: number }
   | { t: 'chanceRoll'; kind: 'die' | 'roulette'; result: number; win: boolean; label: string }
-  | { t: 'draw'; n: number }
+  | { t: 'draw'; n: number; uids?: number[]; src?: 'turn' | 'hand' | 'card' }
   | { t: 'combo'; id: string }
   | { t: 'tierUp'; tag: string; tier: number };

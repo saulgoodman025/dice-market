@@ -181,6 +181,31 @@ export const ENEMIES: EnemyDef[] = [
 
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e])) as Record<string, EnemyDef>;
 
+/** 전투 화면에 항상 보이는 특수 능력 이름표 (탭하면 desc 전체 설명) */
+export const ENEMY_TRAIT: Record<string, string> = {
+  chiprat: '🎰 처치 시 칩',
+  oddhater: '🚫 홀수 무효',
+  evenhater: '🚫 짝수 무효',
+  twins: '😡 분노',
+  auditor: '📋 약한 족보 절반',
+  mitosis: '🧬 분열',
+  hydra: '🧬 분열',
+  goldslime: '🧬 분열 · 🪙',
+  warden: '🚫 면역 눈',
+  mirrorknight: '🚫 면역 눈',
+  vaultkeeper: '🔐 저금통 동결',
+  jester: '🎁 처치 시 소모품',
+  enforcer: '⏳ 충전 (10↑로 취소)',
+  pitguard: '🛡 방어 시 홀수 절반',
+  pitboss: '🎩 하우스 룰',
+  roulettequeen: '🎡 홀/짝만 피해',
+  thehouse: '🏛️ 족보 반격',
+  mime: '🪞 따라 하기',
+  medic: '🩺 치료',
+  sealer: '⛓️ 주사위 봉인',
+  banker: '🏦 칩 세금',
+};
+
 export const JESTER_POOL: IntentSpec[] = [
   { k: 'attack', n: 15 }, { k: 'block', n: 12 }, { k: 'debuff' }, { k: 'multi', n: 5, hits: 3 }, { k: 'buff' },
 ];
