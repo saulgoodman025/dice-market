@@ -1,5 +1,5 @@
 import type { Ctx } from '../src/rules/ctx';
-import { autoPick, endTurn, freeDice, reroll, skillUsable, toggleLock, useSkill } from '../src/rules/combat';
+import { endTurn, freeDice, lockLimit, previewSkill, reroll, skillUsable, toggleLock, useSkill } from '../src/rules/combat';
 import { RARITIES, type HandDie, type RewardOption } from '../src/core/state';
 import { SKILL_BY_ID, type Cond } from '../src/data/skills';
 import { FACE_BY_ID } from '../src/data/faces';
@@ -66,8 +66,11 @@ function rollPhase(ctx: Ctx, r: BotRng) {
     const noRerollScore = expectedScore(free, free.length, r, 0);
     let bestKeep: HandDie[] | null = null;
     let bestScore = noRerollScore * 1.03;
-    for (const k of cands) {
-      const keep = [...new Set([...k, ...fixedLocked])];
+    const limit = lockLimit(ctx);
+    for (const k0 of cands) {
+      // 잠금 제한: 높은 눈 위주로 limit개까지만 지킨다
+      const k = [...k0].sort((a, b) => b.pip - a.pip).slice(0, limit);
+      const keep = [...new Set([...k, ...fixedLocked])].slice(0, Math.max(limit, fixedLocked.length));
       if (keep.length === free.length) continue;
       const sc = expectedScore(keep, free.length, r, cb.rerollsLeft);
       if (sc > bestScore) { bestScore = sc; bestKeep = keep; }
@@ -95,56 +98,31 @@ function incoming(ctx: Ctx): number {
 function placePhase(ctx: Ctx) {
   const run = ctx.run;
   const cb = run.combat!;
-  const slots = run.skills.map((s, i) => ({ i, def: SKILL_BY_ID[s.id] })).sort((a, b) => condRank(a.def.cond) - condRank(b.def.cond));
-  const use = (i: number, keys: number[]) => {
-    const def = SKILL_BY_ID[run.skills[i].id];
-    let choice;
-    if (def.needsChoice) {
-      const other = freeDice(cb).filter((h) => !keys.includes(h.key)).sort((a, b) => a.pip - b.pip)[0];
-      if (other) choice = { key: other.key, value: 6 };
+  // 칩이 남아 있는 동안: 실제 예상 결과가 가장 이득인 카드부터 쓴다
+  for (let guard = 0; guard < 8 && !cb.result; guard++) {
+    const need = Math.max(0, incoming(ctx) - cb.block - cb.keepBlock);
+    const lowHp = run.hp <= run.maxHp * 0.45;
+    let best: { i: number; keys: number[]; v: number } | null = null;
+    for (let i = 0; i < run.skills.length; i++) {
+      if (!skillUsable(ctx, i)) continue;
+      const def = SKILL_BY_ID[run.skills[i].id];
+      // 약점 눈을 우선 사용
+      const tgt = cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? cb.enemies.find((e) => e.hp > 0);
+      const weakKeys = tgt ? freeDice(cb).filter((h) => h.pip === tgt.weakPip).map((h) => h.key) : [];
+      const pv = previewSkill(ctx, i, def.role === 'atk' ? weakKeys : []);
+      if (!pv.keys) continue;
+      const enemyHp = cb.enemies.reduce((s2, e) => s2 + Math.max(0, e.hp), 0);
+      let v = Math.min(pv.dmg, enemyHp) * 1.0
+        + Math.min(pv.block, need) * (lowHp ? 1.4 : 1.0) + Math.max(0, pv.block - need) * 0.15
+        + pv.heal * (lowHp ? 1.0 : 0.4) + pv.gold * 0.3 + pv.piggy * 0.2;
+      if (pv.chance) v = 30 / 6 + 2; // 운 스킬: 기대값
+      if (def.role === 'util') v = 0; // 유틸은 봇이 다루지 않음
+      if (def.cond.k === 'all' && freeDice(cb).reduce((s2, h) => s2 + h.pip, 0) < 15) v = 0;
+      v = v / Math.max(0.6, def.cost + pv.keys.length * 0.35); // 칩·주사위 대비 효율
+      if (!best || v > best.v) best = { i, keys: pv.keys, v };
     }
-    useSkill(ctx, i, keys, choice);
-  };
-  // 1) 다중 주사위 / 강력 조건 스킬
-  for (const { i, def } of slots) {
-    if (cb.result) return;
-    if (!['same', 'seq', 'sumPair', 'sumMin', 'exact'].includes(def.cond.k) || !skillUsable(ctx, i)) continue;
-    const k = autoPick(ctx, i);
-    if (k) use(i, k);
-  }
-  // 2) 방어
-  const need = incoming(ctx) - cb.block - cb.keepBlock;
-  const lowHp = run.hp <= run.maxHp * 0.5;
-  if (need > 3 && (lowHp || need >= 8)) {
-    for (const { i, def } of slots) {
-      if (cb.result) return;
-      if (def.role !== 'def' || !skillUsable(ctx, i) || def.perCombat) continue;
-      const k = autoPick(ctx, i);
-      if (k) use(i, k);
-    }
-  }
-  // 3) 공격 / 유틸(무작위 사용 금지 대상 제외)
-  for (const { i, def } of slots) {
-    if (cb.result) return;
-    if (def.role !== 'atk' || !skillUsable(ctx, i) || def.cond.k === 'all') continue;
-    const k = autoPick(ctx, i);
-    if (k) use(i, k);
-  }
-  // 4) 경제 / 회복
-  for (const { i, def } of slots) {
-    if (cb.result) return;
-    if (!skillUsable(ctx, i)) continue;
-    if (def.role === 'eco' || (def.role === 'def' && def.perCombat && run.hp < run.maxHp * 0.7)) {
-      const k = autoPick(ctx, i);
-      if (k) use(i, k);
-    }
-  }
-  // 5) 올인 (남은 합이 15 이상일 때만)
-  for (const { i, def } of slots) {
-    if (cb.result) return;
-    if (def.cond.k !== 'all' || !skillUsable(ctx, i)) continue;
-    const free = freeDice(cb);
-    if (free.reduce((s, h) => s + h.pip, 0) >= 15) { const k = autoPick(ctx, i); if (k) use(i, k); }
+    if (!best || best.v <= 0.5) break;
+    useSkill(ctx, best.i, best.keys);
   }
 }
 

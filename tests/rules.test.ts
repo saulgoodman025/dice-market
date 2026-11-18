@@ -145,3 +145,59 @@ describe('막 전체 지도 (갈림길)', () => {
     }
   });
 });
+
+describe('족보 칩 · 잠금 제한 · 약점 눈', () => {
+  it('한 번에 2개까지만 잠근다 (사기꾼은 3개)', () => {
+    const { run, ctx } = mk(21, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    cb.hand.forEach((h) => { h.material = 'wood'; });
+    cb.hand.slice(0, 4).forEach((h) => toggleLock(ctx, h.key));
+    expect(cb.hand.filter((h) => h.locked).length).toBe(2);
+    const s = mk(21, 'sharp');
+    startCombat(s.ctx, 'normal', ['golem']);
+    s.run.combat!.hand.forEach((h) => { h.material = 'wood'; });
+    s.run.combat!.hand.slice(0, 4).forEach((h) => toggleLock(s.ctx, h.key));
+    expect(s.run.combat!.hand.filter((h) => h.locked).length).toBe(3);
+  });
+
+  it('칩이 부족하면 카드를 못 쓰고, 쓰면 비용만큼 줄어든다', () => {
+    const { run, ctx } = mk(22, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    cb.hand.forEach((h, i) => { h.pip = [1, 2, 4, 5, 6][i]; h.sticker = undefined; h.material = 'wood'; });
+    confirmHand(ctx); // 노 핸드 → 칩 2
+    expect(cb.handChips).toBe(2);
+    expect(useSkill(ctx, 0, [cb.hand[0].key])).toBe(true); // 베기 (1)
+    expect(cb.handChips).toBe(1);
+    cb.handChips = 0;
+    expect(useSkill(ctx, 1, [cb.hand[1].key])).toBe(false); // 방패 (1) 불가
+  });
+
+  it('남은 칩은 3개까지만 다음 턴으로 넘어간다', () => {
+    const { run, ctx } = mk(23, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    cb.enemies[0].hp = 9999;
+    confirmHand(ctx);
+    cb.handChips = 7;
+    endTurn(ctx);
+    expect(cb.handChips).toBeLessThanOrEqual(3);
+  });
+
+  it('약점 눈으로 공격하면 피해 1.75배', () => {
+    const { run, ctx } = mk(24, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    const e = cb.enemies[0];
+    e.hp = e.maxHp = 999; e.block = 0;
+    cb.hand.forEach((h, i) => { h.pip = [2, 3, 4, 5, 6][i]; h.sticker = undefined; h.material = 'wood'; });
+    confirmHand(ctx);
+    const mult = cb.handResult!.mult;
+    run.heat = 0; // 열기 보너스 제외
+    e.weakPip = 4;
+    const hp0 = e.hp;
+    useSkill(ctx, 0, [cb.hand[2].key]); // 베기 4
+    expect(hp0 - e.hp).toBe(Math.round(Math.round(4 * mult) * 1.75));
+  });
+});

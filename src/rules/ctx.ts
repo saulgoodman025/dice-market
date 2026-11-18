@@ -12,6 +12,8 @@ export const rng = (ctx: Ctx, s: Stream) => new Rng(ctx.run.rng as unknown as Re
 
 export interface Mods {
   rerolls: number;
+  lockLimit: number;
+  handChips: number;
   handAll: number;
   handAdd: Partial<Record<HandId, number>>;
   smallLadder: number;
@@ -56,7 +58,7 @@ export interface Mods {
 }
 
 export const ZERO_MODS = (): Mods => ({
-  rerolls: 0, handAll: 0, handAdd: {}, smallLadder: 0, interestCap: 0, interestUnit: 0,
+  rerolls: 0, lockLimit: 0, handChips: 0, handAll: 0, handAdd: {}, smallLadder: 0, interestCap: 0, interestUnit: 0,
   piggyPct: 0, shopDiscount: 0, shopSlots: 0, shopPricePct: 0, donMaxStreak: 0, donMinDelta: 0,
   donFirstFailKeep: 0, slotPairMult: 0, slotSevenWeight: 0, rouletteZeroWeight: 0, payoutEv: 0,
   haggleKeepOnOne: 0, haggleCount: 0, highrollerTier: 0, casinoChips: 0, scratchCols: 0,

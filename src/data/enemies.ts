@@ -48,7 +48,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   { id: 'dicethief', name: '주사위 도둑', emoji: '🦝', hp: 45, act: 1, tier: 'elite', pattern: [{ k: 'stealDie' }, { k: 'attack', n: 9 }], desc: '훔치기: 다음 턴 가장 높은 주사위 1개를 빼앗음' },
   {
-    id: 'pitboss', name: '피트 보스', emoji: '🎩', hp: 128, act: 1, tier: 'boss', pattern: [{ k: 'attackRange', n: 10, n2: 14 }],
+    id: 'pitboss', name: '피트 보스', emoji: '🎩', hp: 140, act: 1, tier: 'boss', pattern: [{ k: 'attackRange', n: 10, n2: 14 }],
     desc: '체력 50% 이하: 매 턴 하우스 룰 1개 적용 (턴 시작 시 공개)',
     onTurnStart: (ctx, e) => {
       const cb = ctx.run.combat!;

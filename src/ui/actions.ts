@@ -4,7 +4,7 @@ import { clearRun, saveMeta } from '../core/save';
 import { CONSUMABLE_BY_ID } from '../data/consumables';
 import { SKILL_BY_ID, condText } from '../data/skills';
 import {
-  autoPick, canUse, confirmHand, endTurn, nudgeDie, reroll, setDieValue, setTarget, toggleLock, useConsumable, useSkill,
+  autoPick, canUse, chipsAvailable, confirmHand, endTurn, nudgeDie, reroll, setDieValue, setTarget, toggleLock, useConsumable, useSkill,
 } from '../rules/combat';
 import {
   applyFace, applyMaterial, buyChip, cancelPending, casinoHighroller, collectRewardGold, enterNode, eventChoose, leaveCasino,
@@ -303,7 +303,8 @@ export function cardPlayable(app: App, slot: number, explain: boolean): boolean 
   const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : app.ui.sel;
   const ok = canUse(app.ctx, slot, sel) || !!autoPick(app.ctx, slot, sel);
   if (!ok && explain) {
-    app.toast(cb.usedSlots[slot] ? '이번 턴에 이미 쓴 카드' : `이 카드는 ${condText(def.cond)} 주사위가 필요하다`, 'bad');
+    const short = def.cost > chipsAvailable(app.ctx);
+    app.toast(cb.usedSlots[slot] ? '이번 턴에 이미 쓴 카드' : short ? `🔶 족보 칩이 부족하다 (필요 ${def.cost}, 보유 ${chipsAvailable(app.ctx)})` : `이 카드는 ${condText(def.cond)} 주사위가 필요하다`, 'bad');
     sfx.bad();
     vibrate(20);
   }

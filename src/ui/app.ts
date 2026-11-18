@@ -472,7 +472,8 @@ export class App {
                 if (e.crit) { shake(this.root, 8); hitstop(this.root, 100); sfx.crit(); vibrate(40); }
                 else { shake(el, 4); hitstop(this.root, 50); sfx.hit(false); }
               }
-              if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
+              if (e.weakHit) { floatAt(el, '약점!', '#f2b544', 18); this.retrigger(el?.querySelector('.weakpip') ?? null, 'pop'); }
+              else if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
             } else if (e.blocked) {
               this.enemyShield(el);
               floatAt(el, `🛡 ${e.blocked} 막힘`, '#8cc6ff', 18);

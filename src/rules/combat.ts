@@ -21,7 +21,7 @@ export function makeEnemy(ctx: Ctx, id: string, hpMult: number, patternOffset = 
   const e: Enemy = {
     uid: ctx.run.nextUid++, id, name: def.name, emoji: def.emoji, hp, maxHp: hp, block: 0,
     patternIdx: patternOffset % def.pattern.length, intent: { k: 'attack', label: '', icon: '' },
-    poison: 0, weak: 0, nextMult: 1, stacks: 0, charge: 0, phase: 1, splitDone: false, enraged: false,
+    poison: 0, weak: 0, nextMult: 1, stacks: 0, charge: 0, phase: 1, splitDone: false, enraged: false, weakPip: 1,
   };
   return e;
 }
@@ -40,7 +40,7 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
   }
   const cb: CombatState = {
     kind, enemies, hand: [], phase: 'roll', turn: 0, rerollsLeft: 0, block: 0, keepBlock: 0, thorns: 0,
-    piggy: 0, piggyMult: 1, handResult: null, usedSlots: [], target: enemies[0].uid, diceUsedThisTurn: 0,
+    piggy: 0, piggyMult: 1, handChips: 0, handResult: null, usedSlots: [], target: enemies[0].uid, diceUsedThisTurn: 0,
     lastSkill: null, doubledown: 0, counters: {}, turnCounters: {},
     next: { six: 0, one: 0, rerollPenalty: 0, flip: false, stealDie: false, preview: [] },
     jackpotTurn: false, houseRule: null, queenParity: null, lastSkillDamage: 0, dmgTaken: 0, result: null,
@@ -158,6 +158,7 @@ export function startTurn(ctx: Ctx) {
   }
   if (cb.turn === 1 && m.firstTurnBlock) gainBlock(ctx, m.firstTurnBlock);
   fire(ctx, 'onTurnStart');
+  for (const e of alive(cb)) e.weakPip = rng(ctx, 'combat').int(1, 6);
   for (const e of alive(cb)) ENEMY_BY_ID[e.id].onTurnStart?.(ctx, e);
   if (cb.houseRule === 'oneReroll') cb.rerollsLeft = Math.min(cb.rerollsLeft, 1);
   if (cb.result) return;
@@ -249,7 +250,31 @@ export function toggleLock(ctx: Ctx, key: number) {
   if (!hd || hd.used) return;
   if (cb.houseRule === 'noLock' && cb.phase === 'roll') return;
   if (MATERIAL_BY_ID[hd.material].noReroll) return;
+  if (!hd.locked && cb.phase === 'roll' && lockedCount(cb) >= lockLimit(ctx)) {
+    toast(ctx, `🔒 한 번에 ${lockLimit(ctx)}개까지만 잠글 수 있다`, 'bad');
+    return;
+  }
   hd.locked = !hd.locked;
+}
+
+export function lockLimit(ctx: Ctx): number {
+  return Math.max(1, BALANCE.lockLimit + getMods(ctx.run).lockLimit);
+}
+
+/** 잠금 수 (리롤 안 되는 재질의 자동 잠금은 세지 않는다) */
+export function lockedCount(cb: CombatState): number {
+  return cb.hand.filter((h) => h.locked && !h.used && !MATERIAL_BY_ID[h.material].noReroll).length;
+}
+
+/** 지금 쓸 수 있는 족보 칩 (아직 족보 확정 전이면 예상 족보의 칩까지 포함) */
+export function chipsAvailable(ctx: Ctx): number {
+  const cb = cbOf(ctx);
+  if (cb.phase === 'roll' && !cb.turnCounters.confirmed) return cb.handChips + handChipsFor(ctx, previewHand(ctx).id);
+  return cb.handChips;
+}
+
+export function handChipsFor(ctx: Ctx, id: HandResult['id']): number {
+  return HAND_BY_ID[id].chips + getMods(ctx.run).handChips;
 }
 
 export function canReroll(ctx: Ctx): boolean {
@@ -338,6 +363,7 @@ export function confirmHand(ctx: Ctx) {
     return;
   }
   cb.turnCounters.confirmed = 1;
+  cb.handChips += handChipsFor(ctx, hand.id);
   if (hand.heat < 0) resetHeat(ctx);
   else addHeat(ctx, hand.heat);
   if (hand.jackpot) addJackpot(ctx, hand.jackpot);
@@ -373,6 +399,7 @@ export function skillUsable(ctx: Ctx, slot: number): boolean {
   const def = SKILL_BY_ID[inst.id];
   if (def.perTurn && (cb.turnCounters['sk_' + def.id] ?? 0) >= def.perTurn) return false;
   if (def.perCombat && (cb.counters['sk_' + def.id] ?? 0) >= def.perCombat) return false;
+  if (def.cost > chipsAvailable(ctx)) return false;
   return true;
 }
 
@@ -425,6 +452,7 @@ export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key:
   const dice = keys.map((k) => cb.hand.find((h) => h.key === k)!);
   for (const d of dice) d.used = true;
   cb.usedSlots[slot] = true;
+  cb.handChips = Math.max(0, cb.handChips - def.cost);
   cb.diceUsedThisTurn += dice.length;
   if (def.perTurn) cb.turnCounters['sk_' + def.id] = (cb.turnCounters['sk_' + def.id] ?? 0) + 1;
   if (def.perCombat) cb.counters['sk_' + def.id] = (cb.counters['sk_' + def.id] ?? 0) + 1;
@@ -585,6 +613,7 @@ export function endTurn(ctx: Ctx) {
     }
     cb.piggy = Math.round((cb.piggy + add) * mult);
   }
+  cb.handChips = Math.min(BALANCE.chipCarryMax, cb.handChips);
   if (cb.doubledown) {
     damagePlayer(ctx, cb.doubledown, '더블다운', { ignoreBlock: true });
     cb.doubledown = 0;
@@ -773,6 +802,7 @@ export function skillSample(run: RunState, slot: number, up: number): { pips: nu
     cb.hand.forEach((h, i) => { h.pip = pips[i]; h.sticker = undefined; h.used = false; h.gone = false; h.locked = false; h.golden = false; });
     cb.phase = 'place';
     cb.turnCounters.confirmed = 1;
+    cb.handChips = 99;
     cb.handResult = { id: 'none', name: '', mult: 1, heat: 0, jackpot: 0 };
     const presetBlock = def.sampleBlock ?? 0;
     cb.block = presetBlock;

@@ -15,10 +15,10 @@ interface Step {
 const cb = (app: App) => app.run?.combat ?? null;
 
 export const COACH: Step[] = [
-  { sel: '.enemy:not(.dead)', title: '① 적과 다음 행동', text: '위쪽이 적이다. 머리 위 ⚔ 숫자만큼, 내 턴이 끝나면 공격해 온다.' },
+  { sel: '.enemy:not(.dead)', title: '① 적과 다음 행동', text: '위쪽이 적이다. 머리 위 ⚔ 숫자만큼, 내 턴이 끝나면 공격해 온다. 아래 "약점" 눈이 들어간 주사위로 때리면 피해가 1.75배!' },
   { sel: '.tray', title: '② 주사위', text: '매 턴 주사위가 굴러간다. 이 주사위로 아래 카드를 쓴다.' },
   {
-    sel: '.tray', title: '③ 잠그기', text: '마음에 드는 주사위 하나를 탭해 🔒 잠가 보자. 잠근 주사위는 다시 굴려도 그대로 남는다.',
+    sel: '.tray', title: '③ 잠그기', text: '마음에 드는 주사위 하나를 탭해 🔒 잠가 보자. 잠근 주사위는 다시 굴려도 그대로 남는다. 한 번에 2개까지만 잠글 수 있으니 신중하게!',
     doLabel: '주사위 하나를 탭해 보세요', done: (a) => !!cb(a)?.hand.some((h) => h.locked && !h.used) || (cb(a)?.phase ?? 'roll') !== 'roll',
   },
   {
@@ -26,18 +26,19 @@ export const COACH: Step[] = [
     doLabel: '리롤을 눌러 보세요', done: (a) => { const c = cb(a); return !!c && (c.phase !== 'roll' || c.rerollsLeft < baseRerolls(a.ctx)); },
   },
   { sel: '.handbar', title: '⑤ 족보 = 배율', text: '같은 눈·이어지는 눈을 모으면 족보! 배율만큼 이번 턴의 공격·방어가 모두 세진다. 누르면 족보표가 나온다.' },
+  { sel: '.chipstat', title: '⑥ 족보 칩 🔶', text: '족보가 좋을수록 🔶 칩을 더 받는다. 카드 왼쪽 위 숫자가 그 카드의 칩 비용. 남은 칩은 3개까지 다음 턴으로 넘어간다.' },
   {
-    sel: '.hand', title: '⑥ 공격 카드', text: '🎯 표시 카드를 끌어서 적 위에 놓아 보자. 카드 위 숫자가 예상 피해다. (카드를 탭한 뒤 적을 탭해도 된다)',
+    sel: '.hand', title: '⑦ 공격 카드', text: '🎯 표시 카드를 끌어서 적 위에 놓아 보자. 카드 오른쪽 위 숫자가 예상 피해다. (카드를 탭한 뒤 적을 탭해도 된다)',
     doLabel: '공격 카드를 적에게 끌어다 놓아 보세요',
     done: (a) => { const c = cb(a); return !!c && a.run!.skills.some((s, i) => c.usedSlots[i] && SKILL_BY_ID[s.id].target === 'enemy'); },
   },
-  { sel: '.hand', title: '⑦ 방어 카드', text: '✋ 표시 카드(방패 등)는 테이블 아무 곳에 끌어다 놓으면 쓴다. 적의 공격을 🛡 방어도로 막아 준다.' },
-  { sel: '.tablestats', title: '⑧ 저금통', text: '쓰지 않고 남긴 주사위의 눈은 🐷 저금통에 쌓여, 전투가 끝나면 골드가 된다.' },
+  { sel: '.hand', title: '⑧ 방어 카드', text: '✋ 표시 카드(방패 등)는 테이블 아무 곳에 끌어다 놓으면 쓴다. 적의 공격을 🛡 방어도로 막아 준다.' },
+  { sel: '.tablestats', title: '⑨ 저금통', text: '쓰지 않고 남긴 주사위의 눈은 🐷 저금통에 쌓여, 전투가 끝나면 골드가 된다.' },
   {
-    sel: '[data-act="endTurn"]', title: '⑨ 턴 종료', text: '할 일을 마쳤으면 턴 종료! 더 할 수 있는 게 없으면 이 버튼이 반짝인다.',
+    sel: '[data-act="endTurn"]', title: '⑩ 턴 종료', text: '할 일을 마쳤으면 턴 종료! 더 할 수 있는 게 없으면 이 버튼이 반짝인다.',
     doLabel: '턴 종료를 눌러 보세요', done: (a) => (cb(a)?.turn ?? 1) >= 2,
   },
-  { sel: '.player', title: '⑩ 잘했다!', text: '적의 공격은 🛡 방어도가 먼저 막고, 남은 만큼 ❤ 체력이 준다. 이제 혼자 싸워 보자! (오른쪽 위 ? 로 다시 볼 수 있다)' },
+  { sel: '.player', title: '⑪ 잘했다!', text: '적의 공격은 🛡 방어도가 먼저 막고, 남은 만큼 ❤ 체력이 준다. 이제 혼자 싸워 보자! (오른쪽 위 ? 로 다시 볼 수 있다)' },
 ];
 
 /** 렌더 직후 호출: 현재 단계의 대상 요소를 비추고 말풍선을 붙인다 */

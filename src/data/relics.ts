@@ -70,7 +70,7 @@ export const RELICS: RelicDef[] = [
   }),
   R({ id: 'nudge', name: '손가락 튕기기', emoji: '👆', rarity: 'rare', cat: 'manip', desc: '턴당 1회, 주사위 1개 눈 ±1', mods: { turnNudge: 1 } }),
   R({ id: 'foresight', name: '예지의 눈', emoji: '👁️', rarity: 'rare', cat: 'manip', desc: '다음 턴 첫 굴림 결과 1개를 미리 보여줌', mods: { preview: 1 } }),
-  R({ id: 'locksmith', name: '열쇠공', emoji: '🔑', rarity: 'rare', cat: 'manip', desc: '잠근 주사위가 리롤마다 +1 (최대 6)', mods: { locksmith: 1 } }),
+  R({ id: 'locksmith', name: '열쇠공', emoji: '🔑', rarity: 'rare', cat: 'manip', desc: '잠금 +1개, 잠근 주사위가 리롤마다 +1 (최대 6)', mods: { locksmith: 1, lockLimit: 1 } }),
   R({ id: 'stackdeck', name: '밑장빼기', emoji: '🂠', rarity: 'epic', cat: 'manip', desc: '전투 첫 턴에 주사위 1개를 원하는 눈으로', mods: { stackdeck: 1 } }),
   R({ id: 'tumble', name: '텀블러', emoji: '🥃', rarity: 'epic', cat: 'manip', desc: '리롤 시 잠근 주사위 중 가장 낮은 1개도 함께 굴림 (이전 눈 이하면 되돌림)', mods: { tumble: 1 } }),
   R({ id: 'sixthslot', name: '추가 스킬 칸', emoji: '➕', rarity: 'epic', cat: 'manip', desc: '스킬 칸 +1', hooks: { onAcquire: (c) => { c.run.maxSlots = Math.min(BALANCE.maxSlots, c.run.maxSlots + 1); } } }),

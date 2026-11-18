@@ -7,7 +7,7 @@ import { HAND_BY_ID, HANDS } from '../../data/hands';
 import { CHAR_BY_ID } from '../../data/characters';
 import { CONSUMABLE_BY_ID } from '../../data/consumables';
 import { BALANCE } from '../../data/balance';
-import { hasMoves, previewHand, previewPip, previewSkill, skillUsable } from '../../rules/combat';
+import { chipsAvailable, handChipsFor, hasMoves, lockedCount, lockLimit, previewHand, previewPip, previewSkill, skillUsable } from '../../rules/combat';
 import { dieFace, esc, fmt, handDieHtml, pipsHtml } from '../components/parts';
 import { topbar } from './common';
 import type { Enemy, HandDie } from '../../core/state';
@@ -63,6 +63,7 @@ export function combatScreen(app: App): string {
     return `<div class="enemy ${isT ? 'target' : ''} ${e.hp <= 0 ? 'dead' : ''}" data-uid="${e.uid}" data-act="target" data-arg="${e.uid}" data-tip="${esc(def.name + (def.desc ? ': ' + def.desc : ''))}">
       <div class="intent ${it.cls}">${it.text}</div>
       <div class="em">${e.emoji}</div>
+      <div class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯약점 <b>${e.weakPip}</b></div>
       <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>${e.hp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
     </div>`;
@@ -71,7 +72,7 @@ export function combatScreen(app: App): string {
   // ── 족보 ──
   const hr = cb.handResult ?? (roll ? previewHand(ctx) : null);
   const handbar = hr ? `<button class="handbar ${hr.id === 'none' ? 'nohand' : ''}" data-act="modal" data-arg="hands">
-      <span class="hname">${hr.name}</span><span class="hmult">×${hr.mult.toFixed(1)}</span><span class="hq">?</span>
+      <span class="hname">${hr.name}</span><span class="hmult">×${hr.mult.toFixed(1)}</span><span class="hchip">🔶${handChipsFor(ctx, hr.id)}</span><span class="hq">?</span>
     </button>` : '<div class="handbar"></div>';
 
   const rules = cb.houseRule ? esc(HOUSE_RULES[cb.houseRule].replace('하우스 룰: ', '🎩 ')) : cb.queenParity ? `👸 이번 턴 ${cb.queenParity === 'odd' ? '홀수' : '짝수'} 눈만 피해` : '';
@@ -87,6 +88,9 @@ export function combatScreen(app: App): string {
   const infoDie = cb.hand.find((h) => h.key === ui.infoKey && (!h.used || h.gone));
   const info = infoDie ? dieInfo(infoDie, cb.brokenDice.includes(infoDie.dieIdx)) : '';
 
+  const chipsNow = chipsAvailable(ctx);
+  const chips = cb.handChips;
+  const chipGain = roll && !cb.turnCounters.confirmed ? handChipsFor(ctx, previewHand(ctx).id) : 0;
   // ── 스킬 카드 손패 (예상 효과 숫자) ──
   const n = run.skills.length;
   const cards = run.skills.map((s, i) => {
@@ -108,7 +112,7 @@ export function combatScreen(app: App): string {
     const rot = (i - mid) * (n > 4 ? 4 : 3);
     const lift = Math.abs(i - mid) * (n > 4 ? 3 : 2.5);
     return `<div class="scard r-${def.rarity} ${state} ${ui.selCard === i ? 'chosen' : ''}" data-card="${i}" data-act="cardTap" data-arg="${i}" style="--rot:${rot}deg;--lift:${lift}px;z-index:${10 + i}" data-tip="${esc(def.name + ' — ' + condText(def.cond) + ' 주사위: ' + fmt(def.desc, def.v) + (def.target === 'enemy' ? ' (적에게 끌어다 놓기)' : ' (테이블에 끌어다 놓기)'))}">
-      <span class="ccond">${esc(condText(def.cond))}</span>${badge}
+      <span class="ccost ${def.cost > chipsNow ? 'short' : ''}">${def.cost}</span><span class="ccond">${esc(condText(def.cond))}</span>${badge}
       <div class="cart">${def.icon}</div>
       <div class="cname">${esc(def.name)}${s.up ? `<span class="green">+</span>` : ''}</div>
       <div class="cdesc">${cb.usedSlots[i] ? '사용함' : esc(fmt(def.desc, def.v))}</div>
@@ -141,7 +145,11 @@ export function combatScreen(app: App): string {
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}
       <div class="tray ${app.veil ? 'veiled' : ''} ${cb.turnCounters.yahtzee && !app.veil ? 'yahtzee' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>
-      <div class="tablestats"><span data-tip="리롤: 잠그지 않은 주사위를 다시 굴림">🎲 리롤 <b>${roll ? cb.rerollsLeft : 0}</b></span><span data-tip="안 쓴 주사위 눈이 모여 전투 후 골드가 된다">🐷 <b>${cb.piggy}</b></span>${tools}</div>
+      <div class="tablestats">
+        <span data-tip="리롤: 잠그지 않은 주사위를 다시 굴림">🎲 <b>${roll ? cb.rerollsLeft : 0}</b></span>
+        <span data-tip="잠금: 한 번에 잠글 수 있는 주사위 수">🔒 <b>${roll ? lockedCount(cb) : 0}/${lockLimit(ctx)}</b></span>
+        <span class="chipstat" data-tip="🔶 족보 칩: 족보를 확정하면 받는다. 카드마다 칩을 쓴다. 남은 칩은 ${BALANCE.chipCarryMax}개까지 다음 턴으로">🔶 <b>${chips}</b>${chipGain ? `<span class="cg">+${chipGain}</span>` : ''}</span>
+        <span data-tip="안 쓴 주사위 눈이 모여 전투 후 골드가 된다">🐷 <b>${cb.piggy}</b></span>${tools}</div>
     </div>
     <div class="player">
       <span class="pav" data-tip="${esc(ch.name + ': ' + ch.desc)}">${ch.emoji}</span>
@@ -167,11 +175,11 @@ export function handsModal(app: App): string {
   let body = '';
   if (tab === 'hands') {
     const cur = cb ? (cb.handResult ?? (cb.phase === 'roll' ? previewHand(app.ctx) : null)) : null;
-    body = `<div class="small muted">주사위 5개로 만든 족보 하나가 이번 턴 <b>모든 공격·방어·골드</b>에 배율로 곱해진다. 높은 족보가 나오면 🔥열기도 오른다.</div>
+    body = `<div class="small muted">족보는 이번 턴 <b>모든 공격·방어·골드</b>에 배율(×)로 곱해지고, 카드를 쓰는 데 필요한 <b>🔶 족보 칩</b>을 준다. 남은 칩은 ${BALANCE.chipCarryMax}개까지 다음 턴으로 넘어간다.</div>
     <div class="col" style="gap:4px">${[...HANDS].reverse().map((h) => `<div class="hrow ${cur?.id === h.id ? 'cur' : ''}">
       <div class="hdice">${h.example.map((p) => `<div class="die tiny">${pipsHtml(p)}</div>`).join('')}</div>
       <div class="grow"><b>${h.name}</b><div class="muted small">${h.how}</div></div>
-      <b class="gold">×${h.mult}</b>
+      <b class="gold">×${h.mult}</b><span class="hchip">🔶${h.chips}</span>
     </div>`).join('')}</div>`;
   } else {
     const owned = new Set(app.run?.dice.map((d) => d.material) ?? []);

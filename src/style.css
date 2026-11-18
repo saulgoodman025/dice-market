@@ -730,3 +730,17 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .coach .cprog { display: flex; gap: 4px; justify-content: center; }
 .coach .cprog i { width: 14px; height: 4px; border-radius: 2px; background: var(--surface-3); }
 .coach .cprog i.on { background: var(--accent); }
+
+/* v1.1 족보 칩 · 잠금 · 약점 */
+.scard .ccost { position: absolute; left: -7px; top: -8px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #0e1215, 0 2px 6px rgba(0,0,0,.6); z-index: 2; }
+.scard .ccost.short { background: #4a4f54; color: #c9cdd0; }
+.scard .ccond { left: 20px; max-width: 55%; }
+.chipstat b { color: var(--accent); }
+.chipstat .cg { font-size: 10px; color: var(--accent); margin-left: 2px; }
+.handbar .hchip, .hrow .hchip { font-size: 13px; font-weight: 900; color: var(--accent); background: rgba(242,181,68,.12); border-radius: 8px; padding: 0 5px; }
+.weakpip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: var(--accent); background: rgba(0,0,0,.45); border: 1px solid rgba(242,181,68,.5); border-radius: 8px; padding: 1px 5px 1px 6px; margin: 1px auto 2px; }
+.weakpip .die.tiny { width: 16px; height: 16px; border-radius: 4px; }
+.weakpip .die.tiny .pips { width: 12px; height: 12px; }
+.weakpip .die.tiny .pips i { width: 2.6px; height: 2.6px; }
+.weakpip.pop { animation: bpop .35s; }
+.weakpip b { font-size: 14px; color: #fff; background: var(--accent); color: var(--accent-ink); border-radius: 5px; padding: 0 5px; margin-left: 2px; }

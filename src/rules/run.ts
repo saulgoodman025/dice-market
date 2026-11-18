@@ -35,7 +35,7 @@ registerSources((run) => {
   return out;
 });
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface MetaPool {
   unlocked: string[]; // "kind:id"

@@ -40,8 +40,8 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'sharp', name: '사기꾼', emoji: '🃏', hp: 50,
     dice: ['crystal', 'wood', 'wood', 'wood', 'wood'],
     skills: ['slash', 'guard', 'bump', 'flip'],
-    desc: '턴당 리롤 3회, 다음 턴 첫 주사위 1개 미리보기',
-    mods: { rerolls: 1, preview: 1 },
+    desc: '턴당 리롤 3회, 잠금 3개, 다음 턴 첫 주사위 1개 미리보기',
+    mods: { rerolls: 1, preview: 1, lockLimit: 1 },
     unlock: 'clear', unlockText: '첫 클리어',
   },
 ];

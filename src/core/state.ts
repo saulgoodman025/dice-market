@@ -75,6 +75,7 @@ export interface Enemy {
   phase: number;
   splitDone: boolean;
   enraged: boolean;
+  weakPip: number; // 공개된 약점 눈 (이 눈으로 공격하면 피해 1.5배)
 }
 
 export interface HandResult {
@@ -105,6 +106,7 @@ export interface CombatState {
   doubledown: number; // 대기 중인 더블다운 눈 (0=없음)
   counters: Record<string, number>; // 전투 단위 카운터
   turnCounters: Record<string, number>; // 턴 단위 카운터
+  handChips: number; // 🔶 족보 칩 (카드 비용)
   next: { six: number; one: number; rerollPenalty: number; flip: boolean; stealDie: boolean; preview: number[] };
   jackpotTurn: boolean;
   houseRule: string | null;
@@ -251,7 +253,7 @@ export interface RunState {
 
 export type GameEvent =
   | { t: 'roll'; keys: number[] }
-  | { t: 'dmgEnemy'; uid: number; amount: number; crit?: boolean; blocked?: number; src?: string }
+  | { t: 'dmgEnemy'; uid: number; amount: number; crit?: boolean; blocked?: number; src?: string; weakHit?: boolean }
   | { t: 'dmgPlayer'; amount: number; blocked: number; src?: string }
   | { t: 'block'; amount: number }
   | { t: 'heal'; amount: number }

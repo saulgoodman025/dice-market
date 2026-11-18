@@ -29,13 +29,15 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   if (e.hp <= 0) return 0;
   const def = ENEMY_BY_ID[e.id];
   let amt = Math.max(0, Math.round(amount));
+  const weakHit = info.pip !== undefined && info.pip === e.weakPip && amt > 0;
+  if (weakHit) { amt = Math.round(amt * BALANCE.weakMult); addJackpot(ctx, BALANCE.weakJackpot); }
   if (def.modIncoming) amt = Math.max(0, Math.round(def.modIncoming(ctx, e, amt, info)));
   if (e.enraged) amt = Math.round(amt * 1.0);
   const blocked = Math.min(e.block, amt);
   e.block -= blocked;
   const dealt = amt - blocked;
   e.hp = Math.max(0, e.hp - dealt);
-  ctx.emit({ t: 'dmgEnemy', uid: e.uid, amount: dealt, crit: info.crit, blocked, src: info.source });
+  ctx.emit({ t: 'dmgEnemy', uid: e.uid, amount: dealt, crit: info.crit, blocked, src: info.source, weakHit });
   if (dealt > 0) def.onDamaged?.(ctx, e, dealt);
   if (e.hp <= 0) killEnemy(ctx, e);
   void cb;
