@@ -289,6 +289,7 @@ function pickerDie(app: App, key: number) {
 
 
 function finishTutorial(app: App) {
+  if (app.run) app.run.flags.tutorial = 0;
   app.meta.tutorialDone = true;
   saveMeta(app.meta);
 }

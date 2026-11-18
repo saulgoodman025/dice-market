@@ -13,7 +13,7 @@ import { pipsHtml } from './components/parts';
 import { renderScreen } from './screens/index';
 import { handleAction } from './actions';
 import { initCardDrag } from './drag';
-import { drawCoach, COACH } from './coach';
+import { drawCoach, coachActive } from './coach';
 import { ENEMY_BY_ID } from '../data/enemies';
 
 /** 강한 공격 연출 기준 피해량 */
@@ -270,7 +270,7 @@ export class App {
     const dur = this.playFx(events, phase ? opts.enemyPhase!.hp0 : null, phase ? opts.enemyPhase!.blk0 : 0);
     if (phase && !run?.combat?.result) {
       this.ui.busy = true;
-      setTimeout(() => { this.ui.busy = false; }, dur / this.settings.speed);
+      setTimeout(() => { this.ui.busy = false; if (coachActive(this)) this.render(); }, dur / this.settings.speed);
     }
     if (run?.screen === 'combat' && run.combat?.result && !this.resultPending) {
       const cb = run.combat;

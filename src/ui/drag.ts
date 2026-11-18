@@ -12,6 +12,7 @@ interface DragState {
   y0: number;
   card: HTMLElement;
   arrow: SVGSVGElement | null;
+  ghost: HTMLElement | null;
   enemyTarget: boolean;
   hoverUid: number | null;
   armed: boolean;
@@ -50,8 +51,9 @@ export function initCardDrag(app: App) {
   const cleanup = (s: DragState) => {
     root.classList.remove('dragging', 'drag-enemy', 'drag-field');
     root.querySelectorAll('.enemy.aim').forEach((e) => e.classList.remove('aim'));
-    s.card.classList.remove('aiming');
+    s.card.classList.remove('aiming', 'lifted');
     s.arrow?.remove();
+    s.ghost?.remove();
   };
 
   root.addEventListener('pointerdown', (e) => {
@@ -60,20 +62,37 @@ export function initCardDrag(app: App) {
     const slot = Number(card.dataset.card);
     const def = SKILL_BY_ID[app.run?.skills[slot]?.id ?? ''];
     if (!def) return;
-    st = { slot, x0: e.clientX, y0: e.clientY, card, arrow: null, enemyTarget: def.target === 'enemy', hoverUid: null, armed: false };
+    st = { slot, x0: e.clientX, y0: e.clientY, card, arrow: null, ghost: null, enemyTarget: def.target === 'enemy', hoverUid: null, armed: false };
   });
 
   window.addEventListener('pointermove', (e) => {
     if (!st) return;
-    if (!st.arrow) {
+    if (!st.arrow && !st.ghost) {
       if (Math.hypot(e.clientX - st.x0, e.clientY - st.y0) < DRAG_START) return;
       app.cancelTip();
       if (!cardPlayable(app, st.slot, true)) { st = null; return; }
-      st.arrow = makeArrow(root);
-      st.card.classList.add('aiming');
+      if (st.enemyTarget) {
+        st.arrow = makeArrow(root);
+        st.card.classList.add('aiming');
+      } else {
+        // 대상 없는 카드: 화살표 없이 카드 복제본이 손가락을 따라온다
+        const g = st.card.cloneNode(true) as HTMLElement;
+        g.classList.add('ghost', 'fieldmode');
+        g.classList.remove('coach-focus', 'chosen');
+        g.removeAttribute('data-card');
+        g.removeAttribute('data-act');
+        root.appendChild(g);
+        st.ghost = g;
+        st.card.classList.add('lifted');
+      }
       root.classList.add('dragging', st.enemyTarget ? 'drag-enemy' : 'drag-field');
     }
-    drawArrow(st.arrow, root, st.card, e.clientX, e.clientY);
+    if (st.arrow) drawArrow(st.arrow, root, st.card, e.clientX, e.clientY);
+    if (st.ghost) {
+      const hr = root.getBoundingClientRect();
+      st.ghost.style.left = `${e.clientX - hr.left}px`;
+      st.ghost.style.top = `${e.clientY - hr.top}px`;
+    }
     // 놓을 곳 판정
     const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const enemyEl = under?.closest<HTMLElement>('.enemy:not(.dead)') ?? null;
@@ -89,14 +108,15 @@ export function initCardDrag(app: App) {
     } else {
       st.armed = inField;
     }
-    st.arrow.classList.toggle('armed', st.armed);
+    st.arrow?.classList.toggle('armed', st.armed);
+    st.ghost?.classList.toggle('armed', st.armed);
   });
 
   const finish = (cancelled: boolean) => {
     if (!st) return;
     const s = st;
     st = null;
-    if (!s.arrow) return; // 드래그가 아니었으면 탭(클릭)으로 처리된다
+    if (!s.arrow && !s.ghost) return; // 드래그가 아니었으면 탭(클릭)으로 처리된다
     app.swallowClick();
     cleanup(s);
     if (!cancelled && s.armed) playSkill(app, s.slot, s.enemyTarget ? s.hoverUid : null);

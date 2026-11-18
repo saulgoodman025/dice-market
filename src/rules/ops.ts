@@ -35,7 +35,9 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   if (e.enraged) amt = Math.round(amt * 1.0);
   const blocked = Math.min(e.block, amt);
   e.block -= blocked;
-  const dealt = amt - blocked;
+  let dealt = amt - blocked;
+  // 튜토리얼 동안 적은 체력 1 아래로 내려가지 않는다 (끝까지 배울 수 있게)
+  if (ctx.run.flags.tutorial && e.hp - dealt < 1) dealt = Math.max(0, e.hp - 1);
   e.hp = Math.max(0, e.hp - dealt);
   ctx.emit({ t: 'dmgEnemy', uid: e.uid, amount: dealt, crit: info.crit, blocked, src: info.source, weakHit });
   if (dealt > 0) def.onDamaged?.(ctx, e, dealt);
@@ -73,6 +75,7 @@ export function damagePlayer(ctx: Ctx, amount: number, source: string, opts: { i
     cb.block -= blocked - fromKeep;
     amt -= blocked;
   }
+  if (run.flags.tutorial && run.hp - amt < 1) amt = Math.max(0, run.hp - 1);
   run.hp -= amt;
   if (cb) cb.dmgTaken += amt;
   ctx.emit({ t: 'dmgPlayer', amount: amt, blocked, src: source });

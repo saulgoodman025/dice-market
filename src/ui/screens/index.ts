@@ -15,7 +15,7 @@ export function renderScreen(app: App): string {
   let body = '';
   switch (run.screen) {
     case 'combat':
-      if (run.combat && !app.meta.tutorialDone && ui.tut === 0) ui.tut = 1;
+      if (run.combat && !app.meta.tutorialDone && ui.tut === 0 && !run.flags.tutorialSeen) { ui.tut = 1; run.flags.tutorial = 1; run.flags.tutorialSeen = 1; }
       body = run.combat ? combatScreen(app) : mapScreen(app);
       break;
     case 'map': body = mapScreen(app); break;
