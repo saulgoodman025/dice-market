@@ -408,3 +408,20 @@ h1, h2, h3 { margin: 0; }
 .tray.lots .die { width: 36px; height: 36px; font-size: 18px; }
 .tray.lots .die .pips { width: 26px; height: 26px; }
 .tray.lots .die .pips i { width: 5px; height: 5px; }
+
+/* v0.4 방어 연출 */
+.player { position: relative; }
+.shieldfx { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20; pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+.shieldfx .sh { font-size: 74px; filter: drop-shadow(0 0 14px #6cb8ff) drop-shadow(0 0 4px #fff); animation: shslam calc(.75s / var(--speed)) cubic-bezier(.2,1.4,.4,1) forwards; }
+.shieldfx .shnum { margin-top: -10px; font-size: 18px; font-weight: 900; color: #e6f3ff; background: #1b4f86; border: 2px solid #8cc6ff; border-radius: 12px; padding: 1px 10px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.5); animation: bpop calc(.35s / var(--speed)) cubic-bezier(.2,1.6,.4,1); }
+.shieldfx.broke .shnum { background: #7a2430; border-color: #ff9aa5; }
+@keyframes shslam { 0% { transform: translateY(-50px) scale(1.8); opacity: 0; } 25% { transform: translateY(0) scale(.9); opacity: 1; } 35% { transform: scale(1.08); } 45% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
+.shieldfx.broke .sh { animation: shbreak calc(.75s / var(--speed)) ease-out forwards; }
+@keyframes shbreak { 0% { transform: translateY(-50px) scale(1.8); opacity: 0; } 25% { transform: none; opacity: 1; } 40% { transform: rotate(-8deg) scale(1.05); filter: drop-shadow(0 0 14px #ff6b6b) brightness(1.5); } 100% { transform: translateY(40px) rotate(35deg) scale(.6); opacity: 0; } }
+.player.guarded { animation: guarded calc(.4s / var(--speed)); }
+@keyframes guarded { 20% { box-shadow: 0 0 0 3px #8cc6ff, 0 0 24px 6px rgba(108,184,255,.8); background: #17324f; } }
+.pblock.clang { animation: clang calc(.4s / var(--speed)); }
+@keyframes clang { 30% { transform: scale(1.6); color: #fff; text-shadow: 0 0 10px #6cb8ff; } }
+.vignette.blue { box-shadow: inset 0 0 70px 20px rgba(80,160,255,.6); }
+.eshield { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); font-size: 48px; pointer-events: none; z-index: 6; filter: drop-shadow(0 0 10px #6cb8ff); animation: eshield calc(.5s / var(--speed)) ease-out forwards; }
+@keyframes eshield { 0% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { opacity: 0; } }

@@ -188,13 +188,13 @@ export class App {
   }
 
   /** 규칙 실행 후 호출: 저장 → 렌더 → 연출 */
-  after(opts: { noRender?: boolean; enemyPhase?: { hp0: number } } = {}) {
+  after(opts: { noRender?: boolean; enemyPhase?: { hp0: number; blk0: number } } = {}) {
     const run = this.run;
     const events = this.queue.splice(0);
     const phase = !!opts.enemyPhase && events.some((e) => e.t === 'enemyAct');
     this.veil = phase;
     if (!opts.noRender) this.render();
-    const dur = this.playFx(events, phase ? opts.enemyPhase!.hp0 : null);
+    const dur = this.playFx(events, phase ? opts.enemyPhase!.hp0 : null, phase ? opts.enemyPhase!.blk0 : 0);
     if (phase && !run?.combat?.result) {
       this.ui.busy = true;
       setTimeout(() => { this.ui.busy = false; }, dur / this.settings.speed);
@@ -268,16 +268,18 @@ export class App {
   }
 
   /** 이벤트 연출. 적의 턴(hp0 지정)이면 적 행동을 하나씩 순서대로 보여준다. 총 소요(ms, 배속 전) 반환 */
-  playFx(events: GameEvent[], hp0: number | null = null): number {
+  playFx(events: GameEvent[], hp0: number | null = null, blk0 = 0): number {
     let delay = 0;
     const sp = this.settings.speed;
     const at = (ms: number, fn: () => void) => { if (ms <= 0) fn(); else setTimeout(fn, ms / sp); };
     const enemyPhase = hp0 !== null;
     let hp = hp0 ?? 0;
+    let blk = blk0;
     const lastAct = enemyPhase ? events.map((e) => e.t).lastIndexOf('enemyAct') : -1;
     let myTurnShown = !enemyPhase;
     if (enemyPhase) {
       this.setHp(hp);
+      this.setBlock(blk);
       this.banner('적의 턴', 'enemy');
       delay = 700;
     }
@@ -290,6 +292,8 @@ export class App {
         this.view.querySelector('.tray')?.classList.remove('veiled');
         this.view.querySelector('.screen.combat')?.classList.remove('enemyphase');
         this.setHp(this.run?.hp ?? 0);
+        const c = this.run?.combat;
+        this.setBlock(c ? c.block + c.keepBlock : 0);
         if (this.run?.combat && !this.run.combat.result) this.banner('내 턴', 'me');
       });
       delay += 250;
@@ -306,6 +310,7 @@ export class App {
           at(delay, () => {
             const el = this.el(`[data-uid="${e.uid}"]`);
             if (e.amount > 0) {
+              if (e.blocked) { this.enemyShield(el); floatAt(el, `🛡${e.blocked}`, '#8cc6ff', 15); }
               this.slash(el, e.crit);
               this.retrigger(el, 'hit');
               if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
@@ -313,8 +318,9 @@ export class App {
               if (e.crit) { shake(this.root, 8); hitstop(this.root, 100); sfx.crit(); vibrate(40); }
               else { shake(el, 4); hitstop(this.root, 50); sfx.hit(e.amount >= 20); }
             } else if (e.blocked) {
-              floatAt(el, `🛡 ${e.blocked} 막힘`, '#4aa3ff', 17);
-              sfx.block();
+              this.enemyShield(el);
+              floatAt(el, `🛡 ${e.blocked} 막힘`, '#8cc6ff', 18);
+              sfx.clang();
             } else floatAt(el, '무효', '#9aa', 16);
           });
           delay += 140;
@@ -322,22 +328,32 @@ export class App {
         }
         case 'dmgPlayer': {
           const amt = e.amount;
-          if (enemyPhase && idx < lastAct + 1) hp -= amt;
-          else if (enemyPhase) hp -= amt;
-          const shown = hp;
-          at(delay + 160, () => {
-            const plate = this.el('.player');
-            if (amt > 0) {
+          const blocked = e.blocked;
+          if (enemyPhase) { hp -= amt; blk = Math.max(0, blk - blocked); }
+          const shownHp = hp;
+          const shownBlk = blk;
+          const broke = blocked > 0 && amt > 0; // 방패가 뚫림
+          // ① 방패로 막는 순간
+          if (blocked > 0) {
+            at(delay + 160, () => {
+              this.shieldFx(blocked, broke, shownBlk);
+              if (enemyPhase) this.setBlock(shownBlk);
+            });
+          }
+          // ② 막지 못한 피해
+          if (amt > 0) {
+            at(delay + (blocked > 0 ? 420 : 160), () => {
+              const plate = this.el('.player');
               this.flashDamage();
               this.retrigger(plate, 'hurt');
               floatAt(this.el('.player .hpbar'), `-${amt}`, '#ff5a5f', dmgSize(amt) * 1.2);
               shake(this.root, Math.min(10, 3 + amt / 3));
               sfx.hurt();
               vibrate(60);
-              if (enemyPhase) this.setHp(shown);
-            }
-            if (e.blocked > 0) { floatAt(this.el('.pblock'), `🛡 ${e.blocked} 막음`, '#4aa3ff', 16); sfx.block(); }
-          });
+              if (enemyPhase) this.setHp(shownHp);
+            });
+            if (blocked > 0) delay += 260;
+          }
           break;
         }
         case 'block': at(delay, () => { floatAt(this.el('.pblock'), `+${e.amount}🛡`, '#6cb8ff', 18); this.retrigger(this.el('.pblock'), 'pop'); sfx.block(); }); break;
@@ -370,6 +386,43 @@ export class App {
     });
     if (enemyPhase) showMyTurn();
     return delay + 200;
+  }
+
+  private enemyShield(el: Element | null) {
+    if (!el) return;
+    const sh = document.createElement('div');
+    sh.className = 'eshield';
+    sh.textContent = '🛡️';
+    el.appendChild(sh);
+    setTimeout(() => sh.remove(), 500 / this.settings.speed);
+  }
+
+  private setBlock(v: number) {
+    const el = this.view.querySelector('.pblock');
+    if (!el) return;
+    el.textContent = `🛡${Math.max(0, v)}`;
+    el.classList.toggle('zero', v <= 0);
+  }
+
+  /** 방어도로 공격을 막는 연출: 방패가 튀어나와 공격을 받아내고, 뚫리면 깨진다 */
+  private shieldFx(blocked: number, broke: boolean, left: number) {
+    const plate = this.el('.player');
+    if (!plate) return;
+    const sh = document.createElement('div');
+    sh.className = `shieldfx ${broke ? 'broke' : ''}`;
+    sh.innerHTML = `<span class="sh">🛡️</span><span class="shnum">${broke ? `${blocked} 막고 뚫림!` : left > 0 ? `${blocked} 막음!` : '완벽 방어!'}</span>`;
+    plate.appendChild(sh);
+    setTimeout(() => sh.remove(), 800 / this.settings.speed);
+    this.retrigger(plate, 'guarded');
+    this.retrigger(this.el('.pblock'), 'clang');
+    const v = document.createElement('div');
+    v.className = 'vignette blue';
+    this.root.appendChild(v);
+    setTimeout(() => v.remove(), 400 / this.settings.speed);
+    burstAt(plate.querySelector('.pblock') ?? plate, broke ? '#cfe6ff' : '#8cc6ff', broke ? 26 : 16);
+    shake(this.root, 3);
+    if (broke) sfx.shieldBreak(); else sfx.clang();
+    vibrate(broke ? [20, 30, 40] : 25);
   }
 
   private flashDamage() {

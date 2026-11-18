@@ -130,11 +130,12 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'endTurn': {
       if (!cb) break;
       const hp0 = run.hp;
+      const blk0 = cb.block + cb.keepBlock;
       endTurn(ctx);
       ui.sel = [];
       ui.picker = null;
       ui.infoKey = -1;
-      app.after({ enemyPhase: { hp0 } });
+      app.after({ enemyPhase: { hp0, blk0 } });
       return;
     }
     case 'openSet': ui.picker = { mode: 'set' }; app.render(); return;

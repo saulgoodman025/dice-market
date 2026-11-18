@@ -89,5 +89,18 @@ export const sfx = {
   win: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'triangle', 0.3, i * 0.12)); },
   tick: () => tone(1400, 0.02, 'square', 0.12),
   reelStop: () => { tone(300, 0.08, 'square', 0.25); noise(0.04, 0.2, 0, 2000); },
+  /** 방패로 막는 금속음 */
+  clang: () => {
+    tone(1320, 0.12, 'triangle', 0.35, 0, 1180);
+    tone(2640, 0.08, 'sine', 0.2, 0.005);
+    tone(880, 0.25, 'square', 0.12, 0.01, 820);
+    noise(0.05, 0.35, 0, 3500);
+  },
+  /** 방패가 뚫림 */
+  shieldBreak: () => {
+    tone(1100, 0.08, 'triangle', 0.3, 0, 900);
+    noise(0.22, 0.45, 0.03, 1500);
+    tone(300, 0.25, 'sawtooth', 0.2, 0.05, 120);
+  },
   bad: () => tone(200, 0.25, 'sawtooth', 0.3, 0, 100),
 };
