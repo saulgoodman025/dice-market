@@ -21,7 +21,7 @@ export function makeEnemy(ctx: Ctx, id: string, hpMult: number, patternOffset = 
   const e: Enemy = {
     uid: ctx.run.nextUid++, id, name: def.name, emoji: def.emoji, hp, maxHp: hp, block: 0,
     patternIdx: patternOffset % def.pattern.length, intent: { k: 'attack', label: '', icon: '' },
-    poison: 0, weak: 0, nextMult: 1, stacks: 0, charge: 0, phase: 1, splitDone: false, enraged: false, weakPip: 1, str: 0, vuln: 0, frail: 0,
+    poison: 0, weak: 0, nextMult: 1, stacks: 0, charge: 0, phase: 1, splitDone: false, enraged: false, weakPip: 1, str: 0, vuln: 0, frail: 0, immunePip: 0,
   };
   return e;
 }
@@ -45,7 +45,7 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
     kind, enemies, hand: [], phase: 'roll', turn: 0, rerollsLeft: 0, block: 0, keepBlock: 0, thorns: 0,
     piggy: 0, piggyMult: 1, handChips: 0, pStr: 0, pVuln: 0, pWeak: 0, handResult: null, usedSlots: [], target: enemies[0].uid, diceUsedThisTurn: 0,
     lastSkill: null, doubledown: 0, counters: {}, turnCounters: {},
-    next: { six: 0, one: 0, rerollPenalty: 0, flip: false, stealDie: false, preview: [] },
+    next: { six: 0, one: 0, rerollPenalty: 0, flip: false, stealDie: false, preview: [], seal: 0, chipTax: 0 },
     jackpotTurn: false, houseRule: null, queenParity: null, lastSkillDamage: 0, dmgTaken: 0, result: null,
     nextKey: 1, rewardMult, brokenDice: [], log: [],
   };
@@ -96,6 +96,10 @@ export function describeIntent(ctx: Ctx, e: Enemy, spec: IntentSpec): Intent {
     case 'rig': return { ...spec, icon: '🎯', label: '주사위 1 강제' };
     case 'seize': return { ...spec, icon: '📜', label: '소모품 압류' };
     case 'bet': return { ...spec, icon: '🎲', label: `${attackValue(ctx, e, n)}~${attackValue(ctx, e, n * 6)}` };
+    case 'heal': return { ...spec, icon: '🩺', label: `회복 ${n}` };
+    case 'guardAll': return { ...spec, icon: '🛡️', label: `전체 ${n}` };
+    case 'seal': return { ...spec, icon: '🔒', label: '주사위 봉인' };
+    case 'chipTax': return { ...spec, icon: '🏦', label: `칩 -${n}` };
     case 'enrage': return { ...spec, icon: '💪', label: `힘 +${n}` };
     case 'curseWeak': return { ...spec, icon: '🥀', label: `약화 ${n}` };
     case 'curseVuln': return { ...spec, icon: '💔', label: `취약 ${n}` };
@@ -167,7 +171,13 @@ export function startTurn(ctx: Ctx) {
   }
   if (cb.turn === 1 && m.firstTurnBlock) gainBlock(ctx, m.firstTurnBlock);
   fire(ctx, 'onTurnStart');
-  for (const e of alive(cb)) e.weakPip = rng(ctx, 'combat').int(1, 6);
+  for (const e of alive(cb)) {
+    e.weakPip = rng(ctx, 'combat').int(1, 6);
+    if (ENEMY_BY_ID[e.id].immuneRotate) {
+      e.immunePip = rng(ctx, 'combat').int(1, 5);
+      if (e.immunePip >= e.weakPip) e.immunePip++;
+    }
+  }
   for (const e of alive(cb)) ENEMY_BY_ID[e.id].onTurnStart?.(ctx, e);
   if (cb.houseRule === 'oneReroll') cb.rerollsLeft = Math.min(cb.rerollsLeft, 1);
   if (cb.result) return;
@@ -200,6 +210,17 @@ export function startTurn(ctx: Ctx) {
       hi.gone = true;
       toast(ctx, `🦝 주사위 도둑이 ${hi.pip}을 빼앗았다`, 'bad');
     }
+  }
+  // 봉인: 무작위 주사위가 이번 턴 사용 불가
+  while (cb.next.seal > 0) {
+    cb.next.seal--;
+    const free = hand.filter((h) => !h.used);
+    if (!free.length) break;
+    const t = rng(ctx, 'combat').pick(free);
+    t.used = true;
+    t.gone = true;
+    t.locked = true;
+    toast(ctx, `🔒 주사위 ${t.pip}이(가) 봉인됐다 (이번 턴)`, 'bad');
   }
   // 리롤 불가 재질은 자동 잠금
   for (const hd of hand) if (MATERIAL_BY_ID[hd.material].noReroll) hd.locked = true;
@@ -278,7 +299,7 @@ export function lockedCount(cb: CombatState): number {
 /** 지금 쓸 수 있는 족보 칩 (아직 족보 확정 전이면 예상 족보의 칩까지 포함) */
 export function chipsAvailable(ctx: Ctx): number {
   const cb = cbOf(ctx);
-  if (cb.phase === 'roll' && !cb.turnCounters.confirmed) return cb.handChips + handChipsFor(ctx, previewHand(ctx).id);
+  if (cb.phase === 'roll' && !cb.turnCounters.confirmed) return cb.handChips + Math.max(0, handChipsFor(ctx, previewHand(ctx).id) - cb.next.chipTax);
   return cb.handChips;
 }
 
@@ -403,7 +424,9 @@ export function confirmHand(ctx: Ctx) {
     return;
   }
   cb.turnCounters.confirmed = 1;
-  cb.handChips += handChipsFor(ctx, hand.id);
+  cb.handChips += Math.max(0, handChipsFor(ctx, hand.id) - cb.next.chipTax);
+  if (cb.next.chipTax) toast(ctx, `🏦 족보 칩 -${cb.next.chipTax} (은행원)`, 'bad');
+  cb.next.chipTax = 0;
   run.flags.ach_max_chips = Math.max(run.flags.ach_max_chips ?? 0, cb.handChips);
   if (hand.heat < 0) resetHeat(ctx);
   else addHeat(ctx, hand.heat);
@@ -755,6 +778,14 @@ export function enemyTurn(ctx: Ctx) {
         enemyAttack(ctx, e, attackValue(ctx, e, r * n));
         break;
       }
+      case 'heal': {
+        const t = alive(cb).filter((x) => x.hp < x.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (t) { const h = Math.min(n, t.maxHp - t.hp); t.hp += h; toast(ctx, `🩺 ${t.name} 체력 +${h}`, 'bad'); ctx.emit({ t: 'enemyAct', uid: t.uid }); }
+        break;
+      }
+      case 'guardAll': for (const x of alive(cb)) x.block += n; toast(ctx, `🛡 모든 적 방어도 +${n}`, 'bad'); break;
+      case 'seal': cb.next.seal += n || 1; break;
+      case 'chipTax': cb.next.chipTax += n; cb.handChips = Math.max(0, cb.handChips - n); break;
       case 'enrage': e.str += n; toast(ctx, `💪 ${e.name}의 힘 +${n}`, 'bad'); break;
       case 'curseWeak': cb.pWeak += n; toast(ctx, `🥀 약화 ${n}턴: 내가 주는 피해 -25%`, 'bad'); break;
       case 'curseVuln': cb.pVuln += n; toast(ctx, `💔 취약 ${n}턴: 내가 받는 피해 +50%`, 'bad'); break;

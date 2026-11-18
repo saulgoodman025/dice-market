@@ -883,3 +883,19 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .enemy.lethal::before { content: '💀'; position: absolute; left: 50%; top: 22%; transform: translate(-50%, -50%); font-size: 46px; z-index: 7; pointer-events: none; filter: drop-shadow(0 0 10px #ff2a2a); animation: skullpop .6s ease-in-out infinite; }
 @keyframes skullpop { 50% { transform: translate(-50%, -50%) scale(1.18); } }
 .enemy.lethal.aim::after { display: none; }
+
+/* v2.0 고른 카드가 위 설명 줄을 가리지 않게 */
+.scard.ready:active, .scard.chosen { transform: translateY(-6px) rotate(0deg) scale(1.03); }
+.dieinfo { position: relative; z-index: 45; margin-bottom: 4px; }
+.hand { padding-top: 12px; }
+
+/* v2.0 적 3마리 · 면역 눈 */
+.pips2 { display: flex; gap: 3px; justify-content: center; }
+.weakpip, .immpip { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; border-radius: 8px; padding: 1px 5px; margin: 1px 0 2px; }
+.immpip { background: rgba(0,0,0,.55); border: 1px solid rgba(255,107,107,.6); color: #ff9a90; }
+.immpip b { font-size: 13px; color: #fff; background: #b8323b; border-radius: 5px; padding: 0 4px; }
+.enemies.n3 .enemy { max-width: 110px; padding: 2px 1px; }
+.enemies.n3 .enemy .em { font-size: 36px; }
+.enemies.n3 .intent { font-size: 12px !important; padding: 2px 6px !important; }
+.enemies.n3 .ehp { max-width: 92px; }
+.enemies.n4 .enemy { max-width: 84px; } .enemies.n4 .enemy .em { font-size: 30px; } .enemies.n4 .intent { font-size: 11px !important; padding: 1px 4px !important; }

@@ -65,7 +65,7 @@ export function combatScreen(app: App): string {
     return `<div class="enemy ${isT ? 'target' : ''} ${e.hp <= 0 ? 'dead' : ''}" data-uid="${e.uid}" data-act="target" data-arg="${e.uid}" data-tip="${esc(def.name + (def.desc ? ': ' + def.desc : ''))}">
       <div class="intent ${it.cls}">${it.text}</div>
       <div class="em">${e.emoji}</div>
-      <div class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯약점 <b>${e.weakPip}</b></div>
+      <div class="pips2"><span class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯<b>${e.weakPip}</b></span>${e.immunePip ? `<span class="immpip" data-tip="면역 눈: ${e.immunePip}(으)로 준 피해를 받지 않습니다">🚫<b>${e.immunePip}</b></span>` : ''}</div>
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
       <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i>${e.poison && e.hp > 0 ? `<u class="psn" style="left:${(Math.max(0, e.hp - e.poison) / e.maxHp) * 100}%;width:${(Math.min(e.poison, e.hp) / e.maxHp) * 100}%"></u>` : ''}<b>${e.hp}/${e.maxHp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
@@ -144,7 +144,7 @@ export function combatScreen(app: App): string {
   return `${topbar(app)}
   <div class="screen noscroll combat ${app.veil ? 'enemyphase' : ''}">
     <div class="table" data-act="field">
-      <div class="enemies">${enemies}</div>
+      <div class="enemies n${cb.enemies.filter((x) => x.hp > 0).length}">${enemies}</div>
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}
       <div class="tray ${app.veil ? 'veiled' : ''} ${cb.turnCounters.yahtzee && !app.veil ? 'yahtzee' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>

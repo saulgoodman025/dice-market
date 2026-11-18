@@ -50,7 +50,7 @@ export const BALANCE = {
   casinoEnterChips: 2,
 
   // 적 체력 막 보정 (적 데이터 자체가 막별로 다름. 여기선 전역 배율)
-  enemyHpMult: 0.9,
+  enemyHpMult: 1.0,
   bossHealOnWin: 0.25,
 };
 

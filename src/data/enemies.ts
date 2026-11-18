@@ -15,6 +15,8 @@ export interface EnemyDef {
   desc: string;
   count?: number; // 함께 등장하는 수
   frozePiggy?: boolean; // 방어도가 있으면 저금통 동결
+  immuneRotate?: boolean; // 매 턴 무작위 눈 하나의 피해를 받지 않는다
+  splitOnDeath?: { count: number; hpPct: number }; // 쓰러지면 작은 적 여럿으로 갈라져 되살아남
   modIncoming?: (ctx: Ctx, e: Enemy, amount: number, info: DmgInfo) => number;
   onDamaged?: (ctx: Ctx, e: Enemy, dealt: number) => void;
   onDeath?: (ctx: Ctx, e: Enemy) => void;
@@ -58,6 +60,10 @@ export const ENEMIES: EnemyDef[] = [
         toast(ctx, HOUSE_RULES[cb.houseRule], 'bad');
       }
     },
+  },
+  {
+    id: 'mitosis', name: '분열 칩', emoji: '🫧', hp: 18, act: 1, tier: 'normal', pattern: [{ k: 'attack', n: 5 }, { k: 'attack', n: 4 }],
+    desc: '쓰러지면 작은 칩 2개로 갈라져 되살아납니다.', splitOnDeath: { count: 2, hpPct: 0.5 },
   },
   // ── 2막 VIP 라운지 ──
   { id: 'taxman', name: '세금 징수원', emoji: '🧾', hp: 40, act: 2, tier: 'normal', pattern: [{ k: 'attack', n: 8 }, { k: 'tax' }], desc: '보유 골드의 10%를 세금으로 걷어 갑니다.' },
@@ -103,6 +109,18 @@ export const ENEMIES: EnemyDef[] = [
       return (info.pip % 2 === 1) === (p === 'odd') ? a : 0;
     },
   },
+  {
+    id: 'warden', name: '눈 검사관', emoji: '🧐', hp: 44, act: 2, tier: 'normal', immuneRotate: true, pattern: [{ k: 'attack', n: 10 }, { k: 'block', n: 8 }],
+    desc: '매 턴 눈 하나(🚫)를 정해 그 눈으로 준 피해를 받지 않습니다.',
+  },
+  {
+    id: 'medic', name: '카지노 의무관', emoji: '🩺', hp: 28, act: 2, tier: 'normal', pattern: [{ k: 'heal', n: 12 }, { k: 'attack', n: 6 }],
+    desc: '체력이 가장 낮은 동료를 치료합니다. 먼저 쓰러뜨리세요.',
+  },
+  {
+    id: 'sealer', name: '봉인사', emoji: '⛓️', hp: 40, act: 2, tier: 'normal', pattern: [{ k: 'seal', n: 1 }, { k: 'attack', n: 11 }],
+    desc: '다음 턴 내 주사위 하나를 봉인해 쓰지 못하게 합니다.',
+  },
   // ── 3막 하우스 금고 ──
   { id: 'golem', name: '칩 골렘', emoji: '🗿', hp: 70, act: 3, tier: 'normal', pattern: [{ k: 'block', n: 12 }, { k: 'attack', n: 16 }, { k: 'enrage', n: 3 }], desc: '단단하고, 점점 힘이 세집니다.' },
   { id: 'oddsmaker', name: '확률 설계자', emoji: '🧮', hp: 55, act: 3, tier: 'normal', pattern: [{ k: 'attack', n: 12 }, { k: 'rig' }], desc: '다음 굴림에서 내 주사위 하나를 1로 만듭니다.' },
@@ -133,6 +151,18 @@ export const ENEMIES: EnemyDef[] = [
     onDeath: (ctx) => addConsumable(ctx, rng(ctx, 'loot').pick(CONSUMABLES.filter((c) => c.rarity !== 'legendary')).id),
   },
   { id: 'debtcollector', name: '추심원', emoji: '📜', hp: 65, act: 3, tier: 'normal', pattern: [{ k: 'attack', n: 14 }, { k: 'seize' }], desc: '내 소모품 하나를 압류해 갑니다.' },
+  {
+    id: 'hydra', name: '칩 히드라', emoji: '🐍', hp: 64, act: 3, tier: 'normal', pattern: [{ k: 'attack', n: 13 }, { k: 'enrage', n: 2 }],
+    desc: '쓰러지면 머리 둘로 갈라져 되살아납니다.', splitOnDeath: { count: 2, hpPct: 0.45 },
+  },
+  {
+    id: 'banker', name: '은행원', emoji: '🏦', hp: 56, act: 3, tier: 'normal', pattern: [{ k: 'chipTax', n: 2 }, { k: 'guardAll', n: 10 }, { k: 'attack', n: 12 }],
+    desc: '내 족보 칩을 빼앗고, 동료 모두에게 방어도를 줍니다.',
+  },
+  {
+    id: 'mirrorknight', name: '거울 기사', emoji: '🪞', hp: 70, act: 3, tier: 'normal', immuneRotate: true, pattern: [{ k: 'block', n: 14 }, { k: 'attack', n: 15 }, { k: 'curseVuln', n: 1 }],
+    desc: '매 턴 눈 하나(🚫)의 피해를 받지 않고, 내게 취약을 겁니다.',
+  },
   { id: 'highroller', name: '하이롤러', emoji: '🤵', hp: 110, act: 3, tier: 'elite', pattern: [{ k: 'bet', n: 4 }, { k: 'curseVuln', n: 2 }, { k: 'attack', n: 16 }], desc: '내게 취약을 건 뒤 주사위를 굴려 그 눈의 4배로 공격합니다.' },
   { id: 'vaultkeeper', name: '금고지기', emoji: '🔐', hp: 120, act: 3, tier: 'elite', frozePiggy: true, pattern: [{ k: 'block', n: 20 }, { k: 'attack', n: 15 }], desc: '방어도가 있는 동안 내 저금통이 쌓이지 않습니다.' },
   {
@@ -153,4 +183,19 @@ export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e])) as 
 
 export const JESTER_POOL: IntentSpec[] = [
   { k: 'attack', n: 15 }, { k: 'block', n: 12 }, { k: 'debuff' }, { k: 'multi', n: 5, hits: 3 }, { k: 'buff' },
+];
+
+/** 여럿이 함께 나오는 일반 전투 (층이 깊을수록 등장). 가중치는 단독 등장(각 1)과 비교 */
+export const GROUPS: { act: number; minFloor: number; ids: string[]; weight: number }[] = [
+  { act: 1, minFloor: 1, ids: ['chiprat', 'chiprat', 'chiprat'], weight: 1.2 },
+  { act: 1, minFloor: 2, ids: ['mitosis', 'pickpocket'], weight: 1 },
+  { act: 1, minFloor: 2, ids: ['cardshark', 'chiprat'], weight: 0.8 },
+  { act: 2, minFloor: 0, ids: ['medic', 'croupier'], weight: 1.2 },
+  { act: 2, minFloor: 1, ids: ['oddhater', 'evenhater'], weight: 1 },
+  { act: 2, minFloor: 2, ids: ['medic', 'warden', 'sealer'], weight: 1 },
+  { act: 2, minFloor: 2, ids: ['loanshark', 'medic'], weight: 0.8 },
+  { act: 3, minFloor: 0, ids: ['banker', 'golem'], weight: 1.2 },
+  { act: 3, minFloor: 1, ids: ['hydra', 'banker'], weight: 1 },
+  { act: 3, minFloor: 2, ids: ['mirrorknight', 'oddsmaker', 'jester'], weight: 1 },
+  { act: 3, minFloor: 2, ids: ['goldslime', 'enforcer'], weight: 0.8 },
 ];

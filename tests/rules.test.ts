@@ -30,7 +30,7 @@ describe('콘텐츠 수량', () => {
     expect(HANDS.length).toBe(10);
     expect(ENEMIES.filter((e) => e.tier === 'boss').length).toBe(3);
     for (const act of [1, 2, 3]) {
-      expect(ENEMIES.filter((e) => e.act === act && e.tier === 'normal').length).toBe(6);
+      expect(ENEMIES.filter((e) => e.act === act && e.tier === 'normal').length).toBeGreaterThanOrEqual(6);
       expect(ENEMIES.filter((e) => e.act === act && e.tier === 'elite').length).toBe(2);
     }
   });

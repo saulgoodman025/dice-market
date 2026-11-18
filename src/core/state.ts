@@ -44,7 +44,8 @@ export type IntentKind =
   | 'attack' | 'attackRange' | 'multi' | 'block' | 'buff' | 'debuff'
   | 'steal' | 'stealDie' | 'tax' | 'flip' | 'interest' | 'copy' | 'charge'
   | 'rig' | 'seize' | 'bet' | 'random' | 'houseCopy' | 'queen'
-  | 'enrage' | 'curseWeak' | 'curseVuln';
+  | 'enrage' | 'curseWeak' | 'curseVuln'
+  | 'heal' | 'guardAll' | 'seal' | 'chipTax';
 
 export interface IntentSpec {
   k: IntentKind;
@@ -80,6 +81,7 @@ export interface Enemy {
   str: number; // 💪 힘: 공격 피해 +N (전투 동안)
   vuln: number; // 💔 취약: 받는 피해 +50% (남은 턴)
   frail: number; // 🥀 약화: 주는 피해 -25% (남은 턴)
+  immunePip: number; // 🚫 이 눈으로 준 피해 무효 (0 = 없음)
 }
 
 export interface HandResult {
@@ -114,7 +116,7 @@ export interface CombatState {
   pStr: number; // 내 💪 힘
   pVuln: number; // 내 💔 취약
   pWeak: number; // 내 🥀 약화
-  next: { six: number; one: number; rerollPenalty: number; flip: boolean; stealDie: boolean; preview: number[] };
+  next: { six: number; one: number; rerollPenalty: number; flip: boolean; stealDie: boolean; preview: number[]; seal: number; chipTax: number };
   jackpotTurn: boolean;
   houseRule: string | null;
   queenParity: 'odd' | 'even' | null;

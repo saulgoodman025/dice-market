@@ -29,6 +29,7 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   if (e.hp <= 0) return 0;
   const def = ENEMY_BY_ID[e.id];
   let amt = Math.max(0, Math.round(amount));
+  if (e.immunePip && info.pip === e.immunePip && amt > 0) amt = 0; // 🚫 면역 눈
   const weakHit = info.pip !== undefined && info.pip === e.weakPip && amt > 0;
   if (e.vuln > 0 && info.source !== '독' && amt > 0) amt = Math.round(amt * BALANCE.vulnMult);
   if (weakHit) { amt = Math.round(amt * BALANCE.weakMult); addJackpot(ctx, BALANCE.weakJackpot); }
@@ -56,8 +57,17 @@ export function killEnemy(ctx: Ctx, e: Enemy) {
   ctx.run.stats.kills++;
   ctx.emit({ t: 'enemyDie', uid: e.uid });
   if (ENEMY_BY_ID[e.id].tier === 'boss' && cb.turnCounters.yahtzee) ctx.run.flags.ach_yahtzee_boss = 1;
-  ENEMY_BY_ID[e.id].onDeath?.(ctx, e);
+  const def = ENEMY_BY_ID[e.id];
+  def.onDeath?.(ctx, e);
   fire(ctx, 'onKill', { enemy: e });
+  // 분열 부활: 쓰러지면 작은 적 여럿으로 갈라진다 (한 번만)
+  if (def.splitOnDeath && !e.splitDone) {
+    const hp = Math.max(1, Math.round(e.maxHp * def.splitOnDeath.hpPct));
+    for (let i = 0; i < def.splitOnDeath.count; i++) {
+      cb.enemies.push({ ...e, uid: ctx.run.nextUid++, hp, maxHp: hp, block: 0, poison: 0, vuln: 0, frail: 0, splitDone: true, name: e.name + ' 조각', patternIdx: i % def.pattern.length, intent: { ...e.intent } });
+    }
+    toast(ctx, `🧬 ${e.name}이(가) ${def.splitOnDeath.count}개로 갈라져 되살아났다!`, 'bad');
+  }
   if (alive(cb).length === 0) {
     cb.result = 'win';
     cb.phase = 'over';

@@ -1,6 +1,6 @@
 import type { MapNode, NodeType } from '../core/state';
 import { BALANCE } from '../data/balance';
-import { ENEMIES } from '../data/enemies';
+import { ENEMIES, GROUPS } from '../data/enemies';
 import { getMods, rng, type Ctx } from './ctx';
 import { ddaNodeWeights } from './dda';
 
@@ -93,14 +93,15 @@ export function pickEncounter(ctx: Ctx, tier: 'normal' | 'elite' | 'boss'): stri
   const r = rng(ctx, 'map');
   // 엔드리스(4막~): 3막 적, 보스는 셋 중 무작위
   const pool = ENEMIES.filter((e) => (ctx.run.act > 3 && tier === 'boss' ? true : e.act === act) && e.tier === tier);
-  const def = r.pick(pool);
-  const ids = Array(def.count ?? 1).fill(def.id);
-  // 3막 후반 일반 전투는 가끔 2마리
-  if (tier === 'normal' && act >= 2 && ctx.run.floor >= 2 && r.chance(0.25)) {
-    const weak = pool.filter((e) => (e.count ?? 1) === 1 && e.hp <= 45 + (act - 2) * 20);
-    if (weak.length) ids.push(r.pick(weak).id);
+  if (tier !== 'normal') {
+    const def = r.pick(pool);
+    return Array(def.count ?? 1).fill(def.id);
   }
-  return ids;
+  // 일반 전투: 단독 등장 + 무리 등장 중 가중치로 고른다 (깊은 층일수록 무리가 많다)
+  const floor = ctx.run.floor;
+  const options: { ids: string[]; w: number }[] = pool.map((e) => ({ ids: Array(e.count ?? 1).fill(e.id), w: 1 }));
+  for (const g of GROUPS) if (g.act === act && floor >= g.minFloor) options.push({ ids: g.ids, w: g.weight * (1 + floor * 0.25) });
+  return [...r.weighted(options, (o) => o.w).ids];
 }
 
 export const NODE_INFO: Record<NodeType, { emoji: string; name: string; desc: string }> = {
