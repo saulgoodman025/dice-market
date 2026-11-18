@@ -210,17 +210,19 @@ export class App {
         const seg = document.createElement('em');
         seg.className = 'hpprev';
         seg.style.left = `${(Math.max(0, e.hp - h.hpLoss) / e.maxHp) * 100}%`;
-        seg.style.width = `${(Math.min(h.hpLoss, e.hp) / e.maxHp) * 100}%`;
-        bar.appendChild(seg);
+        seg.style.width = `calc(${(Math.min(h.hpLoss, e.hp) / e.maxHp) * 100}% + 1px)`;
+        (bar.querySelector('.hpc') ?? bar).appendChild(seg);
       }
       if (h.poisonGain > 0 && h.poisonNext > 0) {
-        // 독 카드: 다음 턴 독 피해(기존 독 포함)를 체력바 오른쪽 끝에 녹색으로 미리 보여준다
+        // 독 카드: 다음 턴 독 피해(기존 독 포함)를 체력바 자체의 녹색 구간으로 미리 보여준다
         const hpAfter = Math.max(0, e.hp - h.hpLoss);
-        const seg = document.createElement('em');
-        seg.className = 'hpprev psnprev';
-        seg.style.left = `${(Math.max(0, hpAfter - h.poisonNext) / e.maxHp) * 100}%`;
-        seg.style.width = `${(Math.min(h.poisonNext, hpAfter) / e.maxHp) * 100}%`;
-        bar.appendChild(seg);
+        const fill = bar.querySelector<HTMLElement>('.hpc > i');
+        if (fill && e.hp > 0) {
+          fill.dataset.pa0 = fill.style.getPropertyValue('--pa');
+          fill.style.setProperty('--pa', `${(Math.max(0, hpAfter - h.poisonNext) / e.hp) * 100}%`);
+          fill.style.setProperty('--pb', `${(hpAfter / e.hp) * 100}%`);
+          fill.classList.add('psnpv');
+        }
       }
       if (h.kill) {
         // 처치되는 피해: 체력바 전체가 붉게 깜빡이고 적 위에 해골이 뜬다
@@ -240,6 +242,11 @@ export class App {
 
   clearHitPreview() {
     this.view.querySelectorAll('.hpprev, .hplabel').forEach((x) => x.remove());
+    this.view.querySelectorAll<HTMLElement>('.hpc > i.psnpv').forEach((f) => {
+      f.classList.remove('psnpv');
+      f.style.removeProperty('--pb');
+      if (f.dataset.pa0) f.style.setProperty('--pa', f.dataset.pa0); else f.style.removeProperty('--pa');
+    });
     this.view.querySelectorAll('.lethal').forEach((x) => x.classList.remove('lethal'));
     this.view.querySelectorAll<HTMLElement>('.eshb.pvdent, .eshb.pvbreak').forEach((x) => {
       x.classList.remove('pvdent', 'pvbreak');
@@ -412,7 +419,7 @@ export class App {
   private hpMem = new Map<string, number>();
   private trailTimers = new Map<string, number>();
   private trailTo(bar: HTMLElement, key: string, pct: number) {
-    const fill = bar.querySelector<HTMLElement>(':scope > i');
+    const fill = bar.querySelector<HTMLElement>(':scope > i, :scope > .hpc > i');
     const trail = bar.querySelector<HTMLElement>('s.trail');
     const old = this.hpMem.get(key) ?? pct;
     this.hpMem.set(key, pct);
@@ -444,7 +451,7 @@ export class App {
       const key = bar.dataset.hpk!;
       if (key === 'p' && this.veil) {
         const old = this.hpMem.get('p');
-        const fill = bar.querySelector<HTMLElement>(':scope > i');
+        const fill = bar.querySelector<HTMLElement>(':scope > i, :scope > .hpc > i');
         const trail = bar.querySelector<HTMLElement>('s.trail');
         if (old !== undefined && fill && trail) { fill.style.width = `${old}%`; trail.style.width = `${old}%`; }
         return;
