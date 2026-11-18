@@ -67,7 +67,7 @@ export function combatScreen(app: App): string {
       <div class="em">${e.emoji}</div>
       <div class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯약점 <b>${e.weakPip}</b></div>
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
-      <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i>${e.poison && e.hp > 0 ? `<u class="psn" style="left:${(Math.max(0, e.hp - e.poison) / e.maxHp) * 100}%;width:${(Math.min(e.poison, e.hp) / e.maxHp) * 100}%"></u>` : ''}<b>${e.hp}</b></div>
+      <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i>${e.poison && e.hp > 0 ? `<u class="psn" style="left:${(Math.max(0, e.hp - e.poison) / e.maxHp) * 100}%;width:${(Math.min(e.poison, e.hp) / e.maxHp) * 100}%"></u>` : ''}<b>${e.hp}/${e.maxHp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
     </div>`;
   }).join('');

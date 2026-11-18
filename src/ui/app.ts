@@ -194,10 +194,7 @@ export class App {
     if (!cb) return;
     const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : this.ui.sel;
     const pv = previewSkill(this.ctx, slot, sel, targetUid);
-    if (pv.chance) {
-      if (targetUid !== null) this.hitLabel(this.el(`[data-uid="${targetUid}"] .ehp`), '🎲 운에 달림', '');
-      return;
-    }
+    if (pv.chance) return; // 운에 달린 카드는 미리 보여주지 않는다
     for (const h of pv.hits) {
       const e = cb.enemies.find((x) => x.uid === h.uid);
       const bar = this.view.querySelector<HTMLElement>(`[data-hpk="e${h.uid}"]`);
@@ -209,7 +206,11 @@ export class App {
         seg.style.width = `${(Math.min(h.hpLoss, e.hp) / e.maxHp) * 100}%`;
         bar.appendChild(seg);
       }
-      this.hitLabel(bar, h.kill ? `처치! -${h.hpLoss}` : `-${h.hpLoss}`, h.blockLoss ? `🛡${h.blockLoss} 막힘` : '');
+      if (h.kill) {
+        // 처치되는 피해: 체력바 전체가 붉게 깜빡이고 적 위에 해골이 뜬다
+        bar.classList.add('lethal');
+        bar.closest('.enemy')?.classList.add('lethal');
+      }
     }
   }
 
@@ -223,6 +224,7 @@ export class App {
 
   clearHitPreview() {
     this.view.querySelectorAll('.hpprev, .hplabel').forEach((x) => x.remove());
+    this.view.querySelectorAll('.lethal').forEach((x) => x.classList.remove('lethal'));
   }
 
   /** 드래그가 시작되면 길게 누르기 툴팁을 취소 */

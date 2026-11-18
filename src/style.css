@@ -872,3 +872,14 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .enemy.aim::after { font-size: 30px; opacity: .3; top: 30%; }
 .hplabel { bottom: calc(100% + 4px); z-index: 8; }
 .hplabel b { font-size: 18px; padding: 1px 8px; border: 2px solid #fff; }
+
+/* v1.9 처치 미리보기: 숫자 대신 해골·붉은 맥동 */
+.ehp > b { font-size: 9.5px; }
+.ehp.lethal { box-shadow: 0 0 0 2px #ff3b3b, 0 0 14px 3px rgba(255,40,40,.85); animation: lethalbar .5s ease-in-out infinite; }
+@keyframes lethalbar { 50% { box-shadow: 0 0 0 2px #fff, 0 0 20px 6px rgba(255,40,40,1); } }
+.ehp.lethal > em.hpprev { background: #ff2a2a; animation: none; }
+.enemy.lethal .em { filter: grayscale(.6) brightness(.7) drop-shadow(0 0 10px #ff2a2a); animation: lethalshiver .25s linear infinite; }
+@keyframes lethalshiver { 25% { transform: translateX(-2px) rotate(-3deg); } 75% { transform: translateX(2px) rotate(3deg); } }
+.enemy.lethal::before { content: '💀'; position: absolute; left: 50%; top: 22%; transform: translate(-50%, -50%); font-size: 46px; z-index: 7; pointer-events: none; filter: drop-shadow(0 0 10px #ff2a2a); animation: skullpop .6s ease-in-out infinite; }
+@keyframes skullpop { 50% { transform: translate(-50%, -50%) scale(1.18); } }
+.enemy.lethal.aim::after { display: none; }
