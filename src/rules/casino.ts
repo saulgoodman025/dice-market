@@ -11,7 +11,7 @@ import { giveRelic, relicOfRarity, rollItemId } from './economy';
 import { addJackpot, gainChips, gainGold, healPlayer, damagePlayer } from './ops';
 
 export const pct = (p: number) => `${(p * 100).toFixed(1)}%`;
-export const evText = (ev: number) => `기대 수익 ×${ev.toFixed(2)}`;
+export const evText = (ev: number) => `기대값 ×${ev.toFixed(2)}`;
 
 export function payoutMult(run: RunState): number {
   return Math.max(0, 1 + getMods(run).payoutEv);

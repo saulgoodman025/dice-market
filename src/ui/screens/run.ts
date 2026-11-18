@@ -46,7 +46,8 @@ export function rewardScreen(app: App): string {
   const don = `<div class="card col center">
     <b>🎲 더블 오어 낫싱</b>
     <div class="die bigdie" id="dondie">${pipsHtml(ui.don.face)}</div>
-    <div class="odds">${donMin(run)}~6 = 2배 · 성공 ${pct(donChance(run))} · ${evText(donEV(run))} · 최대 ${donMaxStreak(run)}연속 (${rw.donStreak}/${donMaxStreak(run)})</div>
+    <div class="muted small">주사위 ${donMin(run)}~6이 나오면 2배, 아니면 0 (${rw.donStreak}/${donMaxStreak(run)}연속)</div>
+    <div class="odds">성공 ${pct(donChance(run))} · ${evText(donEV(run))}</div>
     <div style="min-height:18px;font-weight:800" class="${ui.don.text.includes('성공') ? 'gold' : 'red'}">${esc(ui.don.text)}</div>
     ${run.consumables.includes('insurance') ? '<div class="small green">📄 보험증서: 실패 시 원금 반환</div>' : ''}
     <div class="row center"><button class="btn danger" data-act="don" ${canDon ? '' : 'disabled'}>${rw.gold}G 걸고 굴리기</button><button class="btn primary" data-act="collect" ${collected ? 'disabled' : ''}>${collected ? '수령 완료' : `${rw.gold}G 받기`}</button></div>
@@ -81,7 +82,7 @@ export function shopScreen(app: App): string {
   }).join('');
   return `${topbar(app)}<div class="screen">
     <h2 class="center">🛒 상점</h2>
-    <div class="odds center">흥정: 1 = +50% · 2~5 = 눈×5% 할인 · 6 = 무료 (각 16.7%) · 평균 가격 ×${ho.ev.toFixed(2)} · 상품당 ${maxH}회</div>
+    <div class="odds center">🎲흥정: 6 무료 · 2~5 할인 · 1 바가지(+50%) · 평균 가격 ×${ho.ev.toFixed(2)}</div>
     <div class="col">${items}</div>
     <div class="row">
       <button class="btn grow" data-act="shopReroll">🔄 리롤 ${s.rerollFree ? '<span class="green">무료</span>' : s.rerollCost + 'G'}</button>

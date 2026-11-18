@@ -248,8 +248,8 @@ export interface RunState {
 
 export type GameEvent =
   | { t: 'roll'; keys: number[] }
-  | { t: 'dmgEnemy'; uid: number; amount: number; crit?: boolean; blocked?: number }
-  | { t: 'dmgPlayer'; amount: number; blocked: number }
+  | { t: 'dmgEnemy'; uid: number; amount: number; crit?: boolean; blocked?: number; src?: string }
+  | { t: 'dmgPlayer'; amount: number; blocked: number; src?: string }
   | { t: 'block'; amount: number }
   | { t: 'heal'; amount: number }
   | { t: 'gold'; amount: number }

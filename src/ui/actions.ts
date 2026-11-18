@@ -1,6 +1,6 @@
 import type { App } from './app';
 import { sfx } from '../audio/sfx';
-import { clearRun } from '../core/save';
+import { clearRun, saveMeta } from '../core/save';
 import { CONSUMABLE_BY_ID } from '../data/consumables';
 import { SKILL_BY_ID, condText } from '../data/skills';
 import {
@@ -40,6 +40,9 @@ export function handleAction(app: App, act: string, arg: string) {
     }
     case 'speed': app.settings.speed = app.settings.speed === 1 ? 2 : 1; app.applySettings(); break;
     case 'modal': ui.modal = arg as typeof ui.modal; break;
+    case 'tutOpen': ui.tut = 1; ui.modal = null; break;
+    case 'tutNext': ui.tut = ui.tut >= 5 ? 0 : ui.tut + 1; if (ui.tut === 0) finishTutorial(app); break;
+    case 'tutSkip': ui.tut = 0; finishTutorial(app); break;
     case 'closeModal': ui.modal = null; ui.scratch = null; ui.mystery = null; break;
     case 'quit': ui.modal = 'quit'; break;
     case 'abandon':
@@ -90,10 +93,10 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'die': {
       if (!cb) break;
       if (ui.picker) { pickerDie(app, n); return; }
+      ui.infoKey = n;
       if (cb.phase === 'roll') { toggleLock(ctx, n); sfx.lock(); }
       else ui.sel = ui.sel.includes(n) ? ui.sel.filter((k) => k !== n) : [...ui.sel, n];
       app.render();
-      maybeTutorial(app);
       return;
     }
     case 'target': if (cb) setTarget(ctx, n); break;
@@ -120,10 +123,18 @@ function runAction(app: App, act: string, arg: string, n: number) {
       useSkill(ctx, n, keys);
       ui.sel = [];
       app.after();
-      maybeTutorial(app);
       return;
     }
-    case 'endTurn': if (cb) { endTurn(ctx); ui.sel = []; ui.picker = null; maybeTutorial(app); } break;
+    case 'endTurn': {
+      if (!cb) break;
+      const hp0 = run.hp;
+      endTurn(ctx);
+      ui.sel = [];
+      ui.picker = null;
+      ui.infoKey = -1;
+      app.after({ enemyPhase: { hp0 } });
+      return;
+    }
     case 'openSet': ui.picker = { mode: 'set' }; app.render(); return;
     case 'openNudge': ui.picker = { mode: 'nudge' }; app.render(); return;
     case 'cancelPicker': ui.picker = null; app.render(); return;
@@ -235,9 +246,8 @@ function pickerDie(app: App, key: number) {
   app.render();
 }
 
-function maybeTutorial(app: App) {
-  const ui = app.ui;
-  const cb = app.run?.combat;
-  if (!cb || ui.tutorialStep > 3) return;
-  if (cb.turn > ui.tutorialStep) ui.tutorialStep = cb.turn;
+
+function finishTutorial(app: App) {
+  app.meta.tutorialDone = true;
+  saveMeta(app.meta);
 }

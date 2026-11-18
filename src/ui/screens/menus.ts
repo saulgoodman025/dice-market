@@ -43,11 +43,11 @@ export function charScreen(app: App): string {
     </button>`;
   }).join('');
   const stakes = Array.from({ length: m.maxStake + 1 }, (_, i) => `<button class="btn ${app.ui.stakeSel === i ? 'primary' : 'ghost'}" style="min-width:44px;padding:4px" data-act="stake" data-arg="${i}">${i}</button>`).join('');
-  const sdesc = app.ui.stakeSel ? STAKES.filter((s) => s.level <= app.ui.stakeSel).map((s) => s.desc).join(' · ') : '기본 난이도';
+  const sdesc = app.ui.stakeSel ? STAKES.filter((s) => s.level <= app.ui.stakeSel).map((s) => s.desc).join(' · ') : '스테이지 0: 기본 난이도';
   return `<div class="screen">
     <div class="row"><button class="btn ghost" data-act="back">←</button><h2>캐릭터 선택</h2></div>
     <div class="col">${cards}</div>
-    <div class="card"><div class="row" style="flex-wrap:wrap"><b>⚜ 스테이크</b>${stakes}</div><div class="muted small" style="margin-top:4px">${esc(sdesc)}${m.maxStake < 8 ? ' · 클리어하면 다음 스테이크 해금' : ''}</div></div>
+    <div class="card"><div class="row" style="flex-wrap:wrap"><b>⚜ 난이도 스테이지</b>${stakes}</div><div class="muted small" style="margin-top:4px">${esc(sdesc)}${m.maxStake < 8 ? ' · 클리어하면 다음 스테이지가 열린다' : ''}</div></div>
     <div class="grow"></div>
     <button class="btn primary big" data-act="start">하우스에 들어간다 ▶</button>
   </div>`;

@@ -35,7 +35,7 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   e.block -= blocked;
   const dealt = amt - blocked;
   e.hp = Math.max(0, e.hp - dealt);
-  ctx.emit({ t: 'dmgEnemy', uid: e.uid, amount: dealt, crit: info.crit, blocked });
+  ctx.emit({ t: 'dmgEnemy', uid: e.uid, amount: dealt, crit: info.crit, blocked, src: info.source });
   if (dealt > 0) def.onDamaged?.(ctx, e, dealt);
   if (e.hp <= 0) killEnemy(ctx, e);
   void cb;
@@ -73,7 +73,7 @@ export function damagePlayer(ctx: Ctx, amount: number, source: string, opts: { i
   }
   run.hp -= amt;
   if (cb) cb.dmgTaken += amt;
-  ctx.emit({ t: 'dmgPlayer', amount: amt, blocked });
+  ctx.emit({ t: 'dmgPlayer', amount: amt, blocked, src: source });
   if (run.hp <= 0) {
     for (const s of sources(run)) {
       if (s.saveLethal?.(ctx)) {

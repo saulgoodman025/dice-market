@@ -232,7 +232,7 @@ function postRoll(ctx: Ctx, rolled: HandDie[]) {
       hd.used = true;
       hd.gone = true;
       cb.brokenDice.push(hd.dieIdx);
-      toast(ctx, '💥 유리 주사위가 깨졌다 (이번 전투 사용 불가)', 'bad');
+      toast(ctx, '💥 유리 주사위 깨짐 (이번 전투)', 'bad');
       continue;
     }
     const f = faceOf(hd);
@@ -691,4 +691,53 @@ export function useConsumable(ctx: Ctx, idx: number, def: { use?: (c: Ctx) => bo
   const ok = def.use(ctx);
   if (ok) ctx.run.consumables.splice(idx, 1);
   return ok;
+}
+
+export interface SkillPreview {
+  keys: number[] | null;
+  dmg: number;
+  block: number;
+  heal: number;
+  gold: number;
+  piggy: number;
+  chance: boolean;
+}
+
+/** 스킬을 실제 규칙으로 복제 상태에서 미리 실행해 예상 효과를 구한다 (실제 상태·RNG는 건드리지 않음) */
+export function previewSkill(ctx: Ctx, slot: number, prefer: number[]): SkillPreview {
+  const empty: SkillPreview = { keys: null, dmg: 0, block: 0, heal: 0, gold: 0, piggy: 0, chance: false };
+  const cb = ctx.run.combat;
+  if (!cb || cb.phase === 'over' || !skillUsable(ctx, slot)) return empty;
+  const keys = canUse(ctx, slot, prefer) ? prefer : autoPick(ctx, slot, prefer);
+  if (!keys) return empty;
+  const def = SKILL_BY_ID[ctx.run.skills[slot].id];
+  const run2 = structuredClone(ctx.run);
+  const c2: Ctx = { run: run2, emit: () => {} };
+  const cb2 = run2.combat!;
+  if (cb2.phase === 'roll') confirmHand(c2);
+  if (cb2.result) return { ...empty, keys };
+  const hp0 = cb2.enemies.reduce((s, e) => s + e.hp + e.block, 0);
+  const b0 = cb2.block + cb2.keepBlock;
+  const h0 = run2.hp;
+  const g0 = run2.gold;
+  const p0 = cb2.piggy;
+  useSkill(c2, slot, keys, def.needsChoice ? undefined : undefined);
+  const hp1 = cb2.enemies.reduce((s, e) => s + e.hp + e.block, 0);
+  return {
+    keys,
+    dmg: Math.max(0, hp0 - hp1),
+    block: Math.max(0, cb2.block + cb2.keepBlock - b0),
+    heal: Math.max(0, run2.hp - h0),
+    gold: Math.max(0, run2.gold - g0),
+    piggy: Math.max(0, cb2.piggy - p0),
+    chance: !!def.chance,
+  };
+}
+
+/** 이번 턴에 더 할 수 있는 행동이 있는가 */
+export function hasMoves(ctx: Ctx): boolean {
+  const cb = ctx.run.combat;
+  if (!cb || cb.phase === 'over') return false;
+  if (cb.phase === 'roll' && canReroll(ctx)) return true;
+  return ctx.run.skills.some((_, i) => skillUsable(ctx, i) && !!autoPick(ctx, i));
 }

@@ -245,3 +245,152 @@ h1, h2, h3 { margin: 0; }
 .preview-chip { font-size: 11px; background: #000a; border-radius: 6px; padding: 1px 6px; }
 .hidden { display: none !important; }
 .slowmo #app, #app.slowmo { filter: saturate(1.4); }
+
+/* ═════════ v0.2 편의성 패치: 카지노 테이블 · 타격감 · 읽기 쉬운 UI ═════════ */
+#app {
+  /* 카지노 카펫 */
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%),
+    repeating-linear-gradient(45deg, rgba(255,200,90,.05) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, rgba(255,200,90,.05) 0 2px, transparent 2px 22px),
+    linear-gradient(#3a0d16, #22070d);
+}
+.topbar { gap: 6px; padding: 6px 10px; font-size: 13px; }
+.heat i { width: 5px; height: 11px; }
+.jp { width: 52px; }
+.iconbtn { min-width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.08); border: 1px solid var(--line); font-weight: 900; font-size: 16px; }
+
+.screen.combat { gap: 6px; padding-top: 4px; }
+
+/* 테이블 */
+.table {
+  position: relative; display: flex; flex-direction: column; gap: 4px; padding: 10px 10px 8px;
+  border-radius: 46% 46% 28px 28px / 26% 26% 28px 28px;
+  background: radial-gradient(ellipse at 50% 35%, #1c7a59, #10583f 55%, #0a3a2a);
+  border: 9px solid #6b3a1c;
+  box-shadow: inset 0 0 0 2px rgba(245,197,66,.35), inset 0 8px 30px rgba(0,0,0,.45), 0 0 0 2px #2a1408, 0 8px 18px rgba(0,0,0,.6);
+  background-clip: padding-box;
+}
+.table::before { /* 나무 레일 결 */
+  content: ''; position: absolute; inset: -9px; border-radius: inherit; pointer-events: none;
+  border: 9px solid transparent; background: linear-gradient(135deg, #8a4b22, #5a2f14 40%, #9a5a2a 60%, #4d270f) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.felt-print { position: absolute; left: 0; right: 0; top: 46%; text-align: center; font-weight: 900; letter-spacing: 3px; font-size: 11px; color: rgba(245,197,66,.13); pointer-events: none; }
+.enemies { min-height: 118px; gap: 6px; }
+.enemy { background: transparent; border: none; padding: 2px 4px; border-radius: 12px; }
+.enemy.target { background: rgba(245,197,66,.12); box-shadow: 0 0 0 2px var(--gold) inset; }
+.enemy .em { font-size: 44px; filter: drop-shadow(0 4px 4px rgba(0,0,0,.5)); }
+.enemy .name { font-size: 11px; color: #e7f2ea; }
+.enemy .status { font-size: 10px; }
+.ehp { position: relative; height: 12px; margin: 2px auto 0; max-width: 110px; background: #3a1214; border-radius: 6px; overflow: hidden; border: 1px solid rgba(0,0,0,.5); }
+.ehp > i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #e5484d, #ff7a6e); transition: width .35s; }
+.ehp > b { position: absolute; inset: 0; font-size: 10px; display: flex; align-items: center; justify-content: center; text-shadow: 0 1px 2px #000; }
+.intent { font-size: 15px !important; padding: 3px 10px !important; border-radius: 12px !important; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.intent.atk { background: #5a1418 !important; border: 1px solid #ff6b6b !important; color: #ffd9d9; }
+.intent.def { background: #12304a !important; border: 1px solid #5aa9ff !important; color: #d8ecff; }
+.intent.util { background: #2f2141 !important; border: 1px solid #a983ff !important; color: #eadfff; font-size: 12px !important; }
+.intent.fire { animation: ifire .5s; }
+@keyframes ifire { 30% { transform: scale(1.35); filter: brightness(1.8); } }
+.enemy.act .em { animation: lunge calc(.45s / var(--speed)) ease-in-out; }
+@keyframes lunge { 35% { transform: translateY(26px) scale(1.25); } 55% { transform: translateY(20px) scale(1.2) rotate(-4deg); } }
+.enemy.hit .em { animation: ehit2 calc(.3s / var(--speed)); }
+@keyframes ehit2 { 0% { filter: brightness(3) sepia(1) hue-rotate(-50deg) saturate(6); transform: translateX(-8px) rotate(-8deg); } 50% { transform: translateX(6px) rotate(4deg); filter: brightness(1.6) sepia(1) hue-rotate(-50deg) saturate(4); } 100% { filter: none; transform: none; } }
+.enemy.dying { animation: edie .6s forwards; }
+@keyframes edie { to { opacity: .15; transform: scale(.8) translateY(-6px); filter: grayscale(1); } }
+.slash { position: absolute; left: 50%; top: 42%; width: 120%; height: 6px; background: linear-gradient(90deg, transparent, #fff, #ffe9a8, transparent); transform: translate(-50%, -50%) rotate(-28deg) scaleX(0); border-radius: 3px; box-shadow: 0 0 12px #fff; pointer-events: none; animation: slash calc(.32s / var(--speed)) ease-out forwards; z-index: 5; }
+.slash.crit { height: 10px; background: linear-gradient(90deg, transparent, #ffd34d, #fff, transparent); box-shadow: 0 0 20px #ffd34d; }
+@keyframes slash { 40% { transform: translate(-50%, -50%) rotate(-28deg) scaleX(1); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(-28deg) scaleX(1.1); opacity: 0; } }
+.rulechip { text-align: center; font-size: 12px; font-weight: 800; color: #ffd0d0; background: rgba(0,0,0,.35); border-radius: 8px; padding: 2px 8px; align-self: center; }
+
+.handbar { align-self: center; min-height: 34px; padding: 2px 14px; border-radius: 18px; background: rgba(0,0,0,.35); border: 1px solid rgba(245,197,66,.4); gap: 8px; }
+.handbar .hname { font-size: 17px; }
+.handbar .hmult { font-size: 19px; }
+.handbar .hq { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.15); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.handbar.nohand .hname, .handbar.nohand .hmult { color: var(--ink-dim); }
+.tray { padding: 2px 0; }
+.tray.veiled .die { visibility: hidden; }
+.die.special::before { content: ''; position: absolute; left: 4px; top: 4px; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff; }
+.tablestats { display: flex; justify-content: center; gap: 16px; font-size: 12px; color: #cfe7da; }
+.tablestats b { color: #fff; }
+
+/* 플레이어 패널 */
+.player { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 14px; background: linear-gradient(180deg, #1d2a24, #121b17); border: 1px solid rgba(255,255,255,.12); min-height: 48px; }
+.player .pav { font-size: 26px; }
+.player .hpbar { height: 18px; min-width: 70px; }
+.player .hpbar > b { font-size: 11px; }
+.player.hurt { animation: phurt calc(.4s / var(--speed)); }
+@keyframes phurt { 20% { background: #6a1218; transform: translateX(-5px); } 50% { transform: translateX(4px); } }
+.pblock { font-weight: 900; color: #8cc6ff; font-size: 15px; min-width: 38px; text-align: center; }
+.pblock.zero { opacity: .45; }
+.pblock.pop { animation: bpop .35s; }
+.cbtn { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid var(--line); font-size: 19px; flex-shrink: 0; }
+.cbtn.tool { font-size: 14px; font-weight: 800; background: rgba(245,197,66,.18); border-color: var(--gold-dim); }
+.vignette { position: absolute; inset: 0; pointer-events: none; z-index: 85; box-shadow: inset 0 0 90px 30px rgba(220,30,40,.75); animation: vig calc(.45s / var(--speed)) ease-out forwards; }
+@keyframes vig { from { opacity: 1; } to { opacity: 0; } }
+.dieinfo { min-height: 20px; font-size: 12px; text-align: center; color: var(--ink-dim); line-height: 1.35; }
+.dieinfo b { color: var(--ink); }
+
+/* 스킬 카드 */
+.skills { gap: 6px; }
+.skill { min-height: 54px; padding: 6px 8px; gap: 3px; background: linear-gradient(180deg, #24392f, #1a2b24); border: 2px solid rgba(255,255,255,.1); justify-content: center; }
+.skill .srow { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.skill .sn { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.skill .cond { flex-shrink: 0; font-size: 10.5px; font-weight: 800; color: #1b1208; background: #e9d3a8; border-radius: 6px; padding: 0 5px; }
+.skill .sd { font-size: 10.5px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; -webkit-line-clamp: unset; text-align: right; }
+.skill .pv { font-size: 18px; font-weight: 900; white-space: nowrap; margin-left: 2px; }
+.skill .pv.dmg { color: #ff8a80; } .skill .pv.blk { color: #8cc6ff; } .skill .pv.heal { color: #5be39a; } .skill .pv.gold { color: var(--gold); }
+.skill.ready { border-color: rgba(61,220,132,.75); box-shadow: 0 0 10px rgba(61,220,132,.25); }
+.skill.off { opacity: .5; }
+.skill.used { opacity: .28; }
+.skill.empty { display: flex; align-items: center; justify-content: center; color: var(--ink-dim); font-size: 12px; border-style: dashed; }
+.skill.r-rare { border-left: 4px solid var(--r-rare); } .skill.r-epic { border-left: 4px solid var(--r-epic); } .skill.r-legendary { border-left: 4px solid var(--r-legendary); }
+.actions { grid-template-columns: 1fr .8fr 1.3fr; }
+.btn.glow { animation: glow 1s ease-in-out infinite; }
+@keyframes glow { 50% { box-shadow: 0 0 0 3px #fff6, 0 0 22px 6px rgba(255,216,94,.9); transform: scale(1.04); } }
+
+/* 턴 배너 */
+.turnbanner { position: absolute; left: 0; right: 0; top: 38%; z-index: 88; text-align: center; font-size: 34px; font-weight: 900; padding: 10px 0; pointer-events: none; animation: tban calc(.9s / var(--speed)) ease-out forwards; text-shadow: 0 3px 0 rgba(0,0,0,.5); }
+.turnbanner.enemy { background: linear-gradient(90deg, transparent, rgba(150,20,30,.85), transparent); color: #ffe0e0; }
+.turnbanner.me { background: linear-gradient(90deg, transparent, rgba(20,110,70,.85), transparent); color: #e6ffef; }
+.turnbanner.win { background: linear-gradient(90deg, transparent, rgba(160,110,10,.9), transparent); color: #fff4c2; }
+@keyframes tban { 0% { opacity: 0; transform: scaleY(.2); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
+
+/* 족보표 · 튜토리얼 */
+.hrow { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.hrow.cur { background: rgba(245,197,66,.18); box-shadow: inset 0 0 0 2px var(--gold); }
+.hdice { display: flex; gap: 2px; flex-shrink: 0; }
+.die.tiny { width: 22px; height: 22px; border-radius: 5px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.25); }
+.die.tiny .pips { width: 16px; height: 16px; }
+.die.tiny .pips i { width: 3.5px; height: 3.5px; }
+.tutbox { gap: 12px; }
+.tutemo { font-size: 64px; }
+.tuttext { font-size: 15px; line-height: 1.6; }
+.dots { display: flex; gap: 6px; justify-content: center; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.25); }
+.dots i.on { background: var(--gold); }
+@media (prefers-reduced-motion: reduce) { .btn.glow, .enemy.act .em, .turnbanner { animation-duration: .01s; } }
+
+/* v0.2 보정 */
+.topbar { gap: 4px; padding: 5px 8px; flex-wrap: nowrap; }
+.heat { gap: 1px; } .heat i { width: 4px; height: 11px; }
+.jp { width: 40px; }
+.iconbtn { min-width: 34px; height: 34px; }
+.skills { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.skill { min-width: 0; min-height: 58px; }
+.tray.veiled .die { visibility: visible; opacity: 0; }
+.table { flex: 1 1 auto; justify-content: space-evenly; min-height: 0; }
+.enemy .em { font-size: 52px; }
+.skills.many .skill { min-height: 50px; }
+.enemy .intent { display: table !important; margin: 0 auto 2px !important; }
+.skill .pv.small2 { font-size: 13px; }
+.enemies { align-items: center; }
+.combat.enemyphase .skills, .combat.enemyphase .handbar, .combat.enemyphase .actions, .combat.enemyphase .dieinfo { opacity: .25; pointer-events: none; transition: opacity .2s; }
+.tray.many { gap: 4px; flex-wrap: nowrap; }
+.tray.many .die { width: 42px; height: 42px; font-size: 22px; }
+.tray.many .die .pips { width: 30px; height: 30px; }
+.tray.many .die .pips i { width: 6px; height: 6px; }
+.tablestats { align-items: center; }
+.tablestats .cbtn { width: 36px; height: 36px; }
+.player .hpbar { min-width: 60px; }
+.cbtn.tool { white-space: nowrap; width: auto; min-width: 36px; padding: 0 6px; }

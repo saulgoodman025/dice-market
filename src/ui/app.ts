@@ -23,7 +23,7 @@ export interface Ui {
   picker: null | { mode: 'fate' | 'set' | 'nudge'; slot?: number; keys?: number[]; target?: number };
   casinoTab: 'slot' | 'roulette' | 'high';
   bets: Record<string, number>;
-  modal: null | 'paytable' | 'bag' | 'settings' | 'scratch' | 'mystery' | 'quit';
+  modal: null | 'paytable' | 'bag' | 'settings' | 'scratch' | 'mystery' | 'quit' | 'hands';
   editDie: number;
   busy: boolean;
   charSel: string;
@@ -35,9 +35,10 @@ export interface Ui {
   high: { d: [number, number] | null; win: boolean; text: string };
   don: { rolling: boolean; face: number; text: string };
   end: { points: number; unlocked: string[] } | null;
-  tutorialStep: number;
   codexTab: 'relic' | 'face' | 'enemy' | 'hand';
   shopEdit: boolean;
+  infoKey: number;
+  tut: number;
 }
 
 export class App {
@@ -54,10 +55,12 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, tutorialStep: 0, codexTab: 'relic', shopEdit: false,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
+  private resultPending = false;
+  veil = false;
   private tipTimer = 0;
   private suppressClick = false;
 
@@ -93,7 +96,6 @@ export class App {
     const seed = (Date.now() ^ Math.floor(fxRandom() * 1e9)) >>> 0;
     this.run = newRun(seed, charId, stake, { unlocked: this.meta.unlocked });
     this.ui.page = 'run';
-    this.ui.tutorialStep = this.meta.tutorialDone ? 99 : 1;
     this.save();
   }
 
@@ -178,28 +180,39 @@ export class App {
   }
 
   /** 규칙 실행 후 호출: 저장 → 렌더 → 연출 */
-  after(opts: { noRender?: boolean } = {}) {
+  after(opts: { noRender?: boolean; enemyPhase?: { hp0: number } } = {}) {
     const run = this.run;
     const events = this.queue.splice(0);
+    const phase = !!opts.enemyPhase && events.some((e) => e.t === 'enemyAct');
+    this.veil = phase;
     if (!opts.noRender) this.render();
-    this.playFx(events);
-    if (run?.screen === 'combat' && run.combat?.result && !this.ui.busy) {
+    const dur = this.playFx(events, phase ? opts.enemyPhase!.hp0 : null);
+    if (phase && !run?.combat?.result) {
+      this.ui.busy = true;
+      setTimeout(() => { this.ui.busy = false; }, dur / this.settings.speed);
+    }
+    if (run?.screen === 'combat' && run.combat?.result && !this.resultPending) {
       const cb = run.combat;
+      this.resultPending = true;
       this.ui.busy = true;
       const boss = cb.kind === 'boss';
       const close = cb.result === 'win' && boss && run.hp <= run.maxHp * 0.1;
-      if (close) { document.documentElement.style.setProperty('--speed', String(this.settings.speed * 0.4)); }
-      if (cb.result === 'win') { sfx.win(); }
-      if (cb.result === 'lose') { sfx.lose(); }
+      const wait = Math.max(close ? 1300 : 900, dur + 500) / this.settings.speed;
+      setTimeout(() => {
+        if (close) document.documentElement.style.setProperty('--speed', String(this.settings.speed * 0.4));
+        if (cb.result === 'win') { sfx.win(); this.banner('승리!', 'win'); }
+        if (cb.result === 'lose') { sfx.lose(); this.banner('패배...', 'enemy'); }
+      }, Math.max(0, wait - 800 / this.settings.speed));
       setTimeout(() => {
         document.documentElement.style.setProperty('--speed', String(this.settings.speed));
         this.ui.busy = false;
+        this.resultPending = false;
         this.ui.sel = [];
         this.ui.picker = null;
         finishCombat(this.ctx);
         if (run.screen === 'gameover') this.endRun();
         this.after();
-      }, (close ? 1300 : 800) / this.settings.speed);
+      }, wait + (close ? 500 : 0));
     }
     if (run?.screen === 'reward' && run.reward && this.piggyAnimated !== run.reward) {
       this.piggyAnimated = run.reward;
@@ -213,61 +226,149 @@ export class App {
     return this.view.querySelector(sel);
   }
 
-  playFx(events: GameEvent[]) {
+  /** 큰 배너 (내 턴 / 적의 턴 / 승리) */
+  banner(text: string, tone: 'me' | 'enemy' | 'win') {
+    const d = document.createElement('div');
+    d.className = `turnbanner ${tone}`;
+    d.textContent = text;
+    this.root.appendChild(d);
+    setTimeout(() => d.remove(), 900 / this.settings.speed);
+  }
+
+  private setHp(v: number) {
+    const run = this.run;
+    if (!run) return;
+    const bar = this.view.querySelector<HTMLElement>('.player .hpbar > i');
+    const val = this.view.querySelector('.player .hpval');
+    if (bar) bar.style.width = `${Math.max(0, (v / run.maxHp) * 100)}%`;
+    if (val) val.textContent = String(Math.max(0, v));
+  }
+
+  private retrigger(el: Element | null, cls: string) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void (el as HTMLElement).offsetWidth;
+    el.classList.add(cls);
+  }
+
+  private slash(el: Element | null, crit?: boolean) {
+    if (!el) return;
+    const s = document.createElement('div');
+    s.className = `slash ${crit ? 'crit' : ''}`;
+    el.appendChild(s);
+    setTimeout(() => s.remove(), 400 / this.settings.speed);
+  }
+
+  /** 이벤트 연출. 적의 턴(hp0 지정)이면 적 행동을 하나씩 순서대로 보여준다. 총 소요(ms, 배속 전) 반환 */
+  playFx(events: GameEvent[], hp0: number | null = null): number {
     let delay = 0;
     const sp = this.settings.speed;
     const at = (ms: number, fn: () => void) => { if (ms <= 0) fn(); else setTimeout(fn, ms / sp); };
-    for (const e of events) {
+    const enemyPhase = hp0 !== null;
+    let hp = hp0 ?? 0;
+    const lastAct = enemyPhase ? events.map((e) => e.t).lastIndexOf('enemyAct') : -1;
+    let myTurnShown = !enemyPhase;
+    if (enemyPhase) {
+      this.setHp(hp);
+      this.banner('적의 턴', 'enemy');
+      delay = 700;
+    }
+    const showMyTurn = () => {
+      if (myTurnShown) return;
+      myTurnShown = true;
+      delay += 650;
+      at(delay, () => {
+        this.veil = false;
+        this.view.querySelector('.tray')?.classList.remove('veiled');
+        this.view.querySelector('.screen.combat')?.classList.remove('enemyphase');
+        this.setHp(this.run?.hp ?? 0);
+        if (this.run?.combat && !this.run.combat.result) this.banner('내 턴', 'me');
+      });
+      delay += 250;
+    };
+    events.forEach((e, idx) => {
+      if (enemyPhase && idx > lastAct && e.t === 'roll') showMyTurn();
       switch (e.t) {
         case 'roll': {
           const keys = e.keys;
-          at(delay, () => this.animateRoll(keys));
-          sfx.roll();
+          at(delay, () => { this.animateRoll(keys); sfx.roll(); });
           break;
         }
         case 'dmgEnemy': {
           at(delay, () => {
             const el = this.el(`[data-uid="${e.uid}"]`);
             if (e.amount > 0) {
-              floatAt(el, `${e.crit ? '★' : ''}${e.amount}`, e.crit ? '#ffd34d' : '#fff', dmgSize(e.amount) * (e.crit ? 2 : 1));
-              el?.classList.remove('hit');
-              void (el as HTMLElement | null)?.offsetWidth;
-              el?.classList.add('hit');
+              this.slash(el, e.crit);
+              this.retrigger(el, 'hit');
+              if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
+              floatAt(el, `${e.crit ? '★' : '-'}${e.amount}`, e.crit ? '#ffd34d' : '#ffffff', dmgSize(e.amount) * (e.crit ? 1.6 : 1.15));
               if (e.crit) { shake(this.root, 8); hitstop(this.root, 100); sfx.crit(); vibrate(40); }
-              else { hitstop(this.root, 50); sfx.hit(e.amount >= 20); }
+              else { shake(el, 4); hitstop(this.root, 50); sfx.hit(e.amount >= 20); }
             } else if (e.blocked) {
-              floatAt(el, `🛡${e.blocked}`, '#4aa3ff', 18);
+              floatAt(el, `🛡 ${e.blocked} 막힘`, '#4aa3ff', 17);
               sfx.block();
-            } else floatAt(el, '0', '#888', 18);
+            } else floatAt(el, '무효', '#9aa', 16);
           });
-          delay += 90;
+          delay += 140;
           break;
         }
-        case 'dmgPlayer':
-          at(delay, () => {
-            const el = this.el('.hpbar');
-            if (e.amount > 0) { floatAt(el, `-${e.amount}`, '#ff5a5f', dmgSize(e.amount)); shake(this.root, 5); sfx.hurt(); vibrate(60); }
-            if (e.blocked > 0) floatAt(this.el('.pblock'), `🛡-${e.blocked}`, '#4aa3ff', 16);
+        case 'dmgPlayer': {
+          const amt = e.amount;
+          if (enemyPhase && idx < lastAct + 1) hp -= amt;
+          else if (enemyPhase) hp -= amt;
+          const shown = hp;
+          at(delay + 160, () => {
+            const plate = this.el('.player');
+            if (amt > 0) {
+              this.flashDamage();
+              this.retrigger(plate, 'hurt');
+              floatAt(this.el('.player .hpbar'), `-${amt}`, '#ff5a5f', dmgSize(amt) * 1.2);
+              shake(this.root, Math.min(10, 3 + amt / 3));
+              sfx.hurt();
+              vibrate(60);
+              if (enemyPhase) this.setHp(shown);
+            }
+            if (e.blocked > 0) { floatAt(this.el('.pblock'), `🛡 ${e.blocked} 막음`, '#4aa3ff', 16); sfx.block(); }
           });
           break;
-        case 'block': at(delay, () => { floatAt(this.el('.pblock') ?? this.el('.hpbar'), `+${e.amount}🛡`, '#4aa3ff', 18); sfx.block(); }); break;
-        case 'heal': at(delay, () => { floatAt(this.el('.hpbar'), `+${e.amount}`, '#3ddc84', 18); sfx.heal(); }); break;
+        }
+        case 'block': at(delay, () => { floatAt(this.el('.pblock'), `+${e.amount}🛡`, '#6cb8ff', 18); this.retrigger(this.el('.pblock'), 'pop'); sfx.block(); }); break;
+        case 'heal': {
+          if (enemyPhase) hp += e.amount;
+          at(delay, () => { floatAt(this.el('.player .hpbar') ?? this.el('.hpbar'), `+${e.amount}`, '#3ddc84', 18); sfx.heal(); });
+          break;
+        }
         case 'gold': at(delay, () => { floatAt(this.el('.st-gold'), `${e.amount > 0 ? '+' : ''}${e.amount}G`, '#f5c542', 16); if (e.amount > 0) sfx.coin(); }); break;
         case 'chips': at(delay, () => { floatAt(this.el('.st-chips'), `${e.amount > 0 ? '+' : ''}${e.amount}🎰`, '#ff9de2', 15); sfx.chip(); }); break;
         case 'hand': at(delay + 650, () => this.handBanner(e.hand.id, e.hand.mult)); break;
         case 'yahtzee': at(delay + 700, () => this.yahtzeeFx()); break;
         case 'heat': if (e.heat >= BALANCE.heatMax) at(delay, () => this.toast('🔥 온 파이어! 다음 굴림 주사위 1개 = 6', 'gold')); break;
-        case 'jackpotFull': at(delay + 300, () => { sfx.jackpot(); this.toast('💰 잭팟 게이지 100%! 다음 턴은 잭팟 턴', 'gold'); vibrate([60, 40, 60]); }); break;
-        case 'enemyDie': at(delay + 120, () => { burstAt(this.el(`[data-uid="${e.uid}"]`), '#ffd34d', 28); }); break;
-        case 'enemyAct':
-          delay += 280;
-          at(delay, () => { const el = this.el(`[data-uid="${e.uid}"]`); el?.classList.remove('act'); void (el as HTMLElement | null)?.offsetWidth; el?.classList.add('act'); });
+        case 'jackpotFull': at(delay + 300, () => { sfx.jackpot(); this.toast('💰 잭팟 100%! 다음 턴은 잭팟 턴', 'gold'); vibrate([60, 40, 60]); }); break;
+        case 'enemyDie': at(delay + 150, () => { const el = this.el(`[data-uid="${e.uid}"]`); burstAt(el, '#ffd34d', 30); el?.classList.add('dying'); }); break;
+        case 'enemyAct': {
+          delay += enemyPhase ? 750 : 280;
+          const uid = e.uid;
+          at(delay, () => {
+            const el = this.el(`[data-uid="${uid}"]`);
+            this.retrigger(el, 'act');
+            this.retrigger(el?.querySelector('.intent') ?? null, 'fire');
+          });
           break;
+        }
         case 'toast': { const tx = e.text; const tone = e.tone; at(delay, () => this.toast(tx, tone)); break; }
         case 'megaJackpot': at(delay + 400, () => this.megaFx()); break;
         case 'sfx': break;
       }
-    }
+    });
+    if (enemyPhase) showMyTurn();
+    return delay + 200;
+  }
+
+  private flashDamage() {
+    const v = document.createElement('div');
+    v.className = 'vignette';
+    this.root.appendChild(v);
+    setTimeout(() => v.remove(), 450 / this.settings.speed);
   }
 
   /** 저금통 정산: 코인이 하나씩 쌓이는 소리 (최대 30개, 이후 빠르게) */
