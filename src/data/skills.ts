@@ -45,6 +45,7 @@ export interface SkillDef {
   perCombat?: number;
   needsChoice?: boolean; // 다른 주사위와 눈 선택 필요 (운명 조작)
   noEcho?: boolean;
+  keepDie?: boolean; // 주사위를 바꾸기만 하고 소모하지 않음
   icon: string; // 카드 그림
   target?: 'enemy'; // 적 하나를 골라 쓰는 스킬 (없으면 화면에 놓기만 하면 발동)
   chance?: boolean; // 결과가 운에 달려 미리보기 불가
@@ -141,7 +142,7 @@ export const SKILLS: SkillDef[] = [
     run: (u) => { const cb = cbOf(u.ctx); cb.piggy = Math.round(cb.piggy * 1.5 + u.v); },
   },
   {
-    id: 'fate', name: '운명 조작', icon: '🔮', rarity: 'legendary', cond: { k: 'any' }, desc: '다른 주사위 하나를 원하는 눈으로', role: 'util', needsChoice: true, noEcho: true,
+    id: 'fate', name: '운명 조작', icon: '🔮', rarity: 'legendary', cond: { k: 'any' }, desc: '다른 주사위 하나를 원하는 눈으로 (이 주사위는 돌려받음)', role: 'util', needsChoice: true, noEcho: true, keepDie: true,
     run: () => { /* combat.ts에서 choice 처리 */ },
   },
 ];

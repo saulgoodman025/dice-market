@@ -343,6 +343,7 @@ export function confirmHand(ctx: Ctx) {
   if (hand.jackpot) addJackpot(ctx, hand.jackpot);
   if (HAND_BY_ID[hand.id].celebrate) {
     run.stats.yahtzees++;
+    cb.turnCounters.yahtzee = 1;
     run.flags.meta_yahtzee = (run.flags.meta_yahtzee ?? 0) + 1;
     ctx.emit({ t: 'yahtzee' });
   }
@@ -501,6 +502,12 @@ export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key:
 
   // 면 사용 효과
   for (const d of dice) faceOf(d)?.onUse?.({ ctx, hd: d, power: faceMult });
+
+  // 주사위를 소모하지 않는 스킬 (운명 조작 등): 쓴 주사위를 그대로 돌려준다
+  if (runDef.keepDie || def.keepDie) {
+    for (const d of dice) d.used = false;
+    cb.diceUsedThisTurn -= dice.length;
+  }
 
   // 손으로 반환
   if (u.ret) {

@@ -15,12 +15,15 @@ import { doubleOrNothing, haggle, openMystery, rouletteSpin, scratchCard, slotSp
 import type { RouletteBet } from '../data/casino';
 import { animateDon, animateRoulette, animateSlot } from './screens/casino';
 import { vibrate } from './fx/fx';
+import { COACH } from './coach';
+
+const TUT_STEPS = COACH.length;
 
 export function handleAction(app: App, act: string, arg: string) {
   const ui = app.ui;
   const run = app.run;
   const n = Number(arg);
-  sfx.click();
+  if (act !== 'cardTap') sfx.click();
   switch (act) {
     // ── 타이틀/메뉴 ──
     case 'new': ui.page = 'charselect'; ui.stakeSel = Math.min(ui.stakeSel, app.meta.maxStake); break;
@@ -40,9 +43,14 @@ export function handleAction(app: App, act: string, arg: string) {
     }
     case 'speed': app.settings.speed = app.settings.speed === 1 ? 2 : 1; app.applySettings(); break;
     case 'modal': ui.modal = arg as typeof ui.modal; break;
+    case 'relicInfo': {
+      const el = app.view.querySelector<HTMLElement>(`[data-act="relicInfo"][data-arg="${arg}"]`);
+      if (el) app.tipAt(el, 2600);
+      return;
+    }
     case 'helpTab': ui.helpTab = arg as typeof ui.helpTab; break;
     case 'tutOpen': ui.tut = 1; ui.modal = null; break;
-    case 'tutNext': ui.tut = ui.tut >= 5 ? 0 : ui.tut + 1; if (ui.tut === 0) finishTutorial(app); break;
+    case 'tutNext': ui.tut = ui.tut >= TUT_STEPS ? 0 : ui.tut + 1; if (ui.tut === 0) finishTutorial(app); break;
     case 'tutSkip': ui.tut = 0; finishTutorial(app); break;
     case 'closeModal': ui.modal = null; ui.scratch = null; ui.mystery = null; break;
     case 'quit': ui.modal = 'quit'; break;
@@ -212,7 +220,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'pickSlot': ui.pickSlot = n; app.render(); return;
     case 'replaceSkill': replaceSkill(ctx, n < 0 ? null : n); ui.pickSlot = null; break;
     case 'replaceConfirm': if (ui.pickSlot !== null) replaceSkill(ctx, ui.pickSlot); ui.pickSlot = null; break;
-    case 'upgradeConfirm': if (ui.pickSlot !== null) upgradeSkill(ctx, ui.pickSlot); ui.pickSlot = null; break;
+    case 'upgradeConfirm': if (ui.pickSlot !== null) { upgradeSkill(ctx, ui.pickSlot); ui.restPick = null; } ui.pickSlot = null; break;
     case 'upgrade': upgradeSkill(ctx, n); break;
     case 'cancelPending': cancelPending(ctx); ui.pickSlot = null; break;
     case 'offer': pickOffer(ctx, n < 0 ? null : n); break;
@@ -259,6 +267,12 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'evLeave': advance(ctx); break;
     case 'restHeal': restHeal(ctx); break;
     case 'restUp': restUpgrade(ctx); break;
+    case 'restPick': ui.restPick = arg as 'heal' | 'up'; app.render(); return;
+    case 'restConfirm':
+      if (ui.restPick === 'heal') { ui.restPick = null; restHeal(ctx); }
+      else if (ui.restPick === 'up') restUpgrade(ctx);
+      break;
+    case 'restBack': run.pending = null; ui.pickSlot = null; break;
     case 'faceOffer': offerFaces(ctx, run.screen); break;
     default: break;
   }

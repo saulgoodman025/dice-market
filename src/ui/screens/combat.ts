@@ -63,7 +63,7 @@ export function combatScreen(app: App): string {
     return `<div class="enemy ${isT ? 'target' : ''} ${e.hp <= 0 ? 'dead' : ''}" data-uid="${e.uid}" data-act="target" data-arg="${e.uid}" data-tip="${esc(def.name + (def.desc ? ': ' + def.desc : ''))}">
       <div class="intent ${it.cls}">${it.text}</div>
       <div class="em">${e.emoji}</div>
-      <div class="ehp"><i style="width:${hpPct}%"></i><b>${e.hp}</b></div>
+      <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>${e.hp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
     </div>`;
   }).join('');
@@ -140,12 +140,12 @@ export function combatScreen(app: App): string {
       <div class="enemies">${enemies}</div>
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}
-      <div class="tray ${app.veil ? 'veiled' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>
+      <div class="tray ${app.veil ? 'veiled' : ''} ${cb.turnCounters.yahtzee && !app.veil ? 'yahtzee' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>
       <div class="tablestats"><span data-tip="리롤: 잠그지 않은 주사위를 다시 굴림">🎲 리롤 <b>${roll ? cb.rerollsLeft : 0}</b></span><span data-tip="안 쓴 주사위 눈이 모여 전투 후 골드가 된다">🐷 <b>${cb.piggy}</b></span>${tools}</div>
     </div>
     <div class="player">
       <span class="pav" data-tip="${esc(ch.name + ': ' + ch.desc)}">${ch.emoji}</span>
-      <div class="hpbar"><i style="width:${hpPct}%"></i><b>❤ <span class="hpval">${run.hp}</span>/${run.maxHp}</b></div>
+      <div class="hpbar" data-hpk="p" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>❤ <span class="hpval">${run.hp}</span>/${run.maxHp}</b></div>
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>

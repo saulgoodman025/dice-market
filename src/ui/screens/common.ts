@@ -41,8 +41,9 @@ export function consumablesRow(app: App): string {
 export function relicStrip(app: App): string {
   const r = app.run!;
   if (!r.relics.length) return '';
-  return `<div class="row" style="flex-wrap:wrap;gap:4px">${r.relics.map((id) => {
+  const RN = { common: '일반', rare: '희귀', epic: '영웅', legendary: '전설' } as const;
+  return `<div class="relicstrip">${r.relics.map((id) => {
     const d = RELIC_BY_ID[id];
-    return `<span data-tip="${esc(d.name + ': ' + d.desc)}" style="font-size:20px">${d.emoji}</span>`;
+    return `<button class="relic r-${d.rarity}" data-act="relicInfo" data-arg="${id}" data-tip="${esc(`${d.emoji} ${d.name} (${RN[d.rarity]})\n${d.desc}`)}">${d.emoji}</button>`;
   }).join('')}</div>`;
 }

@@ -13,6 +13,7 @@ import { pipsHtml } from './components/parts';
 import { renderScreen } from './screens/index';
 import { handleAction } from './actions';
 import { initCardDrag } from './drag';
+import { drawCoach, COACH } from './coach';
 import { ENEMY_BY_ID } from '../data/enemies';
 
 /** 강한 공격 연출 기준 피해량 */
@@ -47,6 +48,7 @@ export interface Ui {
   pickSlot: number | null;
   pickFace: number | null;
   selCard: number | null; // 탭으로 고른 스킬 카드
+  restPick: 'heal' | 'up' | null;
   pickMat: number | null;
   /** 연출 중에는 결과가 반영되기 전 숫자를 보여준다 (결과 미리 노출 방지) */
   freeze: { gold: number; chips: number; hp: number } | null;
@@ -67,7 +69,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, freeze: null,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, freeze: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
@@ -144,9 +146,23 @@ export class App {
       if (!t) return;
       const x = ev.clientX;
       const y = ev.clientY;
-      this.tipTimer = window.setTimeout(() => { this.showTip(t.dataset.tip!, x, y); this.suppressClick = true; }, 420);
+      this.tipTimer = window.setTimeout(() => { this.showTip(t.dataset.tip!, x, y, t); this.suppressClick = true; }, 420);
     });
-    const cancel = () => { clearTimeout(this.tipTimer); setTimeout(() => this.hideTip(), 1400); };
+    const cancel = () => { clearTimeout(this.tipTimer); if (!this.tipPinned) setTimeout(() => this.hideTip(), 1400); };
+    // 마우스: 올리면 바로 설명
+    this.root.addEventListener('pointerover', (ev) => {
+      if (ev.pointerType !== 'mouse' || this.root.classList.contains('dragging') || ev.buttons) return;
+      const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+      if (!t || this.tipFor === t) return;
+      const r = t.getBoundingClientRect();
+      this.showTip(t.dataset.tip!, r.left + r.width / 2, r.top, t);
+    });
+    this.root.addEventListener('pointerout', (ev) => {
+      if (ev.pointerType !== 'mouse') return;
+      const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+      const to = (ev.relatedTarget as HTMLElement | null)?.closest?.('[data-tip]');
+      if (t && t !== to && this.tipFor === t) this.hideTip();
+    });
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -164,8 +180,22 @@ export class App {
     setTimeout(() => { this.suppressClick = false; }, 0);
   }
 
-  private showTip(text: string, x: number, y: number) {
+  private tipFor: HTMLElement | null = null;
+  private tipPinned = false;
+
+  /** 요소 위에 설명 풍선을 띄운다 (탭으로 연 경우 잠시 고정) */
+  tipAt(el: HTMLElement, pinMs = 0) {
+    const r = el.getBoundingClientRect();
+    this.showTip(el.dataset.tip ?? '', r.left + r.width / 2, r.top, el);
+    if (pinMs) {
+      this.tipPinned = true;
+      setTimeout(() => { this.tipPinned = false; if (this.tipFor === el) this.hideTip(); }, pinMs);
+    }
+  }
+
+  private showTip(text: string, x: number, y: number, el: HTMLElement | null = null) {
     this.hideTip();
+    this.tipFor = el;
     const r = this.root.getBoundingClientRect();
     const d = document.createElement('div');
     d.className = 'tip';
@@ -180,6 +210,7 @@ export class App {
   private hideTip() {
     this.tipEl?.remove();
     this.tipEl = null;
+    this.tipFor = null;
   }
 
   toast(text: string, tone: 'good' | 'bad' | 'info' | 'gold' = 'info') {
@@ -203,6 +234,8 @@ export class App {
     this.view.innerHTML = renderScreen(this);
     if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
     this.reapplyRecent();
+    this.applyHpTrails();
+    drawCoach(this);
     if (this.debug && run) {
       updateFlow(run);
       const d = document.createElement('div');
@@ -290,10 +323,55 @@ export class App {
   private setHp(v: number) {
     const run = this.run;
     if (!run) return;
-    const bar = this.view.querySelector<HTMLElement>('.player .hpbar > i');
+    const bar = this.view.querySelector<HTMLElement>('.player .hpbar');
     const val = this.view.querySelector('.player .hpval');
-    if (bar) bar.style.width = `${Math.max(0, (v / run.maxHp) * 100)}%`;
+    if (bar) this.trailTo(bar, 'p', Math.max(0, (v / run.maxHp) * 100));
     if (val) val.textContent = String(Math.max(0, v));
+  }
+
+  /** 체력바 기억값: 빨간 바는 즉시, 하얀 잔상은 뒤늦게 따라 줄어든다 */
+  private hpMem = new Map<string, number>();
+  private trailTimers = new Map<string, number>();
+  private trailTo(bar: HTMLElement, key: string, pct: number) {
+    const fill = bar.querySelector<HTMLElement>('i');
+    const trail = bar.querySelector<HTMLElement>('s.trail');
+    const old = this.hpMem.get(key) ?? pct;
+    this.hpMem.set(key, pct);
+    if (fill) { fill.style.transition = 'none'; fill.style.width = `${pct}%`; }
+    if (!trail) return;
+    clearTimeout(this.trailTimers.get(key));
+    if (pct < old) {
+      // 잔상은 이전 위치에서 잠시 멈췄다가 천천히 따라간다
+      const cur = parseFloat(trail.style.width) || old;
+      trail.style.transition = 'none';
+      trail.style.width = `${Math.max(cur, old)}%`;
+      trail.classList.add('hit');
+      void trail.offsetWidth;
+      this.trailTimers.set(key, window.setTimeout(() => {
+        trail.style.transition = `width ${0.65 / this.settings.speed}s cubic-bezier(.3,.7,.4,1)`;
+        trail.style.width = `${pct}%`;
+        setTimeout(() => trail.classList.remove('hit'), 700 / this.settings.speed);
+      }, 380 / this.settings.speed));
+    } else {
+      trail.style.transition = 'none';
+      trail.style.width = `${pct}%`;
+    }
+  }
+
+  /** 다시 그린 뒤 각 체력바에 잔상 적용 (적의 턴엔 플레이어 바를 연출이 직접 움직인다) */
+  private applyHpTrails() {
+    if (!this.run?.combat) { this.hpMem.clear(); return; }
+    this.view.querySelectorAll<HTMLElement>('[data-hpk]').forEach((bar) => {
+      const key = bar.dataset.hpk!;
+      if (key === 'p' && this.veil) {
+        const old = this.hpMem.get('p');
+        const fill = bar.querySelector<HTMLElement>('i');
+        const trail = bar.querySelector<HTMLElement>('s.trail');
+        if (old !== undefined && fill && trail) { fill.style.width = `${old}%`; trail.style.width = `${old}%`; }
+        return;
+      }
+      this.trailTo(bar, key, Number(bar.dataset.pct));
+    });
   }
 
   /** 대상 요소와 같은 위치·크기의 연출 상자를 화면 밖 레이어(root)에 만든다. 화면을 다시 그려도 사라지지 않는다 */
@@ -516,6 +594,24 @@ export class App {
     vibrate(broke ? [20, 30, 40] : 25);
   }
 
+  /** 색종이 축하 */
+  confetti(n: number) {
+    const colors = ['#f2b544', '#ff6b6b', '#6fdc9b', '#8cc4ff', '#b57cff', '#ffffff'];
+    const h = this.root.getBoundingClientRect();
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('i');
+      c.className = 'confetti';
+      c.style.left = `${fxRandom() * h.width}px`;
+      c.style.background = colors[i % colors.length];
+      c.style.setProperty('--dx', `${(fxRandom() - 0.5) * 120}px`);
+      c.style.setProperty('--rot', `${fxRandom() * 720}deg`);
+      c.style.animationDelay = `${fxRandom() * 0.4}s`;
+      c.style.animationDuration = `${(1.6 + fxRandom() * 1.2) / this.settings.speed}s`;
+      this.root.appendChild(c);
+      setTimeout(() => c.remove(), 3300 / this.settings.speed);
+    }
+  }
+
   private flash(cls = 'white') {
     const f = document.createElement('div');
     f.className = `screenflash ${cls}`;
@@ -730,6 +826,9 @@ export class App {
       this.root.appendChild(fs);
       sfx.yahtzee();
       vibrate([80, 50, 80, 50, 200]);
+      this.flash('gold');
+      coinRain(50);
+      this.confetti(90);
       const r = this.root.getBoundingClientRect();
       for (let i = 0; i < 5; i++) setTimeout(() => burstAtXY(r.width * (0.2 + fxRandom() * 0.6), r.height * (0.3 + fxRandom() * 0.3)), i * 150);
       setTimeout(() => fs.remove(), 1700 / this.settings.speed);

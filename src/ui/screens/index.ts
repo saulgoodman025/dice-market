@@ -16,7 +16,7 @@ export function renderScreen(app: App): string {
   switch (run.screen) {
     case 'combat':
       if (run.combat && !app.meta.tutorialDone && ui.tut === 0) ui.tut = 1;
-      body = run.combat ? combatScreen(app) + (ui.tut > 0 ? tutorialModal(app) : '') : mapScreen(app);
+      body = run.combat ? combatScreen(app) : mapScreen(app);
       break;
     case 'map': body = mapScreen(app); break;
     case 'reward': body = rewardScreen(app); break;

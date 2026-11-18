@@ -169,11 +169,17 @@ export function eventScreen(app: App): string {
 
 export function restScreen(app: App): string {
   const run = app.run!;
+  const pick = app.ui.restPick;
+  const heal = Math.min(run.maxHp - run.hp, Math.round(run.maxHp * BALANCE.restHealPct));
+  const opt = (id: 'heal' | 'up', icon: string, title: string, desc: string) =>
+    `<button class="item restopt ${pick === id ? 'picked' : ''}" style="width:100%" data-act="restPick" data-arg="${id}"><div class="ic">${icon}</div><div class="grow" style="text-align:left"><div class="tt">${pick === id ? '✔ ' : ''}${title}</div><div class="ds">${desc}</div></div></button>`;
   return `${topbar(app)}<div class="screen" style="justify-content:center">
     <div class="center" style="font-size:64px">🛏️</div>
     <h2 class="center">휴게실</h2>
-    <button class="item" style="width:100%" data-act="restHeal"><div class="ic">❤️</div><div class="grow" style="text-align:left"><div class="tt">휴식</div><div class="ds">체력 ${Math.round(run.maxHp * BALANCE.restHealPct)} 회복 (30%)</div></div></button>
-    <button class="item" style="width:100%" data-act="restUp"><div class="ic">⬆️</div><div class="grow" style="text-align:left"><div class="tt">수련</div><div class="ds">스킬 1개 강화 +${Math.round(BALANCE.restUpgrade * 100)}%</div></div></button>
+    <div class="center small">둘 중 하나를 고른 뒤 아래 버튼으로 확정</div>
+    ${opt('heal', '❤️', '휴식', `체력 ${run.hp} → ${run.hp + heal} (+${heal})`)}
+    ${opt('up', '⬆️', '수련', `스킬 1개 강화 +${Math.round(BALANCE.restUpgrade * 100)}% · 다음 화면에서 스킬 선택`)}
+    <button class="btn primary big" data-act="restConfirm" ${pick ? '' : 'disabled'}>${pick === 'heal' ? '✔ 휴식하기' : pick === 'up' ? '강화할 스킬 고르기 ▶' : '하나를 고르세요'}</button>
   </div>`;
 }
 
@@ -232,7 +238,8 @@ function pendingModal(app: App): string {
     const list = run.skills.map((s, i) => {
       const d = SKILL_BY_ID[s.id];
       const change = isUp ? upgradeLine(run, i, p.amount) : '';
-      return `<button class="item r-${d.rarity} ${sel === i ? 'picked' : ''}" style="width:100%" data-act="pickSlot" data-arg="${i}">
+      const locked = isUp && !canUpgrade(run, i, p.amount);
+      return `<button class="item r-${d.rarity} ${sel === i ? 'picked' : ''} ${locked ? 'noup' : ''}" style="width:100%" ${locked ? 'disabled' : `data-act="pickSlot" data-arg="${i}"`}>
         <div class="grow" style="text-align:left">
           <div class="tt">${sel === i ? '✔ ' : ''}${d.name} ${rarityTag(d.rarity)} ${s.up ? `<span class="green small">강화 +${Math.round(s.up * 100)}%</span>` : ''}</div>
           <div class="ds">[${condText(d.cond)}] ${esc(fmt(d.desc, d.v))}</div>
@@ -248,7 +255,7 @@ function pendingModal(app: App): string {
       ${nd ? `<div class="item r-${nd.rarity} newskill"><div class="grow"><div class="tt">새 스킬: ${nd.name} ${rarityTag(nd.rarity)}</div><div class="ds">[${condText(nd.cond)}] ${esc(fmt(nd.desc, nd.v))}</div></div></div><div class="small center">교체할 스킬을 탭해서 고른 뒤 아래 버튼으로 확정</div>` : '<div class="small center">스킬을 탭해서 고른 뒤 아래 버튼으로 확정 · 숫자는 족보·열기 배율을 빼고 계산한 값</div>'}
       <div class="col">${list}</div>
       ${confirm}
-      <button class="btn ghost" data-act="${isUp ? 'cancelPending' : 'replaceSkill'}" data-arg="-1">${isUp ? '강화 안 함' : '새 스킬 가져가지 않음'}</button>
+      ${isUp && p.then === 'rest' ? '<button class="btn ghost" data-act="restBack">← 뒤로 (휴식/수련 다시 고르기)</button>' : `<button class="btn ghost" data-act="${isUp ? 'cancelPending' : 'replaceSkill'}" data-arg="-1">${isUp ? '강화 안 함' : '새 스킬 가져가지 않음'}</button>`}
     </div></div>`;
   }
   return '';
@@ -321,7 +328,7 @@ function upgradeLine(run: RunState, slot: number, amount: number): string {
   const def = SKILL_BY_ID[s.id];
   const basis = def.sampleBlock ? `방어도 ${def.sampleBlock}일 때` : before.chance ? '명중하면' : `🎲${before.pips.join('·')} 기준`;
   const changed = parts.some((x) => !x.includes('(+0)'));
-  if (!parts.length || !changed) return `<div class="upline none">⚠ 강화해도 수치가 바뀌지 않는 스킬 · ${mult}</div>`;
+  if (!parts.length || !changed) return `<div class="upline none">🚫 강화해도 수치가 바뀌지 않아 강화할 수 없음</div>`;
   return `<div class="upline"><span class="muted">${basis}:</span> ${parts.join(' · ')}</div>`;
 }
 
@@ -340,4 +347,13 @@ function faceConfirm(app: App, name: string): string {
   const old = f.sticker ? FACE_BY_ID[f.sticker] : null;
   return `<div class="small center">눈 ${f.pip} 면에 붙인다${old ? ` · <span class="red">기존 ${old.emoji} ${old.name} 스티커는 사라짐</span>` : ''}</div>
     <button class="btn primary big" data-act="confirmFace">✔ 여기에 「${name}」 붙이기</button>`;
+}
+
+/** 강화해서 수치가 실제로 오르는 스킬인가 */
+function canUpgrade(run: RunState, slot: number, amount: number): boolean {
+  const s = run.skills[slot];
+  const a = skillSample(run, slot, s.up);
+  const b = skillSample(run, slot, s.up + amount);
+  if (!a || !b) return false;
+  return b.dmg + b.block + b.heal + b.gold + b.piggy + b.poison > a.dmg + a.block + a.heal + a.gold + a.piggy + a.poison;
 }
