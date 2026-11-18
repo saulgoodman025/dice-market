@@ -148,16 +148,17 @@ export function combatScreen(app: App): string {
       <div class="tablestats">
         <span data-tip="리롤: 잠그지 않은 주사위를 다시 굴림">🎲 <b>${roll ? cb.rerollsLeft : 0}</b></span>
         <span data-tip="잠금: 한 번에 잠글 수 있는 주사위 수">🔒 <b>${roll ? lockedCount(cb) : 0}/${lockLimit(ctx)}</b></span>
-        <span class="chipstat" data-tip="🔶 족보 칩: 족보를 확정하면 받는다. 카드마다 칩을 쓴다. 남은 칩은 ${BALANCE.chipCarryMax}개까지 다음 턴으로">🔶 <b>${chips}</b>${chipGain ? `<span class="cg">+${chipGain}</span>` : ''}</span>
         <span data-tip="안 쓴 주사위 눈이 모여 전투 후 골드가 된다">🐷 <b>${cb.piggy}</b></span>${tools}</div>
     </div>
     <div class="player">
       <span class="pav" data-tip="${esc(ch.name + ': ' + ch.desc)}">${ch.emoji}</span>
       <div class="hpbar" data-hpk="p" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>❤ <span class="hpval">${run.hp}</span>/${run.maxHp}</b></div>
+      <div class="chiporb chipstat ${chipsNow === 0 ? 'empty' : ''}" data-tip="🔶 족보 칩 = 카드 비용\n족보로 얻고, 남은 칩은 ${BALANCE.chipCarryMax}개까지 이월">
+        <span class="onum">${chipsNow}</span><span class="olbl">🔶 칩</span>${chipGain ? `<span class="ogain">족보 +${chipGain}</span>` : ''}</div>
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>
-    <div class="dieinfo">${info || (ui.selCard !== null ? (SKILL_BY_ID[run.skills[ui.selCard].id].target === 'enemy' ? '🎯 공격할 <b>적</b>을 탭하세요' : '✋ <b>테이블</b>을 탭하면 사용') : roll ? '주사위를 탭해 <b>🔒잠그고</b> 리롤 · 카드를 <b>끌어다 놓아</b> 사용' : '카드를 <b>적</b>(🎯) 또는 <b>테이블</b>(✋)에 끌어다 놓기')}</div>
+    <div class="dieinfo">${info || (ui.selCard !== null ? (SKILL_BY_ID[run.skills[ui.selCard].id].target === 'enemy' ? '🎯 공격할 <b>적</b>을 탭하세요' : '✋ <b>테이블</b>을 탭하면 사용') : roll ? '🔒 탭해서 잠금 · 카드는 <b>끌어다 놓기</b>' : '🎯 카드 → 적 · ✋ 카드 → 위로')}</div>
     <div class="hand n${n}">${cards}</div>
     <div class="actions">
       <button class="btn" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}>🎲 리롤 ${roll ? cb.rerollsLeft : 0}</button>
@@ -175,7 +176,7 @@ export function handsModal(app: App): string {
   let body = '';
   if (tab === 'hands') {
     const cur = cb ? (cb.handResult ?? (cb.phase === 'roll' ? previewHand(app.ctx) : null)) : null;
-    body = `<div class="small muted">족보는 이번 턴 <b>모든 공격·방어·골드</b>에 배율(×)로 곱해지고, 카드를 쓰는 데 필요한 <b>🔶 족보 칩</b>을 준다. 남은 칩은 ${BALANCE.chipCarryMax}개까지 다음 턴으로 넘어간다.</div>
+    body = `<div class="small muted">족보 = 이번 턴 효과 <b>×배율</b> + <b>🔶 칩</b> (남으면 ${BALANCE.chipCarryMax}개까지 이월)</div>
     <div class="col" style="gap:4px">${[...HANDS].reverse().map((h) => `<div class="hrow ${cur?.id === h.id ? 'cur' : ''}">
       <div class="hdice">${h.example.map((p) => `<div class="die tiny">${pipsHtml(p)}</div>`).join('')}</div>
       <div class="grow"><b>${h.name}</b><div class="muted small">${h.how}</div></div>
@@ -183,7 +184,7 @@ export function handsModal(app: App): string {
     </div>`).join('')}</div>`;
   } else {
     const owned = new Set(app.run?.dice.map((d) => d.material) ?? []);
-    body = `<div class="small muted">주사위 왼쪽 아래 작은 아이콘이 재질이다. 전투 중 주사위를 탭하면 아래에 설명이 나온다. <b>내 것</b> 표시는 지금 가진 재질.</div>
+    body = `<div class="small muted">주사위 왼쪽 아래 아이콘 = 재질 · <b>내 것</b> = 보유 중</div>
     <div class="col" style="gap:4px">${MATERIALS.map((m) => `<div class="hrow ${owned.has(m.id) ? 'cur' : ''}">
       <div class="die small mat-${m.id}" style="flex-shrink:0">${pipsHtml(5)}${m.id !== 'wood' ? `<span class="matb">${m.icon}</span>` : ''}</div>
       <div class="grow"><b>${m.icon} ${m.name}</b>${owned.has(m.id) ? ' <span class="tag rare">내 것</span>' : ''}<div class="small">${esc(m.long)}</div></div>

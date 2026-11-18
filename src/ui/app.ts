@@ -49,6 +49,7 @@ export interface Ui {
   pickFace: number | null;
   selCard: number | null; // 탭으로 고른 스킬 카드
   restPick: 'heal' | 'up' | null;
+  rewardSel: number | null;
   pickMat: number | null;
   /** 연출 중에는 결과가 반영되기 전 숫자를 보여준다 (결과 미리 노출 방지) */
   freeze: { gold: number; chips: number; hp: number } | null;
@@ -69,7 +70,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, freeze: null,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, rewardSel: null, freeze: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;

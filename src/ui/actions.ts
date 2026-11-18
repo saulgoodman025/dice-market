@@ -191,7 +191,16 @@ function runAction(app: App, act: string, arg: string, n: number) {
       break;
     }
     case 'pick': pickReward(ctx, n); if (!run.pending && !run.offer) leaveReward(ctx); break;
-    case 'leaveReward': leaveReward(ctx); break;
+    case 'rewardSel': ui.rewardSel = n; app.render(); return;
+    case 'rewardConfirm': {
+      if (ui.rewardSel === null) return;
+      const i = ui.rewardSel;
+      ui.rewardSel = null;
+      pickReward(ctx, i);
+      if (!run.pending && !run.offer) leaveReward(ctx);
+      break;
+    }
+    case 'leaveReward': ui.rewardSel = null; leaveReward(ctx); break;
     // ── 상점 ──
     case 'haggle': {
       const d = haggle(ctx, n);
@@ -202,8 +211,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'pricetag': shopApplyPricetag(ctx, n); break;
     case 'shopReroll': {
       const d = shopReroll(ctx);
-      if (d === null) app.toast('골드가 부족하다', 'bad');
-      else app.toast(`🎲 리롤 주사위 ${d}${d === 6 ? ' — 다음 리롤 무료!' : ''}`, d === 6 ? 'gold' : 'info');
+      if (d === null) app.toast(run.shop && run.shop.rerolls >= 1 ? '리롤은 상점마다 1번' : '골드가 부족하다', 'bad');
       break;
     }
     case 'buyChip': if (!buyChip(ctx)) app.toast('골드가 부족하다', 'bad'); break;

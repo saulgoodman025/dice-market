@@ -108,14 +108,29 @@ export function rewardScreen(app: App): string {
     </div>`;
   }
   const kind = rw.options[0]?.kind === 'relic' ? '유물' : '보상';
-  const opts = rw.options.map((o, i) => itemHtml(o, rw.picked ? 'sold' : '', rw.picked ? '' : `<button class="btn primary" data-act="pick" data-arg="${i}">가져가기</button>`)).join('');
-  return `${topbar(app)}<div class="screen">
+  const sel = ui.rewardSel;
+  const RN = { common: '일반', rare: '희귀', epic: '영웅', legendary: '전설' } as const;
+  const cards = rw.options.map((o, i) => {
+    const info = optInfo(o);
+    const icon = o.kind === 'skill' ? SKILL_BY_ID[o.id].icon : info.emoji;
+    const cost = o.kind === 'skill' ? `<span class="rccost">${SKILL_BY_ID[o.id].cost}</span>` : '';
+    return `<button class="rcard rar-${info.rarity} ${sel === i ? 'sel' : ''} ${rw.picked ? 'done' : ''}" style="animation-delay:${i * 0.08}s" ${rw.picked ? 'disabled' : `data-act="rewardSel" data-arg="${i}"`}>
+      <span class="rrib">${RN[info.rarity]}</span>${cost}
+      <span class="ricon">${icon}</span>
+      <span class="rname">${esc(info.name)}</span>
+      <span class="rkind">${info.kindLabel}</span>
+      <span class="rdesc">${esc(info.desc)}</span>
+      ${sel === i ? '<span class="rcheck">✔</span>' : ''}
+    </button>`;
+  }).join('');
+  const chosen = sel !== null && rw.options[sel] ? optInfo(rw.options[sel]).name : '';
+  return `${topbar(app)}<div class="screen rewardpick">
     <h2 class="center">${kind} 선택</h2>
     ${steps}
-    <div class="center small">하나를 가져가거나, 필요 없으면 건너뛰자.</div>
-    <div class="col">${opts}</div>
-    <div class="grow"></div>
-    <button class="btn ${rw.picked ? 'primary' : ''} big" data-act="leaveReward">${rw.picked ? '계속 ▶' : '건너뛰기 ▶'}</button>
+    <div class="rcards">${cards}</div>
+    <div class="center small muted">${rw.picked ? '획득 완료' : '하나를 골라 확정 · 필요 없으면 건너뛰기'}</div>
+    ${rw.picked ? '' : `<button class="btn primary big" data-act="rewardConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '카드를 고르세요' : `「${esc(chosen)}」 가져가기`}</button>`}
+    <button class="btn ${rw.picked ? 'primary' : 'ghost'} big" data-act="leaveReward">${rw.picked ? '계속 ▶' : '건너뛰기 ▶'}</button>
   </div>`;
 }
 
@@ -140,10 +155,10 @@ export function shopScreen(app: App): string {
     <div class="odds center">🎲흥정: 6 → 공짜 · 2~5 → 눈×5% 할인 · 1 → 50% 비싸짐</div>
     <div class="col">${items}</div>
     <div class="row">
-      <button class="btn grow" data-act="shopReroll">🔄 리롤 ${s.rerollFree ? '<span class="green">무료</span>' : s.rerollCost + 'G'}</button>
+      <button class="btn grow" data-act="shopReroll" ${s.rerolls >= BALANCE.shopRerollMax ? 'disabled' : ''}>${s.rerolls >= BALANCE.shopRerollMax ? '🔄 리롤 끝' : `🔄 리롤 ${s.rerollFree ? '무료' : s.rerollCost + 'G'} (1회)`}</button>
       <button class="btn grow" data-act="buyChip">🎰 칩 1 = ${BALANCE.chipPrice}G</button>
     </div>
-    <div class="muted small center">리롤할 때 주사위를 굴려 6이 나오면 다음 리롤 무료${s.lastRerollDie ? ` · 직전 ${s.lastRerollDie}` : ''}</div>
+    <div class="muted small center">리롤은 상점마다 1번 · 🎲6이면 비용 환급</div>
     <button class="btn ghost" data-act="shopEdit">🎲 내 주사위 보기</button>
     ${app.ui.shopEdit ? diceViewer(app, false) : ''}
     <div class="row">${consumablesRow(app)}<div class="grow"></div><button class="btn primary" data-act="leaveShop">나가기 ▶</button></div>
@@ -176,7 +191,7 @@ export function restScreen(app: App): string {
   return `${topbar(app)}<div class="screen" style="justify-content:center">
     <div class="center" style="font-size:64px">🛏️</div>
     <h2 class="center">휴게실</h2>
-    <div class="center small">둘 중 하나를 고른 뒤 아래 버튼으로 확정</div>
+    <div class="center small">하나 고르고 확정</div>
     ${opt('heal', '❤️', '휴식', `체력 ${run.hp} → ${run.hp + heal} (+${heal})`)}
     ${opt('up', '⬆️', '수련', `스킬 1개 강화 +${Math.round(BALANCE.restUpgrade * 100)}% · 다음 화면에서 스킬 선택`)}
     <button class="btn primary big" data-act="restConfirm" ${pick ? '' : 'disabled'}>${pick === 'heal' ? '✔ 휴식하기' : pick === 'up' ? '강화할 스킬 고르기 ▶' : '하나를 고르세요'}</button>
@@ -213,7 +228,7 @@ function pendingModal(app: App): string {
     return `<div class="modal"><div class="box">
       <h3>${f.emoji} ${f.name} 면 붙이기 ${rarityTag(f.rarity)}</h3>
       <div class="small">${esc(fmt(f.desc, f.v))} <span class="muted">(${f.kind === 'attr' ? '◎ 속성: 원래 눈 유지' : '● 대체: 눈 자체가 바뀜'})</span></div>
-      <div class="muted small">① 위에서 주사위 고르기 → ② 붙일 면 탭 → ③ 아래 버튼으로 확정</div>
+      <div class="muted small">주사위 → 면 고르고 확정</div>
       ${diceViewer(app, true)}
       ${faceConfirm(app, f.name)}
       <button class="btn ghost" data-act="cancelPending">버리기</button>
@@ -224,7 +239,7 @@ function pendingModal(app: App): string {
     return `<div class="modal"><div class="box">
       <h3>🎲 ${m.name} 재질 적용 ${rarityTag(m.rarity)}</h3>
       <div class="small">${esc(fmt(m.desc, m.v))}</div>
-      <div class="muted small">바꿀 주사위를 탭한 뒤 아래 버튼으로 확정</div>
+      <div class="muted small">주사위 고르고 확정</div>
       <div class="dicepick">${run.dice.map((d, i) => dieFace(6, undefined, d.material, app.ui.pickMat === i ? 'pickedDie' : '', `data-act="pickMat" data-arg="${i}" data-tip="${esc(MATERIAL_BY_ID[d.material].name)}"`)).join('')}</div>
       ${app.ui.pickMat !== null ? `<div class="small center">${MATERIAL_BY_ID[run.dice[app.ui.pickMat].material].icon} ${MATERIAL_BY_ID[run.dice[app.ui.pickMat].material].name} 주사위 → ${m.icon} ${m.name} 주사위</div>` : ''}
       <button class="btn primary big" data-act="confirmMat" ${app.ui.pickMat === null ? 'disabled' : ''}>${app.ui.pickMat === null ? '주사위를 고르세요' : '✔ 이 주사위에 적용'}</button>
@@ -252,7 +267,7 @@ function pendingModal(app: App): string {
       : `<button class="btn primary big" data-act="replaceConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '버릴 스킬을 고르세요' : `「${selName}」 버리고 「${nd!.name}」 넣기`}</button>`;
     return `<div class="modal"><div class="box">
       <h3>${isUp ? `⬆️ 스킬 강화 (효과 +${Math.round(p.amount * 100)}%)` : '스킬 칸이 가득 찼다'}</h3>
-      ${nd ? `<div class="item r-${nd.rarity} newskill"><div class="grow"><div class="tt">새 스킬: ${nd.name} ${rarityTag(nd.rarity)}</div><div class="ds">[${condText(nd.cond)}] ${esc(fmt(nd.desc, nd.v))}</div></div></div><div class="small center">교체할 스킬을 탭해서 고른 뒤 아래 버튼으로 확정</div>` : '<div class="small center">스킬을 탭해서 고른 뒤 아래 버튼으로 확정 · 숫자는 족보·열기 배율을 빼고 계산한 값</div>'}
+      ${nd ? `<div class="item r-${nd.rarity} newskill"><div class="grow"><div class="tt">새 스킬: ${nd.name} ${rarityTag(nd.rarity)}</div><div class="ds">[${condText(nd.cond)}] ${esc(fmt(nd.desc, nd.v))}</div></div></div><div class="small center">버릴 스킬을 고르고 확정</div>` : '<div class="small center">고르고 확정 · 족보 배율 제외 수치</div>'}
       <div class="col">${list}</div>
       ${confirm}
       ${isUp && p.then === 'rest' ? '<button class="btn ghost" data-act="restBack">← 뒤로 (휴식/수련 다시 고르기)</button>' : `<button class="btn ghost" data-act="${isUp ? 'cancelPending' : 'replaceSkill'}" data-arg="-1">${isUp ? '강화 안 함' : '새 스킬 가져가지 않음'}</button>`}

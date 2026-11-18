@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newRun, openShop } from '../src/rules/run';
+import { newRun, openShop, shopReroll } from '../src/rules/run';
 import { confirmHand, endTurn, reroll, startCombat, toggleLock, useSkill } from '../src/rules/combat';
 import { donChance, donEV, rouletteOdds, slotOdds, haggleOdds } from '../src/rules/casino';
 import { MANIP_SKILLS } from '../src/data/meta';
@@ -199,5 +199,16 @@ describe('족보 칩 · 잠금 제한 · 약점 눈', () => {
     const hp0 = e.hp;
     useSkill(ctx, 0, [cb.hand[2].key]); // 베기 4
     expect(hp0 - e.hp).toBe(Math.round(Math.round(4 * mult) * 1.75));
+  });
+});
+
+describe('상점 리롤 제한', () => {
+  it('상점당 리롤은 1번만', () => {
+    const { run, ctx } = mk(31);
+    run.gold = 999;
+    openShop(ctx);
+    expect(shopReroll(ctx)).not.toBeNull();
+    expect(shopReroll(ctx)).toBeNull();
+    expect(run.shop!.rerolls).toBe(1);
   });
 });

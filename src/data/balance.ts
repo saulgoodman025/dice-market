@@ -28,6 +28,7 @@ export const BALANCE = {
 
   shopSlotCount: 5,
   shopRerollStart: 2,
+  shopRerollMax: 1, // 상점당 리롤 횟수 (유물 싹쓸이 방지)
   chipPrice: 8,
   prices: {
     skill: { common: 5, rare: 8, epic: 12, legendary: 18 },

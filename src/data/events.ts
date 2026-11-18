@@ -33,7 +33,7 @@ const offer = (ctx: Ctx, title: string, options: RewardOption[]) => {
 
 export const EVENTS: EventDef[] = [
   {
-    id: 'shellgame', name: '야바위', emoji: '🥤', text: '컵 세 개가 빠르게 섞인다. "10G 걸면 30G!"',
+    id: 'shellgame', name: '야바위', emoji: '🥤', text: '"10G 걸면 30G!"',
     choices: [
       {
         label: '10G를 건다', odds: '컵 3개 중 정답 1개 → 30G · 틀리면 10G 잃음', can: (c) => c.run.gold >= 10,
@@ -43,14 +43,14 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'devil', name: '악마의 거래', emoji: '😈', text: '붉은 정장의 사내가 계약서를 내민다.',
+    id: 'devil', name: '악마의 거래', emoji: '😈', text: '계약서를 내미는 붉은 정장의 사내.',
     choices: [
       { label: '최대 체력 -15 → 전설 유물', can: (c) => c.run.maxHp > 25, run: (c) => { maxHpChange(c.run, -15); const id = relicOfRarity(c, 'legendary'); if (id) giveRelic(c, id); return '계약이 성립했다.'; } },
       { label: '거절한다', run: () => '사내는 웃으며 사라졌다.' },
     ],
   },
   {
-    id: 'drunkdealer', name: '취한 딜러', emoji: '🍺', text: '"주사위 한 판 어때? 칩 3개 걸고, 높으면 두 배!"',
+    id: 'drunkdealer', name: '취한 딜러', emoji: '🍺', text: '"주사위 한 판, 높으면 두 배!"',
     choices: [
       {
         label: '칩 3을 걸고 대결', odds: '내 눈이 더 크면 칩 6 · 같으면 반환 · 작으면 꽝', can: (c) => c.run.chips >= 3,
@@ -68,7 +68,7 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'fountain', name: '소원의 우물', emoji: '⛲', text: '반짝이는 동전들이 바닥에 깔려 있다.',
+    id: 'fountain', name: '소원의 우물', emoji: '⛲', text: '동전이 반짝이는 우물.',
     choices: [
       {
         label: '10G 던지기', odds: '50.0%: 체력 전부 회복 / 50.0%: 아무 일 없음', can: (c) => c.run.gold >= 10,
@@ -78,7 +78,7 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'forge', name: '주사위 대장간', emoji: '⚒️', text: '"15G면 주사위 재질을 바꿔주지."',
+    id: 'forge', name: '주사위 대장간', emoji: '⚒️', text: '"15G에 재질을 바꿔주지."',
     choices: [
       {
         label: '15G: 재질 변경 (3중 택1)', can: (c) => c.run.gold >= 15,
@@ -94,7 +94,7 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'tattoo', name: '문신 가게', emoji: '🖋️', text: '"공짜로 새겨주지. 대신 내 서명(해골)도 하나 넣어야 해."',
+    id: 'tattoo', name: '문신 가게', emoji: '🖋️', text: '"공짜로 새겨주지. 💀 서명 하나 포함."',
     choices: [
       {
         label: '면 스티커 무료 + 해골 면 1개',
@@ -112,14 +112,14 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'loan', name: '사채', emoji: '🦈', text: '"지금 50G, 다음 막 시작할 때 80G. 못 갚으면… 최대 체력 20."', maxAct: 2,
+    id: 'loan', name: '사채', emoji: '🦈', text: '지금 50G → 다음 막에 80G 상환 (못 갚으면 최대❤-20)', maxAct: 2,
     choices: [
       { label: '50G 빌린다', can: (c) => !c.run.flags.loan, run: (c) => { gainGold(c, 50); c.run.flags.loan = 80; return '두툼한 봉투를 받았다.'; } },
       { label: '거절', run: () => '사채업자가 명함을 남기고 간다.' },
     ],
   },
   {
-    id: 'oldgambler', name: '늙은 도박꾼', emoji: '👴', text: '"자네 유물 하나 걸고 홀짝 어떤가? 이기면 같은 등급 두 개."',
+    id: 'oldgambler', name: '늙은 도박꾼', emoji: '👴', text: '"유물 걸고 홀짝 한 판?"',
     choices: [
       {
         label: '가장 최근 유물을 걸고 홀짝', odds: '홀짝을 맞히면 같은 등급 유물 2개 · 틀리면 잃음', can: (c) => c.run.relics.length > 0,
@@ -140,14 +140,14 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'luckycat', name: '행운의 고양이', emoji: '🐈', text: '황금 방울을 단 고양이가 다가온다.',
+    id: 'luckycat', name: '행운의 고양이', emoji: '🐈', text: '황금 방울 고양이.',
     choices: [
       { label: '쓰다듬기', run: (c) => { addJackpot(c, 25); return '골골송. 잭팟 게이지 +25%'; } },
       { label: '5G로 먹이 주기', can: (c) => c.run.gold >= 5, run: (c) => { gainGold(c, -5); c.run.flags.luckycat = 3; return '다음 3전투 저금통 정산 +20%'; } },
     ],
   },
   {
-    id: 'mirror', name: '거울의 방', emoji: '🪞', text: '끝없이 반사되는 방. 무언가를 복제할 수 있을 것 같다.',
+    id: 'mirror', name: '거울의 방', emoji: '🪞', text: '무언가를 복제할 수 있는 방.',
     choices: [
       {
         label: '주사위 1개 복제 (이번 막 동안)',
@@ -166,14 +166,14 @@ export const EVENTS: EventDef[] = [
     ],
   },
   {
-    id: 'vipcard', name: 'VIP 초대장', emoji: '💌', text: '금박 초대장이 바닥에 떨어져 있다.',
+    id: 'vipcard', name: 'VIP 초대장', emoji: '💌', text: '금박 초대장.',
     choices: [
       { label: '다음 카지노에서 칩 ×2', run: (c) => { c.run.flags.vip = 1; return '초대장을 챙겼다.'; } },
       { label: '즉시 칩 4', run: (c) => { gainChips(c, 4); return '칩 4개를 받았다.'; } },
     ],
   },
   {
-    id: 'rigged', name: '조작된 슬롯', emoji: '🎰', text: '"이 슬롯은 7 확률 20%입니다." — 정직한 안내문이 붙어 있다. (실제로 20%)',
+    id: 'rigged', name: '조작된 슬롯', emoji: '🎰', text: '"7 확률 20%" (진짜다)',
     choices: [
       {
         label: '칩 2로 1회', odds: '7: 20.0% → 영웅 유물 · 꽝 80.0%', can: (c) => c.run.chips >= 2,

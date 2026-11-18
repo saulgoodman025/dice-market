@@ -319,19 +319,17 @@ export function openShop(ctx: Ctx) {
 export function shopReroll(ctx: Ctx): number | null {
   const run = ctx.run;
   const s = run.shop;
-  if (!s) return null;
-  if (!s.rerollFree) {
-    if (run.gold < s.rerollCost) return null;
-    gainGold(ctx, -s.rerollCost);
-    s.rerollCost++;
-  }
+  if (!s || s.rerolls >= BALANCE.shopRerollMax) return null;
+  const paid = s.rerollFree ? 0 : s.rerollCost;
+  if (run.gold < paid) return null;
+  if (paid) gainGold(ctx, -paid);
   s.rerollFree = false;
   s.rerolls++;
   const d = shopRerollDie(ctx);
   s.lastRerollDie = d;
-  if (d === 6) {
-    s.rerollFree = true;
-    toast(ctx, '🎲 6! 다음 리롤 무료', 'gold');
+  if (d === 6 && paid) {
+    gainGold(ctx, paid);
+    toast(ctx, `🎲 6! 리롤 비용 ${paid}G 돌려받음`, 'gold');
   }
   const kept = s.items.filter((i) => i.sold);
   const fresh = fillShop(ctx).filter((_, i) => !s.items[i]?.sold);
