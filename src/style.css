@@ -899,3 +899,33 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .enemies.n3 .intent { font-size: 12px !important; padding: 2px 6px !important; }
 .enemies.n3 .ehp { max-width: 92px; }
 .enemies.n4 .enemy { max-width: 84px; } .enemies.n4 .enemy .em { font-size: 30px; } .enemies.n4 .intent { font-size: 11px !important; padding: 1px 4px !important; }
+
+/* v2.1 적 방어막: 체력바 왼쪽 큰 방패 배지 + 파란 테두리 */
+.ehp.shielded { border: 2px solid #6cb8ff !important; box-shadow: 0 0 0 1px #1b4f86, 0 0 10px rgba(108,184,255,.75); }
+.ehp.shielded::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 5px; pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(140,196,255,.28) 0 4px, rgba(140,196,255,0) 4px 9px); }
+.eshb { position: absolute; left: -22px; top: 50%; transform: translateY(-50%); z-index: 4; width: 30px; height: 34px;
+  display: flex; align-items: center; justify-content: center; pointer-events: auto;
+  background: linear-gradient(180deg, #8fd0ff, #2f7fd6 55%, #1b4f86); border: 2px solid #e6f3ff;
+  border-radius: 45% 45% 50% 50% / 22% 22% 78% 78%; box-shadow: 0 2px 6px rgba(0,0,0,.55), 0 0 10px rgba(108,184,255,.9); }
+.eshb .n { font-size: 14px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #0b2a4d, 0 0 3px #0b2a4d; line-height: 1; margin-top: -3px; }
+.enemies.n3 .eshb, .enemies.n4 .eshb { width: 26px; height: 30px; left: -19px; }
+.enemies.n3 .eshb .n, .enemies.n4 .eshb .n { font-size: 12.5px; }
+.eshb.gain { animation: eshgain calc(.5s / var(--speed)) cubic-bezier(.2,1.6,.4,1); }
+@keyframes eshgain { 0% { transform: translateY(-50%) scale(.2); } 60% { transform: translateY(-50%) scale(1.45); filter: brightness(1.8); } 100% { transform: translateY(-50%) scale(1); } }
+.eshb.clang { animation: eshclang calc(.4s / var(--speed)); }
+@keyframes eshclang { 20% { transform: translateY(-50%) rotate(-14deg) scale(1.15); filter: brightness(2); } 55% { transform: translateY(-50%) rotate(9deg); } }
+/* 카드 미리보기: 깎일 방패 = 깜빡임, 깨질 방패 = 붉은 금 */
+.eshb.pvdent { animation: hpblink .6s ease-in-out infinite; }
+.eshb.pvbreak { background: linear-gradient(180deg, #ff9aa5, #b8323f 55%, #6d1620); border-color: #ffd6da; box-shadow: 0 0 12px rgba(255,60,60,.9); animation: eshwob .5s ease-in-out infinite; }
+.eshb.pvbreak::after { content: ''; position: absolute; inset: 3px 12px; background: linear-gradient(100deg, transparent 40%, #fff 45%, transparent 55%); transform: skewX(-20deg); opacity: .85; }
+@keyframes eshwob { 50% { transform: translateY(-50%) rotate(-6deg); } }
+/* 방패가 뚫렸을 때 두 조각으로 갈라져 날아감 */
+.eshbreak { position: absolute; left: -22px; top: 50%; width: 30px; height: 34px; transform: translateY(-50%); pointer-events: none; z-index: 30; }
+.eshbreak .a, .eshbreak .b { position: absolute; top: 0; width: 15px; height: 34px; background: linear-gradient(180deg, #8fd0ff, #2f7fd6 55%, #1b4f86); border: 2px solid #e6f3ff; box-shadow: 0 0 10px #6cb8ff; }
+.eshbreak .a { left: 0; border-radius: 90% 0 0 100% / 22% 0 0 78%; border-right: none; animation: shardL calc(.65s / var(--speed)) ease-out forwards; }
+.eshbreak .b { right: 0; border-radius: 0 90% 100% 0 / 0 22% 78% 0; border-left: none; animation: shardR calc(.65s / var(--speed)) ease-out forwards; }
+.eshbreak em { position: absolute; left: -6px; top: -26px; font-style: normal; font-weight: 900; font-size: 15px; color: #cfe7ff; white-space: nowrap; text-shadow: 0 1px 3px #000; animation: shtext calc(.65s / var(--speed)) ease-out forwards; }
+@keyframes shardL { 0% { transform: none; } 100% { transform: translate(-22px, 18px) rotate(-55deg); opacity: 0; } }
+@keyframes shardR { 0% { transform: none; } 100% { transform: translate(20px, 22px) rotate(50deg); opacity: 0; } }
+@keyframes shtext { 0% { transform: translateY(6px) scale(.6); opacity: 0; } 25% { transform: none; opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }

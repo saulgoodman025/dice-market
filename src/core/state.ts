@@ -267,6 +267,7 @@ export type GameEvent =
   | { t: 'roll'; keys: number[] }
   | { t: 'dmgEnemy'; uid: number; amount: number; crit?: boolean; blocked?: number; src?: string; weakHit?: boolean }
   | { t: 'dmgPlayer'; amount: number; blocked: number; src?: string }
+  | { t: 'eBlock'; uid: number; amount: number }
   | { t: 'block'; amount: number }
   | { t: 'heal'; amount: number }
   | { t: 'gold'; amount: number }

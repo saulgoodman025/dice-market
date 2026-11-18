@@ -753,7 +753,7 @@ export function enemyTurn(ctx: Ctx) {
       case 'attack': enemyAttack(ctx, e, attackValue(ctx, e, n)); break;
       case 'attackRange': enemyAttack(ctx, e, attackValue(ctx, e, rng(ctx, 'combat').int(n, it.n2 ?? n))); break;
       case 'multi': enemyAttack(ctx, e, attackValue(ctx, e, n), it.hits ?? 1); break;
-      case 'block': e.block += n; break;
+      case 'block': e.block += n; ctx.emit({ t: 'eBlock', uid: e.uid, amount: n }); break;
       case 'buff': e.nextMult = 2; break;
       case 'debuff': cb.next.rerollPenalty += 1; break;
       case 'steal': cb.piggy = Math.max(0, cb.piggy - n); toast(ctx, `🫳 저금통 -${n}`, 'bad'); break;
@@ -783,7 +783,7 @@ export function enemyTurn(ctx: Ctx) {
         if (t) { const h = Math.min(n, t.maxHp - t.hp); t.hp += h; toast(ctx, `🩺 ${t.name} 체력 +${h}`, 'bad'); ctx.emit({ t: 'enemyAct', uid: t.uid }); }
         break;
       }
-      case 'guardAll': for (const x of alive(cb)) x.block += n; toast(ctx, `🛡 모든 적 방어도 +${n}`, 'bad'); break;
+      case 'guardAll': for (const x of alive(cb)) { x.block += n; ctx.emit({ t: 'eBlock', uid: x.uid, amount: n }); } break;
       case 'seal': cb.next.seal += n || 1; break;
       case 'chipTax': cb.next.chipTax += n; cb.handChips = Math.max(0, cb.handChips - n); break;
       case 'enrage': e.str += n; toast(ctx, `💪 ${e.name}의 힘 +${n}`, 'bad'); break;

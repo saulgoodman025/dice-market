@@ -199,6 +199,13 @@ export class App {
       const e = cb.enemies.find((x) => x.uid === h.uid);
       const bar = this.view.querySelector<HTMLElement>(`[data-hpk="e${h.uid}"]`);
       if (!e || !bar) continue;
+      const shb = bar.querySelector<HTMLElement>('.eshb');
+      if (shb && h.blockLoss > 0) {
+        const left = Math.max(0, e.block - h.blockLoss);
+        shb.classList.add(left ? 'pvdent' : 'pvbreak');
+        const n = shb.querySelector<HTMLElement>('.n');
+        if (n) n.textContent = String(left);
+      }
       if (h.hpLoss > 0) {
         const seg = document.createElement('em');
         seg.className = 'hpprev';
@@ -225,6 +232,11 @@ export class App {
   clearHitPreview() {
     this.view.querySelectorAll('.hpprev, .hplabel').forEach((x) => x.remove());
     this.view.querySelectorAll('.lethal').forEach((x) => x.classList.remove('lethal'));
+    this.view.querySelectorAll<HTMLElement>('.eshb.pvdent, .eshb.pvbreak').forEach((x) => {
+      x.classList.remove('pvdent', 'pvbreak');
+      const n = x.querySelector<HTMLElement>('.n');
+      if (n) n.textContent = x.dataset.blk ?? '';
+    });
   }
 
   /** 드래그가 시작되면 길게 누르기 툴팁을 취소 */
@@ -391,7 +403,7 @@ export class App {
   private hpMem = new Map<string, number>();
   private trailTimers = new Map<string, number>();
   private trailTo(bar: HTMLElement, key: string, pct: number) {
-    const fill = bar.querySelector<HTMLElement>('i');
+    const fill = bar.querySelector<HTMLElement>(':scope > i');
     const trail = bar.querySelector<HTMLElement>('s.trail');
     const old = this.hpMem.get(key) ?? pct;
     this.hpMem.set(key, pct);
@@ -423,7 +435,7 @@ export class App {
       const key = bar.dataset.hpk!;
       if (key === 'p' && this.veil) {
         const old = this.hpMem.get('p');
-        const fill = bar.querySelector<HTMLElement>('i');
+        const fill = bar.querySelector<HTMLElement>(':scope > i');
         const trail = bar.querySelector<HTMLElement>('s.trail');
         if (old !== undefined && fill && trail) { fill.style.width = `${old}%`; trail.style.width = `${old}%`; }
         return;
@@ -525,7 +537,7 @@ export class App {
               return;
             }
             if (e.amount > 0) {
-              if (e.blocked) { this.enemyShield(el); floatAt(el, `🛡${e.blocked}`, '#8cc6ff', 15); }
+              if (e.blocked) { this.shieldBreak(el, e.blocked); }
               const tier = e.amount >= HIT_MASSIVE ? 2 : e.amount >= HIT_STRONG ? 1 : 0;
               this.retrigger(el, 'hit');
               this.mark(`[data-uid="${e.uid}"]`, 'hit');
@@ -541,6 +553,7 @@ export class App {
               else if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
             } else if (e.blocked) {
               this.enemyShield(el);
+              this.retrigger(el?.querySelector('.eshb') ?? null, 'clang');
               floatAt(el, `🛡 ${e.blocked} 막힘`, '#8cc6ff', 18);
               sfx.clang();
             } else floatAt(el, '무효', '#9aa', 16);
@@ -612,6 +625,18 @@ export class App {
           });
           break;
         }
+        case 'eBlock': {
+          const uid = e.uid; const n = e.amount;
+          at(delay + 120, () => {
+            const el = this.el(`[data-uid="${uid}"]`);
+            this.retrigger(el?.querySelector('.eshb') ?? null, 'gain');
+            this.enemyShield(el);
+            floatAt(el?.querySelector('.ehp') ?? el, `+${n}🛡`, '#8cc6ff', 18);
+            sfx.block();
+          });
+          delay += 180;
+          break;
+        }
         case 'toast': { const tx = e.text; const tone = e.tone; at(delay, () => this.toast(tx, tone)); break; }
         case 'megaJackpot': at(delay + 400, () => this.megaFx()); break;
         case 'sfx': break;
@@ -619,6 +644,18 @@ export class App {
     });
     if (enemyPhase) showMyTurn();
     return delay + 200;
+  }
+
+  /** 적 방패가 뚫림: 체력바 왼쪽 방패가 조각나며 흩어진다 */
+  private shieldBreak(el: Element | null, blocked: number) {
+    const bar = el?.querySelector('.ehp') ?? el;
+    const host = this.anchor(bar, 700);
+    if (!host) return;
+    const d = document.createElement('div');
+    d.className = 'eshbreak';
+    d.innerHTML = `<span class="a"></span><span class="b"></span><em>-${blocked}🛡</em>`;
+    host.appendChild(d);
+    sfx.shieldBreak();
   }
 
   private enemyShield(el: Element | null) {

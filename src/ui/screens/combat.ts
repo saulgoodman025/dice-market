@@ -51,7 +51,6 @@ export function combatScreen(app: App): string {
     const it = intentText(e);
     const hpPct = (e.hp / e.maxHp) * 100;
     const st = [
-      e.block ? `<span class="blk">🛡${e.block}</span>` : '',
       e.weak ? `<span>❄-${e.weak}</span>` : '',
       e.str ? `<span class="st str" data-tip="💪 힘 ${e.str}: 공격 피해 +${e.str}">💪${e.str}</span>` : '',
       e.vuln ? `<span class="st vuln" data-tip="💔 취약 ${e.vuln}턴: 받는 피해 +50%">💔${e.vuln}</span>` : '',
@@ -67,7 +66,7 @@ export function combatScreen(app: App): string {
       <div class="em">${e.emoji}</div>
       <div class="pips2"><span class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯<b>${e.weakPip}</b></span>${e.immunePip ? `<span class="immpip" data-tip="면역 눈: ${e.immunePip}(으)로 준 피해를 받지 않습니다">🚫<b>${e.immunePip}</b></span>` : ''}</div>
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
-      <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i>${e.poison && e.hp > 0 ? `<u class="psn" style="left:${(Math.max(0, e.hp - e.poison) / e.maxHp) * 100}%;width:${(Math.min(e.poison, e.hp) / e.maxHp) * 100}%"></u>` : ''}<b>${e.hp}/${e.maxHp}</b></div>
+      <div class="ehp ${e.block && e.hp > 0 ? 'shielded' : ''}" data-hpk="e${e.uid}" data-pct="${hpPct}">${e.block && e.hp > 0 ? `<span class="eshb" data-blk="${e.block}" data-tip="방어도 ${e.block}: 체력보다 먼저 피해를 막습니다. 이 적의 다음 행동 때 사라집니다."><span class="n">${e.block}</span></span>` : ''}<s class="trail"></s><i style="width:${hpPct}%"></i>${e.poison && e.hp > 0 ? `<u class="psn" style="left:${(Math.max(0, e.hp - e.poison) / e.maxHp) * 100}%;width:${(Math.min(e.poison, e.hp) / e.maxHp) * 100}%"></u>` : ''}<b>${e.hp}/${e.maxHp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
     </div>`;
   }).join('');
