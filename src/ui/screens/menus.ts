@@ -35,9 +35,9 @@ export function charScreen(app: App): string {
   const m = app.meta;
   const cards = CHARACTERS.map((c) => {
     const unlocked = !c.unlock || m.flags[c.unlock];
-    return `<button class="item ${app.ui.charSel === c.id ? 'r-legendary' : ''} ${unlocked ? '' : 'lockedchar'}" style="width:100%" ${unlocked ? `data-act="char" data-arg="${c.id}"` : 'disabled'}>
+    return `<button class="item ${app.ui.charSel === c.id && unlocked ? 'charpick' : ''} ${unlocked ? '' : 'lockedchar'}" style="width:100%" ${unlocked ? `data-act="char" data-arg="${c.id}"` : 'disabled'}>
       <div class="ic" style="font-size:34px">${unlocked ? c.emoji : '🔒'}</div>
-      <div class="grow" style="text-align:left"><div class="tt">${c.name} <span class="muted small">❤${c.hp}</span></div>
+      <div class="grow" style="text-align:left"><div class="tt">${app.ui.charSel === c.id && unlocked ? '✔ ' : ''}${c.name} <span class="muted small">❤${c.hp}</span></div>
       <div class="ds">${esc(c.desc)}</div>
       <div class="ds">스킬: ${c.skills.map((s) => SKILL_BY_ID[s].name).join('·')}</div>
       <div class="ds">주사위: ${[...new Set(c.dice)].map((m) => `${MATERIAL_BY_ID[m].icon} ${MATERIAL_BY_ID[m].name}×${c.dice.filter((x) => x === m).length}`).join(' ')}</div>

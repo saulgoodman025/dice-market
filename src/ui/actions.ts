@@ -45,7 +45,7 @@ export function handleAction(app: App, act: string, arg: string) {
     case 'modal': ui.modal = arg as typeof ui.modal; break;
     case 'relicInfo': {
       const el = app.view.querySelector<HTMLElement>(`[data-act="relicInfo"][data-arg="${arg}"]`);
-      if (el) app.tipAt(el, 2600);
+      if (el) app.tipAt(el);
       return;
     }
     case 'helpTab': ui.helpTab = arg as typeof ui.helpTab; break;

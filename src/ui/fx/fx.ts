@@ -93,7 +93,10 @@ export function floatAt(el: Element | null, text: string, color = '#fff', size =
   const d = document.createElement('div');
   d.className = 'float';
   d.textContent = text;
-  const est = Math.min(h.width * 0.45, text.length * size * 0.32); // 화면 밖으로 잘리지 않게
+  // 한 줄로 화면 폭 안에 들어가도록 글자 크기 자동 축소
+  const wide = [...text].reduce((w, ch) => w + (/[0-9!★+\-]/.test(ch) ? 0.62 : 1.0), 0);
+  if (wide * size > h.width * 0.9) size = Math.floor((h.width * 0.9) / wide);
+  const est = Math.min(h.width * 0.45, (wide * size) / 2); // 화면 밖으로 잘리지 않게
   const cx = r.left - h.left + r.width / 2 + (fxRandom() - 0.5) * 20;
   d.style.left = `${Math.max(est + 6, Math.min(h.width - est - 6, cx))}px`;
   d.style.top = `${r.top - h.top + r.height * 0.3}px`;
@@ -103,14 +106,18 @@ export function floatAt(el: Element | null, text: string, color = '#fff', size =
   setTimeout(() => d.remove(), 1000 / S.speed + 100);
 }
 
-export function shake(el: Element | null, px = 6) {
+/** 화면 흔들림: 점점 잦아드는 무작위 흔들림 (다른 CSS 연출과 겹쳐도 덮이지 않게 Web Animations 사용) */
+export function shake(el: Element | null, px = 6, ms = 260) {
   if (!el || !S.shake) return;
   const h = el as HTMLElement;
-  h.style.setProperty('--sx', `${px}px`);
-  h.classList.remove('shake');
-  void h.offsetWidth;
-  h.classList.add('shake');
-  setTimeout(() => h.classList.remove('shake'), 260);
+  const n = Math.max(6, Math.round(ms / 35));
+  const frames: Keyframe[] = [];
+  for (let i = 0; i < n; i++) {
+    const k = 1 - i / n;
+    frames.push({ transform: `translate(${((fxRandom() - 0.5) * 2 * px * k).toFixed(1)}px, ${((fxRandom() - 0.5) * 1.4 * px * k).toFixed(1)}px)` });
+  }
+  frames.push({ transform: 'translate(0, 0)' });
+  h.animate(frames, { duration: ms / S.speed, easing: 'linear', composite: 'add' });
 }
 
 export function vibrate(ms: number | number[]) {

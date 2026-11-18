@@ -142,13 +142,16 @@ export class App {
     // 롱프레스 툴팁
     this.root.addEventListener('pointerdown', (ev) => {
       const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+      // 고정된 설명은 다른 곳을 누르면 닫힌다 (같은 유물을 다시 누르면 그대로)
+      if (this.tipPinned && t && t === this.tipFor) return;
+      this.tipPinned = false;
       this.hideTip();
       if (!t) return;
       const x = ev.clientX;
       const y = ev.clientY;
       this.tipTimer = window.setTimeout(() => { this.showTip(t.dataset.tip!, x, y, t); this.suppressClick = true; }, 420);
     });
-    const cancel = () => { clearTimeout(this.tipTimer); if (!this.tipPinned) setTimeout(() => this.hideTip(), 1400); };
+    const cancel = () => { clearTimeout(this.tipTimer); setTimeout(() => { if (!this.tipPinned) this.hideTip(); }, 1400); };
     // 마우스: 올리면 바로 설명
     this.root.addEventListener('pointerover', (ev) => {
       if (ev.pointerType !== 'mouse' || this.root.classList.contains('dragging') || ev.buttons) return;
@@ -161,7 +164,7 @@ export class App {
       if (ev.pointerType !== 'mouse') return;
       const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-tip]');
       const to = (ev.relatedTarget as HTMLElement | null)?.closest?.('[data-tip]');
-      if (t && t !== to && this.tipFor === t) this.hideTip();
+      if (t && t !== to && this.tipFor === t && !this.tipPinned) this.hideTip();
     });
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
@@ -184,13 +187,11 @@ export class App {
   private tipPinned = false;
 
   /** 요소 위에 설명 풍선을 띄운다 (탭으로 연 경우 잠시 고정) */
-  tipAt(el: HTMLElement, pinMs = 0) {
+  /** 탭으로 연 설명: 화면의 다른 곳을 누를 때까지 유지 */
+  tipAt(el: HTMLElement) {
     const r = el.getBoundingClientRect();
     this.showTip(el.dataset.tip ?? '', r.left + r.width / 2, r.top, el);
-    if (pinMs) {
-      this.tipPinned = true;
-      setTimeout(() => { this.tipPinned = false; if (this.tipFor === el) this.hideTip(); }, pinMs);
-    }
+    this.tipPinned = true;
   }
 
   private showTip(text: string, x: number, y: number, el: HTMLElement | null = null) {
@@ -637,11 +638,11 @@ export class App {
     this.ring(el, '#ffb347');
     floatAt(el, `${crit ? '★' : ''}${amt}!`, '#ffb347', dmgSize(amt) * 1.6);
     floatAt(el, '강타!', '#ffd34d', 18);
-    shake(this.root, 7);
     hitstop(this.root, 90);
+    // 멈춤이 끝난 뒤 흔들림·진동 (강타: 중간 세기)
+    setTimeout(() => { shake(this.view, 9, 380); vibrate(70); }, 90 / this.settings.speed);
     sfx.heavy();
     if (crit) sfx.crit();
-    vibrate(50);
   }
 
   /** 초강타 (30+): 화면 번쩍 + 줌 펀치 + 큰 충격파 + 거대한 숫자 */
@@ -656,11 +657,12 @@ export class App {
     burstAt(el, '#ff9a3c', 34);
     floatAt(el, `${crit ? '★' : ''}${amt}!!`, '#ff6a3d', dmgSize(amt) * 2.1);
     floatAt(el, '초강타!!', '#ffd34d', 22);
-    shake(this.root, 12);
     hitstop(this.root, 160);
+    // 초강타: 더 크고 길게 흔들리고, 진동도 더 길고 세게 (두 번 몰아침)
+    setTimeout(() => { shake(this.view, 18, 650); vibrate([140, 50, 200]); }, 160 / this.settings.speed);
+    setTimeout(() => shake(this.view, 8, 300), (160 + 650) / this.settings.speed);
     sfx.heavy();
     sfx.crit();
-    vibrate([60, 30, 90]);
   }
 
   /** 보스 격파: 체력바가 깨져 흩어지고 보스가 폭발한다 */
