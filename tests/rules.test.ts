@@ -212,3 +212,21 @@ describe('상점 리롤 제한', () => {
     expect(run.shop!.rerolls).toBe(1);
   });
 });
+
+describe('족보 재판정', () => {
+  it('올리기로 눈을 바꾸면 족보도 바뀐다 (트리플 → 포카드)', () => {
+    const { run, ctx } = mk(41, 'sharp');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    cb.enemies[0].hp = 9999;
+    cb.hand.forEach((h, i) => { h.pip = [6, 6, 6, 5, 2][i]; h.sticker = undefined; h.material = 'wood'; });
+    confirmHand(ctx);
+    expect(cb.handResult!.id).toBe('triple');
+    const chips0 = cb.handChips;
+    const bump = run.skills.findIndex((s) => s.id === 'bump');
+    expect(useSkill(ctx, bump, [cb.hand[3].key])).toBe(true); // 5 → 6
+    expect(cb.hand.filter((h) => !h.gone).map((h) => h.pip).filter((p) => p === 6).length).toBe(4);
+    expect(cb.handResult!.id).toBe('four');
+    expect(cb.handChips).toBe(chips0 + 3); // 트리플 4 → 포카드 7 (올리기 비용 0)
+  });
+});

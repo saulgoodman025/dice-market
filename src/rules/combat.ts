@@ -348,6 +348,37 @@ export function scoreHand(ctx: Ctx, id: HandResult['id']): HandResult {
   return { id, name: def.name, mult: Math.round(mult * 100) / 100, heat: def.heat, jackpot: def.jackpot };
 }
 
+/**
+ * 족보가 확정된 뒤 주사위 눈이 바뀌면(올리기·뒤집기·분할·운명 조작·손가락 튕기기 등) 족보를 다시 판정한다.
+ * 화면의 주사위와 족보가 항상 일치하게. 더 좋은 족보가 되면 늘어난 만큼 열기·잭팟·족보 칩을 더 준다.
+ */
+export function rescoreHand(ctx: Ctx) {
+  const cb = cbOf(ctx);
+  if (!cb.turnCounters.confirmed || !cb.handResult || cb.result) return;
+  const old = cb.handResult;
+  const now = previewHand(ctx);
+  if (now.id === old.id && now.mult === old.mult) return;
+  cb.handResult = now;
+  const oldDef = HAND_BY_ID[old.id];
+  const newDef = HAND_BY_ID[now.id];
+  if (newDef.rank > oldDef.rank) {
+    const heatGain = Math.max(0, newDef.heat) - Math.max(0, oldDef.heat);
+    if (heatGain > 0) addHeat(ctx, heatGain);
+    if (newDef.jackpot > oldDef.jackpot) addJackpot(ctx, newDef.jackpot - oldDef.jackpot);
+    const chipGain = newDef.chips - oldDef.chips;
+    if (chipGain > 0) cb.handChips += chipGain;
+    if (newDef.celebrate && !oldDef.celebrate) {
+      ctx.run.stats.yahtzees++;
+      cb.turnCounters.yahtzee = 1;
+      ctx.emit({ t: 'yahtzee' });
+    }
+    fire(ctx, 'onHandScored', { hand: now });
+  }
+  ctx.run.flags['seen_hand_' + now.id] = 1;
+  ctx.emit({ t: 'hand', hand: now });
+  refreshIntents(ctx);
+}
+
 export function confirmHand(ctx: Ctx) {
   const cb = cbOf(ctx);
   const run = ctx.run;
@@ -555,6 +586,7 @@ export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key:
     ctx.emit({ t: 'roll', keys: cb.hand.filter((h) => !h.used).map((h) => h.key) });
   }
 
+  rescoreHand(ctx);
   cb.lastSkillDamage = dealtTotal || cb.lastSkillDamage;
   if (!def.echo) cb.lastSkill = { slot };
   fire(ctx, 'onSkill');
@@ -574,6 +606,7 @@ export function nudgeDie(ctx: Ctx, key: number, delta: 1 | -1): boolean {
   hd.sticker = undefined;
   cb.turnCounters.nudge--;
   refreshDerived(cb);
+  if (cb.phase === 'place') rescoreHand(ctx);
   ctx.emit({ t: 'roll', keys: [key] });
   return true;
 }
@@ -586,6 +619,7 @@ export function setDieValue(ctx: Ctx, key: number, value: number): boolean {
   forcePip(ctx, hd, Math.max(1, Math.min(6, value)));
   cb.turnCounters.setValue--;
   refreshDerived(cb);
+  if (cb.phase === 'place') rescoreHand(ctx);
   ctx.emit({ t: 'roll', keys: [key] });
   return true;
 }

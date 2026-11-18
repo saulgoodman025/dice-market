@@ -93,7 +93,7 @@ export function drawCoach(app: App) {
   bubble.className = 'coach';
   bubble.innerHTML = `<div class="ctitle">${step.title}</div><div class="ctext">${step.text}</div>
     ${step.done && !last ? `<div class="cdo">👉 ${step.doLabel}</div>` : ''}
-    <div class="cbtns"><button class="btn ghost" data-act="tutSkip" data-always="1">튜토리얼 끄기</button>
+    <div class="cbtns">${app.run!.flags.tutorial ? '<span></span>' : '<button class="btn ghost" data-act="tutSkip" data-always="1">닫기</button>'}
     ${step.done && !last ? '' : `<button class="btn primary" data-act="tutNext" data-always="1">${last ? '시작!' : '다음 ▶'}</button>`}</div>
     <div class="cprog">${COACH.map((_, i) => `<i class="${i < ui.tut ? 'on' : ''}"></i>`).join('')}</div>`;
   app.view.appendChild(bubble);
