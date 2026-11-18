@@ -121,6 +121,7 @@ export function animateSlot(app: App, res: SlotResult) {
   setTimeout(() => {
     ui.slot = { res, spinning: false };
     ui.busy = false;
+    ui.freeze = null;
     app.queue.unshift(...pendingEvents);
     if (res.match === 3) { sfx.jackpot(); vibrate([60, 40, 60]); }
     else if (res.match === 2) sfx.coin();
@@ -160,16 +161,17 @@ export function animateRoulette(app: App, n: number, won: number) {
     ui.roulette = { n, won, spinning: false };
     ui.bets = {};
     ui.busy = false;
+    ui.freeze = null;
     app.queue.unshift(...ev);
     if (won > 0) sfx.jackpot(); else sfx.bad();
     app.after();
   }, 2300 / sp);
 }
 
-export function animateDon(app: App, frames: number[], win: boolean) {
+export function animateDon(app: App, frames: number[], win: boolean, before?: { gold: number; streak: number }) {
   const ui = app.ui;
   ui.busy = true;
-  ui.don = { rolling: true, face: frames[0], text: '' };
+  ui.don = { rolling: true, face: frames[0], text: '', before };
   app.render();
   const sp = app.settings.speed;
   const el = app.view.querySelector<HTMLElement>('#dondie');

@@ -7,14 +7,16 @@ import { esc } from '../components/parts';
 import { interestFor } from '../../rules/economy';
 
 export function topbar(app: App): string {
-  const r = app.run!;
+  const run = app.run!;
+  const fz = app.ui.freeze;
+  const r = fz ? { ...run, gold: fz.gold, chips: fz.chips, hp: fz.hp } : run;
   const cb = r.combat;
   const hpPct = Math.max(0, (r.hp / r.maxHp) * 100);
   const heat = Array.from({ length: BALANCE.heatMax }, (_, i) => `<i class="${i < r.heat ? 'on' : ''}"></i>`).join('');
   const jp = Math.min(100, r.jackpot);
   const hpRow = cb ? '' : `<div class="topbar"><span class="stat">${CHAR_BY_ID[r.charId].emoji}</span><div class="hpbar" data-tip="체력"><i style="width:${hpPct}%"></i><b>❤ ${r.hp}/${r.maxHp}</b></div></div>`;
   return `${hpRow}<div class="topbar">
-    <span class="stat st-gold gold" data-tip="골드: 상점에서 쓴다. 이동할 때마다 이자 +${interestFor(r)}G">🪙${r.gold}</span>
+    <span class="stat st-gold gold" data-tip="골드: 상점에서 쓴다. 이동할 때마다 이자 +${interestFor(run)}G">🪙${r.gold}</span>
     <span class="stat st-chips" data-tip="칩: 카지노 전용 (판이 끝나면 사라짐)">🎰${r.chips}</span>
     <span class="stat" data-tip="🔥 열기 ${r.heat}/10: 족보를 낼수록 오르고 피해가 세진다 (단계당 +5%). 족보를 못 내면 0">🔥<span class="heat">${heat}</span></span>
     <span class="stat" data-tip="💰 잭팟 ${Math.round(jp)}%: 100%가 되면 다음 턴 모든 주사위 효과 2배 + 무료 슬롯">💰<span class="jp ${jp >= 100 ? 'full' : ''}"><i style="width:${jp}%"></i></span></span>

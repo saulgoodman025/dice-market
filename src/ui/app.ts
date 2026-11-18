@@ -37,13 +37,17 @@ export interface Ui {
   slot: { res: SlotResult | null; spinning: boolean } ;
   roulette: { n: number | null; won: number; spinning: boolean };
   high: { d: [number, number] | null; win: boolean; text: string };
-  don: { rolling: boolean; face: number; text: string };
+  don: { rolling: boolean; face: number; text: string; before?: { gold: number; streak: number } };
   end: { points: number; unlocked: string[] } | null;
   codexTab: 'relic' | 'face' | 'enemy' | 'hand';
   shopEdit: boolean;
   infoKey: number;
   helpTab: 'hands' | 'dice';
   pickSlot: number | null;
+  pickFace: number | null;
+  pickMat: number | null;
+  /** 연출 중에는 결과가 반영되기 전 숫자를 보여준다 (결과 미리 노출 방지) */
+  freeze: { gold: number; chips: number; hp: number } | null;
   tut: number;
 }
 
@@ -61,7 +65,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, freeze: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
@@ -183,6 +187,7 @@ export class App {
     this.lastRenderKey = key;
     this.view.innerHTML = renderScreen(this);
     if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
+    this.reapplyRecent();
     if (this.debug && run) {
       updateFlow(run);
       const d = document.createElement('div');
@@ -241,7 +246,7 @@ export class App {
         this.after();
       }, wait + (close ? 500 : 0));
     }
-    if (!run?.pending) this.ui.pickSlot = null;
+    if (!run?.pending) { this.ui.pickSlot = null; this.ui.pickFace = null; this.ui.pickMat = null; }
     if (run && run.screen !== 'reward' && (this.ui.don.text || this.ui.slot.res)) {
       this.ui.don = { rolling: false, face: 6, text: '' };
       this.ui.slot = { res: null, spinning: false };
@@ -276,6 +281,33 @@ export class App {
     if (val) val.textContent = String(Math.max(0, v));
   }
 
+  /** 대상 요소와 같은 위치·크기의 연출 상자를 화면 밖 레이어(root)에 만든다. 화면을 다시 그려도 사라지지 않는다 */
+  private anchor(el: Element | null, ms: number): HTMLElement | null {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const h = this.root.getBoundingClientRect();
+    const a = document.createElement('div');
+    a.className = 'fxanchor';
+    a.style.cssText = `left:${r.left - h.left}px;top:${r.top - h.top}px;width:${r.width}px;height:${r.height}px`;
+    this.root.appendChild(a);
+    setTimeout(() => a.remove(), ms / this.settings.speed);
+    return a;
+  }
+
+  /** 최근에 맞은 요소: 다시 그려진 뒤에도 흔들림 연출을 이어간다 */
+  private recent = new Map<string, number>();
+  private mark(sel: string, cls: string) {
+    this.recent.set(`${sel}|${cls}`, performance.now());
+  }
+  private reapplyRecent() {
+    const now = performance.now();
+    for (const [k, t] of this.recent) {
+      if (now - t > 350 / this.settings.speed) { this.recent.delete(k); continue; }
+      const [sel, cls] = k.split('|');
+      this.view.querySelector(sel)?.classList.add(cls);
+    }
+  }
+
   private retrigger(el: Element | null, cls: string) {
     if (!el) return;
     el.classList.remove(cls);
@@ -284,10 +316,11 @@ export class App {
   }
 
   private slash(el: Element | null, crit?: boolean, dir = '') {
-    if (!el) return;
+    const host = this.anchor(el, 450);
+    if (!host) return;
     const s = document.createElement('div');
     s.className = `slash ${crit ? 'crit' : ''} ${dir}`;
-    el.appendChild(s);
+    host.appendChild(s);
     setTimeout(() => s.remove(), 400 / this.settings.speed);
   }
 
@@ -337,6 +370,7 @@ export class App {
               if (e.blocked) { this.enemyShield(el); floatAt(el, `🛡${e.blocked}`, '#8cc6ff', 15); }
               const tier = e.amount >= HIT_MASSIVE ? 2 : e.amount >= HIT_STRONG ? 1 : 0;
               this.retrigger(el, 'hit');
+              this.mark(`[data-uid="${e.uid}"]`, 'hit');
               if (tier === 2) this.massiveHit(el, e.amount, e.crit);
               else if (tier === 1) this.strongHit(el, e.amount, e.crit);
               else {
@@ -375,6 +409,7 @@ export class App {
               const plate = this.el('.player');
               this.flashDamage();
               this.retrigger(plate, 'hurt');
+              this.mark('.player', 'hurt');
               floatAt(this.el('.player .hpbar'), `-${amt}`, '#ff5a5f', dmgSize(amt) * 1.2);
               shake(this.root, Math.min(10, 3 + amt / 3));
               sfx.hurt();
@@ -383,6 +418,8 @@ export class App {
             });
             if (blocked > 0) delay += 260;
           }
+          if (amt === 0 && blocked === 0) at(delay + 160, () => floatAt(this.el('.player .hpbar'), '0', '#bbb', 20));
+          if (enemyPhase) delay += 320; // 연속 공격은 한 대씩 따로 보이게
           break;
         }
         case 'block': at(delay, () => { floatAt(this.el('.pblock'), `+${e.amount}🛡`, '#6cb8ff', 18); this.retrigger(this.el('.pblock'), 'pop'); sfx.block(); }); break;
@@ -426,11 +463,12 @@ export class App {
   }
 
   private enemyShield(el: Element | null) {
-    if (!el) return;
+    const host = this.anchor(el, 550);
+    if (!host) return;
     const sh = document.createElement('div');
     sh.className = 'eshield';
     sh.textContent = '🛡️';
-    el.appendChild(sh);
+    host.appendChild(sh);
     setTimeout(() => sh.remove(), 500 / this.settings.speed);
   }
 
@@ -444,13 +482,14 @@ export class App {
   /** 방어도로 공격을 막는 연출: 방패가 튀어나와 공격을 받아내고, 뚫리면 깨진다 */
   private shieldFx(blocked: number, broke: boolean, left: number) {
     const plate = this.el('.player');
-    if (!plate) return;
+    const host = this.anchor(plate, 850);
+    if (!plate || !host) return;
     const sh = document.createElement('div');
     sh.className = `shieldfx ${broke ? 'broke' : ''}`;
     sh.innerHTML = `<span class="sh">🛡️</span><span class="shnum">${broke ? `${blocked} 막고 뚫림!` : left > 0 ? `${blocked} 막음!` : '완벽 방어!'}</span>`;
-    plate.appendChild(sh);
-    setTimeout(() => sh.remove(), 800 / this.settings.speed);
+    host.appendChild(sh);
     this.retrigger(plate, 'guarded');
+    this.mark('.player', 'guarded');
     this.retrigger(this.el('.pblock'), 'clang');
     const v = document.createElement('div');
     v.className = 'vignette blue';
@@ -470,11 +509,12 @@ export class App {
   }
 
   private ring(el: Element | null, color: string) {
-    if (!el) return;
+    const host = this.anchor(el, 650);
+    if (!host) return;
     const r = document.createElement('div');
     r.className = 'shockring';
     r.style.borderColor = color;
-    el.appendChild(r);
+    host.appendChild(r);
     setTimeout(() => r.remove(), 600 / this.settings.speed);
   }
 

@@ -79,7 +79,10 @@ export function rewardScreen(app: App): string {
   const ui = app.ui;
   const steps = `<div class="steps"><span class="${collected ? 'done' : 'on'}">① 골드 정산</span><i></i><span class="${collected ? 'on' : ''}">② 보상 선택</span></div>`;
   if (!collected) {
-    const canDon = !rw.donDone && rw.gold > 0 && rw.donStreak < donMaxStreak(run);
+    const rolling = ui.don.rolling && !!ui.don.before;
+    const gold = rolling ? ui.don.before!.gold : rw.gold;
+    const streak = rolling ? ui.don.before!.streak : rw.donStreak;
+    const canDon = !rolling && !rw.donDone && rw.gold > 0 && rw.donStreak < donMaxStreak(run);
     const spins = run.pendingFreeSpins > 0 || ui.slot.res || ui.slot.spinning;
     return `${topbar(app)}<div class="screen">
       <h2 class="center gold">승리!</h2>
@@ -88,20 +91,20 @@ export function rewardScreen(app: App): string {
         <div class="row"><span class="grow">기본 보상</span><b>${rw.base}G</b></div>
         <div class="row"><span class="grow">🐷 저금통 <span class="muted small">(열기·유물 보정 ×${rw.heatMult.toFixed(2)})</span></span><b id="piggyamt">${rw.piggy}G</b></div>
         ${rw.heal ? `<div class="green">보스 처치: 체력 ${rw.heal} 회복</div>` : ''}
-        <div class="row total"><span class="grow">받을 골드</span><b class="gold">${rw.gold}G</b></div>
+        <div class="row total"><span class="grow">받을 골드</span><b class="gold">${gold}G</b></div>
       </div>
       <div class="card col center">
         <b>🎲 더블 오어 낫싱 <span class="muted small">(선택)</span></b>
         <div class="die bigdie" id="dondie">${pipsHtml(ui.don.face)}</div>
         <div class="donrule"><span class="win">🎲 ${faces(donMin(run), 6)} → 2배!</span><span class="lose">🎲 ${faces(1, donMin(run) - 1)} → 0G</span></div>
-        <div class="muted small">최대 ${donMaxStreak(run)}번 연속 (${rw.donStreak}/${donMaxStreak(run)})</div>
+        <div class="muted small">최대 ${donMaxStreak(run)}번 연속 (${streak}/${donMaxStreak(run)})</div>
         <div style="min-height:22px;font-weight:900;font-size:17px" class="${ui.don.text.includes('성공') ? 'gold' : 'red'}">${esc(ui.don.text)}</div>
         ${run.consumables.includes('insurance') ? '<div class="small green">📄 보험증서: 실패 시 원금 반환</div>' : ''}
-        <button class="btn danger" data-act="don" ${canDon ? '' : 'disabled'}>${rw.gold}G 걸고 굴리기</button>
+        <button class="btn danger" data-act="don" ${canDon ? '' : 'disabled'}>${rolling ? '굴리는 중…' : `${gold}G 걸고 굴리기`}</button>
       </div>
       ${spins ? `<div class="card col"><b>💰 잭팟 무료 스핀 ×${run.pendingFreeSpins}</b>${slotMachine(app)}<button class="btn primary" data-act="freespin" ${run.pendingFreeSpins > 0 && !ui.slot.spinning ? '' : 'disabled'}>무료 스핀!</button></div>` : ''}
       <div class="grow"></div>
-      <button class="btn primary big" data-act="collect">${rw.gold > 0 ? `💰 ${rw.gold}G 받고 다음 ▶` : '다음 ▶'}</button>
+      <button class="btn primary big" data-act="collect" ${rolling ? 'disabled' : ''}>${rolling ? '결과를 기다리는 중…' : gold > 0 ? `💰 ${gold}G 받고 다음 ▶` : '다음 ▶'}</button>
     </div>`;
   }
   const kind = rw.options[0]?.kind === 'relic' ? '유물' : '보상';
@@ -186,7 +189,7 @@ export function diceViewer(app: App, applyFace: boolean): string {
     const sd = f.sticker ? FACE_BY_ID[f.sticker] : undefined;
     const label = sd?.kind === 'replace' ? (sd.wild ? '🃏' : sd.mirror ? '🪞' : String(sd.pip)) : String(f.pip);
     const [c, r] = NET_POS[i];
-    return `<div class="face mat-${die.material} ${applyFace ? 'target' : ''}" style="grid-column:${c};grid-row:${r}" ${applyFace ? `data-act="applyFace" data-arg="${i}"` : ''} data-tip="${esc(sd ? `${sd.name}: ${fmt(sd.desc, sd.v)}` : `눈 ${f.pip}`)}">${label}${sd ? `<span class="stk">${sd.emoji}</span>` : ''}</div>`;
+    return `<div class="face mat-${die.material} ${applyFace ? 'target' : ''} ${applyFace && app.ui.pickFace === i ? 'pickedFace' : ''}" style="grid-column:${c};grid-row:${r}" ${applyFace ? `data-act="pickFace" data-arg="${i}"` : ''} data-tip="${esc(sd ? `${sd.name}: ${fmt(sd.desc, sd.v)}` : `눈 ${f.pip}`)}">${label}${sd ? `<span class="stk">${sd.emoji}</span>` : ''}</div>`;
   }).join('');
   const m = MATERIAL_BY_ID[die.material];
   const stickers = die.faces.filter((f) => f.sticker).map((f) => { const sd = FACE_BY_ID[f.sticker!]; return `<div class="small">${sd.emoji} <b>${sd.name}</b> (${f.pip} 면) — ${esc(fmt(sd.desc, sd.v))}</div>`; }).join('');
@@ -204,8 +207,9 @@ function pendingModal(app: App): string {
     return `<div class="modal"><div class="box">
       <h3>${f.emoji} ${f.name} 면 붙이기 ${rarityTag(f.rarity)}</h3>
       <div class="small">${esc(fmt(f.desc, f.v))} <span class="muted">(${f.kind === 'attr' ? '◎ 속성: 원래 눈 유지' : '● 대체: 눈 자체가 바뀜'})</span></div>
-      <div class="muted small">주사위를 고르고 붙일 면을 탭하세요. 기존 스티커는 교체됩니다.</div>
+      <div class="muted small">① 위에서 주사위 고르기 → ② 붙일 면 탭 → ③ 아래 버튼으로 확정</div>
       ${diceViewer(app, true)}
+      ${faceConfirm(app, f.name)}
       <button class="btn ghost" data-act="cancelPending">버리기</button>
     </div></div>`;
   }
@@ -214,7 +218,10 @@ function pendingModal(app: App): string {
     return `<div class="modal"><div class="box">
       <h3>🎲 ${m.name} 재질 적용 ${rarityTag(m.rarity)}</h3>
       <div class="small">${esc(fmt(m.desc, m.v))}</div>
-      <div class="dicepick">${run.dice.map((d, i) => dieFace(6, undefined, d.material, '', `data-act="applyMat" data-arg="${i}" data-tip="${esc(MATERIAL_BY_ID[d.material].name)}"`)).join('')}</div>
+      <div class="muted small">바꿀 주사위를 탭한 뒤 아래 버튼으로 확정</div>
+      <div class="dicepick">${run.dice.map((d, i) => dieFace(6, undefined, d.material, app.ui.pickMat === i ? 'pickedDie' : '', `data-act="pickMat" data-arg="${i}" data-tip="${esc(MATERIAL_BY_ID[d.material].name)}"`)).join('')}</div>
+      ${app.ui.pickMat !== null ? `<div class="small center">${MATERIAL_BY_ID[run.dice[app.ui.pickMat].material].icon} ${MATERIAL_BY_ID[run.dice[app.ui.pickMat].material].name} 주사위 → ${m.icon} ${m.name} 주사위</div>` : ''}
+      <button class="btn primary big" data-act="confirmMat" ${app.ui.pickMat === null ? 'disabled' : ''}>${app.ui.pickMat === null ? '주사위를 고르세요' : '✔ 이 주사위에 적용'}</button>
       <button class="btn ghost" data-act="cancelPending">버리기</button>
     </div></div>`;
   }
@@ -322,4 +329,15 @@ function upgradeLine(run: RunState, slot: number, amount: number): string {
 function faces(lo: number, hi: number): string {
   if (hi < lo) return '없음';
   return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).join('·');
+}
+
+function faceConfirm(app: App, name: string): string {
+  const run = app.run!;
+  const i = app.ui.pickFace;
+  if (i === null) return `<button class="btn primary big" disabled>붙일 면을 고르세요</button>`;
+  const die = run.dice[Math.min(app.ui.editDie, run.dice.length - 1)];
+  const f = die.faces[i];
+  const old = f.sticker ? FACE_BY_ID[f.sticker] : null;
+  return `<div class="small center">눈 ${f.pip} 면에 붙인다${old ? ` · <span class="red">기존 ${old.emoji} ${old.name} 스티커는 사라짐</span>` : ''}</div>
+    <button class="btn primary big" data-act="confirmFace">✔ 여기에 「${name}」 붙이기</button>`;
 }

@@ -534,3 +534,9 @@ h1, h2, h3 { margin: 0; }
 .donrule { display: flex; flex-direction: column; gap: 4px; align-items: center; font-weight: 900; font-size: 15px; }
 .donrule .win { color: #2a1a00; background: var(--gold); border-radius: 10px; padding: 2px 10px; }
 .donrule .lose { color: #ffd0d3; background: #5a1a22; border-radius: 10px; padding: 2px 10px; }
+
+/* 연출 레이어 (화면을 다시 그려도 유지) */
+.fxanchor { position: absolute; pointer-events: none; z-index: 65; }
+
+.net .face.pickedFace { outline: 4px solid var(--gold); box-shadow: 0 0 16px rgba(245,197,66,.8); transform: scale(1.08); }
+.die.pickedDie { outline: 3px solid var(--gold); box-shadow: 0 0 14px rgba(245,197,66,.8); transform: translateY(-4px); }

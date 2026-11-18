@@ -154,10 +154,12 @@ function runAction(app: App, act: string, arg: string, n: number) {
     }
     // ── 보상 ──
     case 'don': {
+      const rw = run.reward;
+      const before = rw ? { gold: rw.gold, streak: rw.donStreak } : undefined;
       const r = doubleOrNothing(ctx);
       if (!r) return;
       app.queue.splice(0);
-      animateDon(app, r.frames, r.win);
+      animateDon(app, r.frames, r.win, before);
       return;
     }
     case 'collect': collectRewardGold(ctx); break;
@@ -165,7 +167,9 @@ function runAction(app: App, act: string, arg: string, n: number) {
       if (run.pendingFreeSpins <= 0) return;
       run.pendingFreeSpins--;
       ui.casinoTab = 'slot';
+      ui.freeze = { gold: run.gold, chips: run.chips, hp: run.hp };
       const res = slotSpin(ctx, { free: true });
+      if (!res) ui.freeze = null;
       if (res) { animateSlot(app, res); return; }
       break;
     }
@@ -189,7 +193,11 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'leaveShop': leaveShop(ctx); ui.shopEdit = false; break;
     case 'shopEdit': ui.shopEdit = !ui.shopEdit; break;
     // ── 선택(펜딩) ──
-    case 'editDie': ui.editDie = n; break;
+    case 'editDie': ui.editDie = n; ui.pickFace = null; break;
+    case 'pickFace': ui.pickFace = n; app.render(); return;
+    case 'pickMat': ui.pickMat = n; app.render(); return;
+    case 'confirmFace': if (ui.pickFace !== null) applyFace(ctx, Math.min(ui.editDie, run.dice.length - 1), ui.pickFace); ui.pickFace = null; break;
+    case 'confirmMat': if (ui.pickMat !== null) applyMaterial(ctx, ui.pickMat); ui.pickMat = null; break;
     case 'applyFace': applyFace(ctx, Math.min(ui.editDie, run.dice.length - 1), n); break;
     case 'applyMat': applyMaterial(ctx, n); break;
     case 'pickSlot': ui.pickSlot = n; app.render(); return;
@@ -202,8 +210,10 @@ function runAction(app: App, act: string, arg: string, n: number) {
     // ── 카지노 ──
     case 'tab': ui.casinoTab = arg as typeof ui.casinoTab; break;
     case 'spin': {
+      ui.freeze = { gold: run.gold, chips: run.chips - 1, hp: run.hp };
       const res = slotSpin(ctx);
-      if (!res) { app.toast('칩이 없다 (상점에서 8G = 칩 1)', 'bad'); return; }
+      if (!res) {
+        ui.freeze = null; app.toast('칩이 없다 (상점에서 8G = 칩 1)', 'bad'); return; }
       animateSlot(app, res);
       return;
     }
@@ -217,8 +227,10 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'clearBets': ui.bets = {}; break;
     case 'spinRoulette': {
       const bets = Object.entries(ui.bets).filter(([, c]) => c > 0).map(([bet, chips]) => ({ bet: bet as RouletteBet, chips }));
+      ui.freeze = { gold: run.gold, chips: run.chips - bets.reduce((a, b) => a + b.chips, 0), hp: run.hp };
       const r = rouletteSpin(ctx, bets);
-      if (!r) { app.toast('먼저 칩을 걸자', 'bad'); return; }
+      if (!r) {
+        ui.freeze = null; app.toast('먼저 칩을 걸자', 'bad'); return; }
       animateRoulette(app, r.n, r.won);
       return;
     }
