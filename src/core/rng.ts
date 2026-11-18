@@ -1,8 +1,8 @@
 // 시드 기반 RNG (mulberry32). 엔진 내장 난수 함수는 사용하지 않는다.
 // 상태는 숫자 하나라 JSON 저장이 가능하다.
 
-export type Stream = 'combat' | 'loot' | 'shop' | 'casino' | 'map';
-export const STREAMS: Stream[] = ['combat', 'loot', 'shop', 'casino', 'map'];
+export type Stream = 'combat' | 'loot' | 'shop' | 'casino' | 'map' | 'deck' | 'reward' | 'augment';
+export const STREAMS: Stream[] = ['combat', 'loot', 'shop', 'casino', 'map', 'deck', 'reward', 'augment'];
 
 export function mulberry32Next(state: number): [number, number] {
   let a = (state + 0x6d2b79f5) | 0;

@@ -9,7 +9,9 @@ import { META_LOCKED_START } from '../../data/meta';
 import { nextUnlockIn, runPoints } from '../../rules/meta';
 import { esc, fmt, rarityTag } from '../components/parts';
 import { MATERIAL_BY_ID } from '../../data/materials';
-import { SKILL_BY_ID } from '../../data/skills';
+import { CARD_BY_ID, CARDS, isPoolCard, resolveCard } from '../../data/cards';
+import { COMBOS } from '../../data/sets';
+import { cardFace } from '../components/parts';
 import { RELIC_BY_ID } from '../../data/relics';
 import { FACE_BY_ID } from '../../data/faces';
 import { CHAR_BY_ID } from '../../data/characters';
@@ -51,7 +53,7 @@ export function charScreen(app: App): string {
       <div class="ic" style="font-size:34px">${unlocked ? c.emoji : '🔒'}</div>
       <div class="grow" style="text-align:left"><div class="tt">${app.ui.charSel === c.id && unlocked ? '✔ ' : ''}${c.name} <span class="muted small">❤${c.hp}</span> <span class="lvl">Lv.${masteryLevel(m.mastery?.[c.id] ?? 0)}</span></div>
       <div class="ds">${esc(c.desc)}</div>
-      <div class="ds">스킬: ${c.skills.map((s) => SKILL_BY_ID[s].name).join('·')}</div>
+      <div class="ds">시작 덱: 베기×4 · 방패×4 · ${c.startCards.map((s) => CARD_BY_ID[s].icon + ' ' + CARD_BY_ID[s].name).join(' · ')}</div>
       <div class="ds">주사위: ${[...new Set(c.dice)].map((m) => `${MATERIAL_BY_ID[m].icon} ${MATERIAL_BY_ID[m].name}×${c.dice.filter((x) => x === m).length}`).join(' ')}</div>
       ${[...new Set(c.dice)].filter((m) => m !== 'wood').map((m) => `<div class="ds">${MATERIAL_BY_ID[m].icon} ${esc(MATERIAL_BY_ID[m].long)}</div>`).join('')}
       ${unlocked ? '' : `<div class="ds red">해금: ${esc(c.unlockText)}</div>`}</div>
@@ -99,7 +101,7 @@ function cos(id: string, kind: string, name: string, color: string, on: boolean,
 export function codexScreen(app: App): string {
   const c = app.meta.codex;
   const tab = app.ui.codexTab;
-  const tabs = `<div class="tabs">${[['relic', '유물'], ['face', '면'], ['enemy', '적'], ['hand', '족보']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="codexTab" data-arg="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="tabs">${[['card', '카드'], ['combo', '콤보'], ['relic', '유물'], ['face', '면'], ['enemy', '적'], ['hand', '족보']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="codexTab" data-arg="${k}">${l}</button>`).join('')}</div>`;
   let list = '';
   if (tab === 'relic') list = RELICS.map((r) => c.relics.includes(r.id)
     ? `<div class="item r-${r.rarity}"><div class="ic">${r.emoji}</div><div class="grow"><div class="tt">${r.name} ${rarityTag(r.rarity)}</div><div class="ds">${esc(r.desc)}</div></div></div>`
@@ -111,6 +113,10 @@ export function codexScreen(app: App): string {
     ? `<div class="item"><div class="ic">${e.emoji}</div><div class="grow"><div class="tt">${e.name} <span class="muted small">${e.act}막 ${e.tier === 'boss' ? '보스' : e.tier === 'elite' ? '엘리트' : ''} ❤${e.hp}</span></div><div class="ds">${esc(e.desc)}</div></div></div>`
     : `<div class="item" style="opacity:.4"><div class="ic">❔</div><div class="grow tt">???</div></div>`).join('');
   if (tab === 'hand') list = HANDS.map((h) => `<div class="item" style="${c.hands.includes(h.id) ? '' : 'opacity:.4'}"><div class="grow"><div class="tt">${h.name}</div><div class="ds">배율 ×${h.mult} · 열기 ${h.heat < 0 ? '초기화' : '+' + h.heat}${h.jackpot ? ` · 잭팟 +${h.jackpot}%` : ''}</div></div></div>`).join('');
+  if (tab === 'card') list = `<div class="dgrid">${CARDS.filter(isPoolCard).map((d) => c.cards.includes(d.id) ? cardFace(resolveCard({ id: d.id, up: null })) : '<div class="dcard unknown"><div class="dart">❔</div><div class="dname">???</div></div>').join('')}</div>`;
+  if (tab === 'combo') list = COMBOS.map((k) => c.combos.includes(k.id)
+    ? `<div class="item"><div class="ic">🔗</div><div class="grow"><div class="tt">${esc(k.name)} <span class="muted small">${CARD_BY_ID[k.a].name} + ${CARD_BY_ID[k.b].name}</span></div><div class="ds">${esc(k.desc)}</div></div></div>`
+    : `<div class="item" style="opacity:.5"><div class="ic">🔒</div><div class="grow"><div class="tt">??? <span class="muted small">${CARD_BY_ID[k.a].icon}? + ${CARD_BY_ID[k.b].icon}?</span></div><div class="ds">${k.char ? '캐릭터 전용 · ' : ''}두 카드를 같은 덱에 모으면 발견</div></div></div>`).join('');
   const s = app.meta.stats;
   return `<div class="screen">
     <div class="row"><button class="btn ghost" data-act="back">←</button><h2>도감</h2></div>
@@ -147,10 +153,10 @@ export function endScreen(app: App): string {
   </div>`;
 }
 
-const RWD_KIND: Record<string, string> = { skill: '스킬', relic: '유물', face: '면', table: '테이블', skin: '주사위 스킨', felt: '테이블 색' };
+const RWD_KIND: Record<string, string> = { card: '카드', skill: '카드', relic: '유물', face: '면', table: '테이블', skin: '주사위 스킨', felt: '테이블 색' };
 export function rewardLabel(r: string): string {
   const [k, id] = r.split(':');
-  const name = k === 'skill' ? SKILL_BY_ID[id]?.name : k === 'relic' ? RELIC_BY_ID[id]?.name : k === 'face' ? FACE_BY_ID[id]?.name
+  const name = k === 'card' || k === 'skill' ? CARD_BY_ID[id]?.name : k === 'relic' ? RELIC_BY_ID[id]?.name : k === 'face' ? FACE_BY_ID[id]?.name
     : k === 'table' ? TABLE_BY_ID[id]?.name : k === 'skin' ? SKINS.find((x) => x.id === id)?.name : FELTS.find((x) => x.id === id)?.name;
   return `${RWD_KIND[k] ?? ''} 「${name ?? id}」`;
 }

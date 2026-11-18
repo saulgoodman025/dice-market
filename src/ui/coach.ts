@@ -4,8 +4,10 @@
 // - 말풍선은 비춘 부분을 가리지 않는 가장 넓은 빈 공간에 놓인다
 // - 튜토리얼 동안 적·나는 쓰러지지 않는다 (run.flags.tutorial) → 끝까지 볼 수 있다
 import type { App } from './app';
-import { SKILL_BY_ID } from '../data/skills';
-import { baseRerolls, skillUsable } from '../rules/combat';
+import { resolveFor } from '../rules/cardfx';
+import { CARD_BY_ID } from '../data/cards';
+import type { RunState } from '../core/state';
+import { baseRerolls, cardUsable } from '../rules/combat';
 
 interface Step {
   focus: (app: App) => string[]; // 밝게 비출 요소 (이 요소만 조작 가능)
@@ -17,22 +19,38 @@ interface Step {
 
 const cb = (app: App) => app.run?.combat ?? null;
 
+/** 첫 전투 손패에 공격(베기)·방어(방패) 카드가 꼭 있게 한다 (설명할 카드가 없으면 안 되므로) */
+export function tutorialHand(run: RunState) {
+  const c = run.combat;
+  if (!c) return;
+  const want = [{ role: 'atk', target: true }, { role: 'def', target: false }];
+  for (const w of want) {
+    const ok = (id: string) => { const d = CARD_BY_ID[id]; return d.role === w.role && !!d.target === w.target && !d.chance && !d.perCombat && d.rarity === 'basic'; };
+    if (c.cards.some((x) => ok(x.id))) continue;
+    const i = c.drawPile.findIndex((x) => ok(x.id));
+    const j = c.cards.findIndex((x) => CARD_BY_ID[x.id].rarity !== 'basic');
+    if (i >= 0) { const [card] = c.drawPile.splice(i, 1); const out = c.cards.splice(j >= 0 ? j : c.cards.length - 1, 1, card); c.drawPile.push(...out); }
+  }
+}
+
 /** 튜토리얼에서 쓰게 할 카드 (공격: 적 대상 카드 / 방어: 방어 카드) */
 export function tutorialCard(app: App, kind: 'atk' | 'def'): number {
   const run = app.run!;
   const ctx = app.ctx;
+  const cards = run.combat?.cards ?? [];
   const match = (i: number) => {
-    const d = SKILL_BY_ID[run.skills[i].id];
+    const d = resolveFor(run, cards[i]);
     return kind === 'atk' ? d.target === 'enemy' && d.role === 'atk' && !d.chance : d.role === 'def' && !d.perCombat;
   };
-  const idx = run.skills.map((_, i) => i).filter(match);
-  return idx.find((i) => skillUsable(ctx, i)) ?? idx[0] ?? -1;
+  const idx = cards.map((_, i) => i).filter(match);
+  return idx.find((i) => cardUsable(ctx, i)) ?? idx[0] ?? -1;
 }
 
 const card = (app: App, kind: 'atk' | 'def') => `.scard[data-card="${tutorialCard(app, kind)}"]`;
 const usedKind = (app: App, kind: 'atk' | 'def') => {
   const c = cb(app);
-  return !!c && app.run!.skills.some((s, i) => c.usedSlots[i] && (kind === 'atk' ? SKILL_BY_ID[s.id].target === 'enemy' : SKILL_BY_ID[s.id].role === 'def'));
+  if (!c) return false;
+  return [...c.discard, ...c.exhausted].some((x) => { const d = resolveFor(app.run!, x); return kind === 'atk' ? d.target === 'enemy' : d.role === 'def'; });
 };
 
 export const COACH: Step[] = [
@@ -56,12 +74,14 @@ export const COACH: Step[] = [
     focus: (a) => [card(a, 'def')], title: '⑧ 방어 카드', text: '✋ 카드는 대상이 없습니다. 위쪽으로 끌어올려 놓으면 씁니다. 얻은 🛡 방어도는 적의 공격을 먼저 막아줍니다.',
     doLabel: '방어 카드를 테이블로 끌어올리세요', done: (a) => usedKind(a, 'def'),
   },
-  { focus: () => ['.tablestats'], title: '⑨ 저금통', text: '쓰지 않고 남긴 주사위의 눈은 🐷 저금통에 쌓입니다. 전투에서 이기면 골드로 바뀝니다.' },
+  { focus: () => ['.piles', '.hand'], title: '⑨ 카드 뽑기', text: '매 턴 덱에서 카드 5장을 뽑고, 턴이 끝나면 손패는 모두 버립니다. 🂠 뽑을 카드가 떨어지면 🗑 버린 카드를 섞어 다시 씁니다. 족보가 투 페어 이상이면 1장 더!' },
+  { focus: () => ['.tablestats'], title: '⑩ 주사위 태우기 🔥', text: '턴마다 1번, 쓰지 않을 주사위 하나를 태워 카드 1장을 더 뽑을 수 있습니다. 태운 주사위는 저금통에 들어가지 않습니다.' },
+  { focus: () => ['.tablestats'], title: '⑪ 저금통', text: '쓰지 않고 남긴 주사위의 눈은 🐷 저금통에 쌓입니다. 전투에서 이기면 골드로 바뀝니다.' },
   {
-    focus: () => ['[data-act="endTurn"]'], title: '⑩ 턴 종료', text: '할 일을 마쳤으면 턴을 끝내세요. 더 할 수 있는 게 없으면 이 버튼이 반짝입니다.',
+    focus: () => ['[data-act="endTurn"]'], title: '⑫ 턴 종료', text: '할 일을 마쳤으면 턴을 끝내세요. 더 할 수 있는 게 없으면 이 버튼이 반짝입니다.',
     doLabel: '턴 종료를 누르세요', done: (a) => (cb(a)?.turn ?? 1) >= 2,
   },
-  { focus: () => ['.player'], title: '⑪ 잘했다!', text: '적의 공격은 🛡 방어도가 먼저 막고, 남은 만큼 ❤ 체력이 줄어듭니다. 이제 직접 싸워 보세요! 오른쪽 위 ? 로 다시 볼 수 있습니다.' },
+  { focus: () => ['.player'], title: '⑬ 잘했다!', text: '적의 공격은 🛡 방어도가 먼저 막고, 남은 만큼 ❤ 체력이 줄어듭니다. 이제 직접 싸워 보세요! 오른쪽 위 ? 로 다시 볼 수 있습니다.' },
 ];
 
 /** 지금 튜토리얼이 조작을 막고 있는가 */

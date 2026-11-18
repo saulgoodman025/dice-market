@@ -51,8 +51,10 @@ export function settleRun(meta: Meta, run: RunState): SettleResult {
     if (k.startsWith('seen_face_')) add(meta.codex.faces, k.slice(10));
     if (k.startsWith('seen_enemy_')) add(meta.codex.enemies, k.slice(11));
     if (k.startsWith('seen_hand_')) add(meta.codex.hands, k.slice(10));
+    if (k.startsWith('comboSeen_')) add(meta.codex.combos, k.slice(10));
   }
   for (const r of run.relics) add(meta.codex.relics, r);
+  for (const c of run.deck) add(meta.codex.cards, c.id);
   const unlocked: string[] = [];
   while (meta.points - meta.spent >= META_POINTS_PER_UNLOCK) {
     const next = META_LOCKED_START.find((l) => !meta.unlocked.includes(`${l.kind}:${l.id}`));

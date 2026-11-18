@@ -1,17 +1,23 @@
 // 전투 규칙. UI를 모르는 순수 로직. 결과는 ctx.emit 이벤트로 알린다.
-import type { CombatState, Enemy, HandDie, HandResult, Intent, IntentSpec, RunState } from '../core/state';
+import type { CardInst, CombatState, Enemy, HandDie, HandResult, Intent, IntentSpec } from '../core/state';
 import { BALANCE } from '../data/balance';
 import { ENEMY_BY_ID, JESTER_POOL } from '../data/enemies';
 import { FACE_BY_ID } from '../data/faces';
 import { HAND_BY_ID } from '../data/hands';
 import { MATERIAL_BY_ID } from '../data/materials';
-import { checkCond, condCount, SKILL_BY_ID, type SkillUse } from '../data/skills';
+import { checkCond, condCounts, condText } from '../data/cond';
+import { CARD_BY_ID, resolveCard, type CardUse, type ResolvedCard } from '../data/cards';
+import { HANDS } from '../data/hands';
+import { addBuff, buffFx, playerStr, tickBuffsTurnStart } from './buffs';
+import { resolveFor } from './cardfx';
+import { snapshotTiers } from './sets';
+import { discardHand, drawCards, shuffle } from './deck';
 import { fire, getMods, rng, sources, toast, type Ctx } from './ctx';
 import { ddaEnemyHpMult } from './dda';
 import { effValue, faceOf, forcePip, refreshDerived, rollFaceIdx, rollHandDie, setFace } from './dice';
 import { evaluateHand } from './hands';
 import {
-  addHeat, addJackpot, alive, cbOf, damageEnemy, damagePlayer, gainBlock, gainGold, healPlayer, randomEnemy, resetHeat,
+  addEnemyPoison, addHeat, addJackpot, alive, cbOf, damageEnemy, damagePlayer, gainBlock, gainGold, healPlayer, randomEnemy, resetHeat, targetEnemy,
 } from './ops';
 
 // ───────────── 시작 ─────────────
@@ -28,6 +34,7 @@ export function makeEnemy(ctx: Ctx, id: string, hpMult: number, patternOffset = 
 
 export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: string[], rewardMult = 1) {
   const run = ctx.run;
+  snapshotTiers(run);
   const m = getMods(run);
   const endless = Math.max(0, run.act - 3);
   const hpMult = BALANCE.enemyHpMult * (1 + m.enemyHpPct) * ddaEnemyHpMult(run) * (1 + 0.4 * endless);
@@ -43,14 +50,17 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
   }
   const cb: CombatState = {
     kind, enemies, hand: [], phase: 'roll', turn: 0, rerollsLeft: 0, block: 0, keepBlock: 0, thorns: 0,
-    piggy: 0, piggyMult: 1, handChips: 0, pStr: 0, pVuln: 0, pWeak: 0, handResult: null, usedSlots: [], target: enemies[0].uid, diceUsedThisTurn: 0,
-    lastSkill: null, doubledown: 0, counters: {}, turnCounters: {},
-    next: { six: 0, one: 0, rerollPenalty: 0, flip: false, stealDie: false, preview: [], seal: 0, chipTax: 0 },
+    piggy: m.combatPiggy, piggyMult: 1, handChips: 0, pStr: 0, pVuln: 0, pWeak: 0, handResult: null, target: enemies[0].uid, diceUsedThisTurn: 0,
+    drawPile: [], cards: [], discard: [], exhausted: [], buffs: [], lastCard: null, cardsPlayed: 0, costFree: [], boosted: [], virtualPips: [], handBoost: 0,
+    doubledown: 0, counters: {}, turnCounters: {},
+    next: { six: 0, one: 0, rerollPenalty: 0, flip: false, stealDie: false, preview: [], seal: 0, chipTax: 0, pinned: [], setFirst: [], chipMult: 1, previewN: 0, sameFirst: 0 },
     jackpotTurn: false, houseRule: null, queenParity: null, lastSkillDamage: 0, dmgTaken: 0, result: null,
     nextKey: 1, rewardMult, brokenDice: [], log: [],
   };
   run.combat = cb;
   run.screen = 'combat';
+  // 덱 전체를 복사해 뽑을 더미로 (deck 스트림 셔플)
+  cb.drawPile = shuffle(ctx, run.deck.map((c) => ({ ...c })));
   for (const e of enemies) e.intent = makeIntent(ctx, e);
   fire(ctx, 'onCombatStart');
   startTurn(ctx);
@@ -60,10 +70,10 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
 function attackValue(ctx: Ctx, e: Enemy, base: number): number {
   const m = getMods(ctx.run);
   const cb = ctx.run.combat;
-  let v = (base + e.stacks + e.str) * e.nextMult;
+  let v = (base * BALANCE.enemyAtkMult + e.stacks + e.str) * e.nextMult;
   if (e.enraged) v *= 1.5;
   if (e.phase >= 2 && m.bossPhase2 > 0 && ENEMY_BY_ID[e.id].tier === 'boss') v *= 1.25;
-  if (e.frail > 0) v *= BALANCE.frailMult; // 적 약화
+  if (e.frail > 0) v *= BALANCE.frailMult - m.frailExtra; // 적 약화
   if (cb && cb.pVuln > 0) v *= BALANCE.vulnMult; // 내 취약
   v -= e.weak;
   return Math.max(0, Math.round(v));
@@ -128,19 +138,29 @@ export function startTurn(ctx: Ctx) {
   const m = getMods(run);
   cb.turn++;
   cb.phase = 'roll';
-  // 요새: 직전 턴에 쌓은 유지 방어는 이번 턴까지만 남는다
-  cb.block = cb.keepBlock;
+  // 요새: 직전 턴에 쌓은 유지 방어는 이번 턴까지만 남는다. 철벽·불멸의 요새면 방어도가 그대로, 방패 2단계면 일부가 넘어온다
+  const persist = buffFx(cb).keepBlock > 0;
+  const carry = persist ? cb.block : m.blockPersistCap ? Math.min(m.blockPersistCap, cb.block) : Math.floor(cb.block * m.blockCarryPct / 100);
+  cb.block = cb.keepBlock + (cb.turn > 1 ? carry : 0);
   cb.keepBlock = 0;
+  tickBuffsTurnStart(ctx);
   cb.thorns = 0;
   cb.handResult = null;
-  cb.usedSlots = run.skills.map(() => false);
   cb.diceUsedThisTurn = 0;
-  cb.lastSkill = null;
+  cb.cardsPlayed = 0;
+  cb.costFree = [];
+  cb.boosted = [];
+  cb.virtualPips = [];
+  cb.handBoost = 0;
   cb.doubledown = 0;
   cb.houseRule = null;
   cb.queenParity = null;
   cb.turnCounters = {};
-  cb.rerollsLeft = Math.max(0, baseRerolls(ctx) - cb.next.rerollPenalty);
+  // 카드 뽑기
+  const mini = m.minimalist && run.deck.length <= 12 ? 1 : 0;
+  drawCards(ctx, BALANCE.drawPerTurn + m.drawPerTurn + mini + (cb.turn === 1 ? m.firstTurnDraw : 0));
+  const curseRr = cb.cards.reduce((s2, c) => s2 + (CARD_BY_ID[c.id]?.inHandRerolls ?? 0), 0);
+  cb.rerollsLeft = Math.max(0, baseRerolls(ctx) - cb.next.rerollPenalty + curseRr);
   cb.next.rerollPenalty = 0;
   cb.turnCounters.nudge = m.turnNudge;
   cb.turnCounters.setValue = m.turnGodhand + (cb.turn === 1 ? m.stackdeck : 0) + (cb.counters.marked ? 1 : 0);
@@ -170,6 +190,8 @@ export function startTurn(ctx: Ctx) {
     if (self) damagePlayer(ctx, self, '저주받은 주사위', { ignoreBlock: true });
   }
   if (cb.turn === 1 && m.firstTurnBlock) gainBlock(ctx, m.firstTurnBlock);
+  if (m.turnBlock) gainBlock(ctx, m.turnBlock);
+  if (m.piggyBlockPct && cb.piggy > 0) gainBlock(ctx, cb.piggy * m.piggyBlockPct / 100);
   fire(ctx, 'onTurnStart');
   for (const e of alive(cb)) {
     e.weakPip = rng(ctx, 'combat').int(1, 6);
@@ -182,13 +204,26 @@ export function startTurn(ctx: Ctx) {
   if (cb.houseRule === 'oneReroll') cb.rerollsLeft = Math.min(cb.rerollsLeft, 1);
   if (cb.result) return;
 
-  // 첫 굴림
+  // 첫 굴림 (고정 카드로 보관한 주사위는 그 눈 그대로)
   const preview = cb.next.preview;
+  const pinned = cb.next.pinned;
+  cb.next.pinned = [];
   hand.forEach((hd, i) => {
-    if (i === 0 && preview.length) setFace(ctx, hd, preview[0]);
+    const pin = pinned.find((p) => p.dieIdx === hd.dieIdx);
+    if (pin) { hd.pip = pin.pip; hd.held = true; hd.locked = true; return; }
+    if (i < preview.length) setFace(ctx, hd, preview[i]);
     else rollHandDie(ctx, hd);
   });
   cb.next.preview = [];
+  // 밑장 빼기: 첫 굴림 주사위를 원하는 눈으로
+  const setFirst = cb.next.setFirst;
+  cb.next.setFirst = [];
+  hand.filter((h) => !h.held).slice(0, setFirst.length).forEach((hd, i) => forcePip(ctx, hd, setFirst[i]));
+  if (cb.next.sameFirst) {
+    const free = hand.filter((h) => !h.held);
+    if (free.length >= 2) forcePip(ctx, free[1], free[0].pip);
+    cb.next.sameFirst = 0;
+  }
   applyForced(ctx, hand);
   if (cb.turn === 1 && m.weighted) {
     const one = hand.find((h) => h.pip === 1);
@@ -277,7 +312,7 @@ function postRoll(ctx: Ctx, rolled: HandDie[]) {
 export function toggleLock(ctx: Ctx, key: number) {
   const cb = cbOf(ctx);
   const hd = cb.hand.find((h) => h.key === key);
-  if (!hd || hd.used) return;
+  if (!hd || hd.used || hd.held) return;
   if (cb.houseRule === 'noLock' && cb.phase === 'roll') return;
   if (MATERIAL_BY_ID[hd.material].noReroll) return;
   if (!hd.locked && cb.phase === 'roll' && lockedCount(cb) >= lockLimit(ctx)) {
@@ -293,7 +328,7 @@ export function lockLimit(ctx: Ctx): number {
 
 /** 잠금 수 (리롤 안 되는 재질의 자동 잠금은 세지 않는다) */
 export function lockedCount(cb: CombatState): number {
-  return cb.hand.filter((h) => h.locked && !h.used && !MATERIAL_BY_ID[h.material].noReroll).length;
+  return cb.hand.filter((h) => h.locked && !h.used && !h.held && !MATERIAL_BY_ID[h.material].noReroll).length;
 }
 
 /** 지금 쓸 수 있는 족보 칩 (아직 족보 확정 전이면 예상 족보의 칩까지 포함) */
@@ -353,15 +388,22 @@ export function reroll(ctx: Ctx) {
 
 // ───────────── 족보 확정 ─────────────
 export function handInputs(cb: CombatState) {
-  return cb.hand.filter((h) => !h.gone).map((h) => {
+  const real = cb.hand.filter((h) => !h.gone).map((h) => {
     const f = faceOf(h);
     return { pip: h.pip, wild: !!(f?.wild || MATERIAL_BY_ID[h.material].wild), magnet: !!f?.magnet };
   });
+  return [...real, ...(cb.virtualPips ?? []).map((pip) => ({ pip }))];
 }
 
 export function previewHand(ctx: Ctx): HandResult {
   const cb = cbOf(ctx);
-  return scoreHand(ctx, evaluateHand(handInputs(cb), { smallLadder: getMods(ctx.run).smallLadder > 0 }));
+  const m = getMods(ctx.run);
+  let id = evaluateHand(handInputs(cb), { smallLadder: m.smallLadder > 0 });
+  if (id === 'none' && m.noneAsPair) id = 'pair';
+  if (id === 'four' && m.fourIsYahtzee) id = 'yahtzee';
+  // 가짜 야찌: 족보 단계 +N
+  if (cb.handBoost) id = HANDS[Math.min(HANDS.length - 1, HAND_BY_ID[id].rank + cb.handBoost)].id;
+  return scoreHand(ctx, id);
 }
 
 export function scoreHand(ctx: Ctx, id: HandResult['id']): HandResult {
@@ -369,6 +411,10 @@ export function scoreHand(ctx: Ctx, id: HandResult['id']): HandResult {
   const m = getMods(ctx.run);
   const def = HAND_BY_ID[id];
   let mult = def.mult + (m.handAdd[id] ?? 0) + (id !== 'none' ? m.handAll : 0);
+  if (m.straightFlush && (id === 'small' || id === 'large')) {
+    const p = cb.hand.filter((h) => !h.gone).map((h) => h.pip);
+    if (p.length >= 5 && (p.every((x) => x % 2 === 1) || p.every((x) => x % 2 === 0))) mult *= HAND_BY_ID.flush.mult + (m.handAdd.flush ?? 0);
+  }
   if (id !== 'none') {
     for (const h of cb.hand) {
       const f = faceOf(h);
@@ -403,6 +449,7 @@ export function rescoreHand(ctx: Ctx) {
       ctx.emit({ t: 'yahtzee' });
     }
     fire(ctx, 'onHandScored', { hand: now });
+    handDraw(ctx);
   }
   ctx.run.flags['seen_hand_' + now.id] = 1;
   ctx.emit({ t: 'hand', hand: now });
@@ -424,7 +471,11 @@ export function confirmHand(ctx: Ctx) {
     return;
   }
   cb.turnCounters.confirmed = 1;
-  cb.handChips += Math.max(0, handChipsFor(ctx, hand.id) - cb.next.chipTax);
+  let gain = Math.max(0, handChipsFor(ctx, hand.id) - cb.next.chipTax);
+  if (cb.next.chipMult === 2) gain *= 2;
+  else if (cb.next.chipMult < 0) gain = Math.max(0, gain + cb.next.chipMult);
+  cb.next.chipMult = 1;
+  cb.handChips += gain;
   if (cb.next.chipTax) toast(ctx, `🏦 족보 칩 -${cb.next.chipTax} (은행원)`, 'bad');
   cb.next.chipTax = 0;
   run.flags.ach_max_chips = Math.max(run.flags.ach_max_chips ?? 0, cb.handChips);
@@ -448,95 +499,176 @@ export function confirmHand(ctx: Ctx) {
   }
   fire(ctx, 'onHandScored', { hand });
   for (const e of alive(cb)) ENEMY_BY_ID[e.id].onHandScored?.(ctx, e, hand);
+  // 족보 드로우: 투 페어 이상이면 1장 (턴당 1회)
+  handDraw(ctx);
   refreshIntents(ctx);
 }
 
-// ───────────── 스킬 사용 ─────────────
+/** 족보가 투 페어(완화 시 원 페어) 이상이면 카드 1장 (턴당 1회) */
+function handDraw(ctx: Ctx) {
+  const cb = cbOf(ctx);
+  if (cb.turnCounters.handDraw || !cb.handResult) return;
+  const min = getMods(ctx.run).handDrawMin ? 1 : 2;
+  if (HAND_BY_ID[cb.handResult.id].rank >= min) {
+    cb.turnCounters.handDraw = 1;
+    drawCards(ctx, 1);
+  }
+}
+
+// ───────────── 카드 사용 ─────────────
 export function freeDice(cb: CombatState): HandDie[] {
   return cb.hand.filter((h) => !h.used);
 }
 
-export function skillUsable(ctx: Ctx, slot: number): boolean {
+/** 이번 턴 족보 단계 (확정 전이면 예상 족보) */
+export function handRankNow(ctx: Ctx): number {
   const cb = cbOf(ctx);
-  const inst = ctx.run.skills[slot];
-  if (!inst || cb.usedSlots[slot]) return false;
-  const def = SKILL_BY_ID[inst.id];
-  if (def.perTurn && (cb.turnCounters['sk_' + def.id] ?? 0) >= def.perTurn) return false;
-  if (def.perCombat && (cb.counters['sk_' + def.id] ?? 0) >= def.perCombat) return false;
-  if (def.cost > chipsAvailable(ctx)) return false;
+  const h = cb.handResult ?? previewHand(ctx);
+  return HAND_BY_ID[h.id].rank;
+}
+
+/** 도박 카드 성공 확률 보정 (%p) */
+export function gambleOddsBonus(ctx: Ctx): number {
+  return getMods(ctx.run).gambleOdds + buffFx(ctx.run.combat).gambleOdds;
+}
+
+/** 이 카드의 지금 비용 */
+export function cardCost(ctx: Ctx, inst: CardInst): number {
+  const cb = cbOf(ctx);
+  const rc = resolveFor(ctx.run, inst);
+  const m = getMods(ctx.run);
+  if (rc.unplayable) return rc.cost;
+  if (cb.costFree.includes(inst.uid) || cb.turnCounters.allFree || (cb.turnCounters.nextFree ?? 0) > 0) return 0;
+  if (rc.tag && buffFx(cb).freeTags.includes(rc.tag)) return 0;
+  if (m.freeRet && rc.retDie) return 0;
+  if (m.freeFromNth && cb.cardsPlayed + 1 >= m.freeFromNth) return 0;
+  let c = rc.cost;
+  if ((cb.turnCounters.discount ?? 0) > 0) c -= 1;
+  if (m.rhythm && cb.cardsPlayed === 2) c -= m.rhythm;
+  return Math.max(0, c);
+}
+
+/** 카드를 쓸 수 있는 상태인가 (주사위 조건 제외) */
+export function cardUsable(ctx: Ctx, idx: number): boolean {
+  const cb = cbOf(ctx);
+  const inst = cb.cards[idx];
+  if (!inst || cb.phase === 'over') return false;
+  const rc = resolveFor(ctx.run, inst);
+  if (rc.unplayable) return false;
+  if (rc.perTurn && (cb.turnCounters['cd_' + rc.id] ?? 0) >= rc.perTurn) return false;
+  if (rc.perCombat && (cb.counters['cd_' + rc.id] ?? 0) >= rc.perCombat) return false;
+  if (cardCost(ctx, inst) > chipsAvailable(ctx)) return false;
+  if (rc.rollOnly && (cb.phase !== 'roll' || cb.turnCounters.confirmed)) return false;
+  if (rc.needHand && handRankNow(ctx) < HAND_BY_ID[rc.needHand].rank) return false;
+  if (rc.needGold && ctx.run.gold < (rc.n[rc.needGold] ?? 0)) return false;
+  if (rc.echo && !cb.lastCard) return false;
   return true;
 }
 
-export function canUse(ctx: Ctx, slot: number, keys: number[]): boolean {
+/** 쓸 수 없는 이유 (UI 안내용) */
+export function cardBlockReason(ctx: Ctx, idx: number): string {
+  const cb = cbOf(ctx);
+  const inst = cb.cards[idx];
+  if (!inst) return '';
+  const rc = resolveFor(ctx.run, inst);
+  if (rc.unplayable) return '사용할 수 없는 저주 카드';
+  if (rc.perTurn && (cb.turnCounters['cd_' + rc.id] ?? 0) >= rc.perTurn) return '이번 턴에는 더 쓸 수 없다';
+  if (rc.perCombat && (cb.counters['cd_' + rc.id] ?? 0) >= rc.perCombat) return '이번 전투에서는 더 쓸 수 없다';
+  const cost = cardCost(ctx, inst);
+  if (cost > chipsAvailable(ctx)) return `🔶 족보 칩이 부족하다 (필요 ${cost}, 보유 ${chipsAvailable(ctx)})`;
+  if (rc.rollOnly && (cb.phase !== 'roll' || cb.turnCounters.confirmed)) return '리롤 단계(족보 확정 전)에만 쓸 수 있다';
+  if (rc.needHand && handRankNow(ctx) < HAND_BY_ID[rc.needHand].rank) return `족보가 ${HAND_BY_ID[rc.needHand].name} 이상이어야 한다`;
+  if (rc.needGold && ctx.run.gold < (rc.n[rc.needGold] ?? 0)) return `골드가 ${rc.n[rc.needGold]} 필요하다`;
+  if (rc.echo && !cb.lastCard) return '따라 할 카드가 없다';
+  return `이 카드는 ${condText(rc.cond)} 주사위가 필요하다`;
+}
+
+export function canPlay(ctx: Ctx, idx: number, keys: number[]): boolean {
   const cb = ctx.run.combat;
-  if (!cb || cb.phase === 'over' || !skillUsable(ctx, slot)) return false;
-  const def = SKILL_BY_ID[ctx.run.skills[slot].id];
+  if (!cb || cb.phase === 'over' || !cardUsable(ctx, idx)) return false;
+  const rc = resolveFor(ctx.run, cb.cards[idx]);
   const dice = keys.map((k) => cb.hand.find((h) => h.key === k)).filter((h): h is HandDie => !!h && !h.used);
   if (dice.length !== keys.length) return false;
   if (cb.houseRule === 'noSix' && dice.some((d) => d.pip === 6)) return false;
-  return checkCond(def.cond, dice.map((d) => d.pip), freeDice(cb).length);
+  return checkCond(rc.cond, dice.map((d) => d.pip), freeDice(cb).length);
 }
 
 /** 조건을 만족하는 주사위 조합을 자동으로 찾는다 (선택 보조/봇용) */
-export function autoPick(ctx: Ctx, slot: number, prefer: number[] = []): number[] | null {
+export function autoPick(ctx: Ctx, idx: number, prefer: number[] = []): number[] | null {
   const cb = cbOf(ctx);
-  const def = SKILL_BY_ID[ctx.run.skills[slot]?.id];
-  if (!def) return null;
+  const inst = cb.cards[idx];
+  if (!inst) return null;
+  const rc = resolveFor(ctx.run, inst);
+  if (rc.cond.k === 'instant') return canPlay(ctx, idx, []) ? [] : null;
   const free = freeDice(cb);
-  const n = condCount(def.cond, free.length);
-  if (n > free.length || n === 0) return null;
   const ordered = [...free].sort((a, b) => (prefer.includes(b.key) ? 1 : 0) - (prefer.includes(a.key) ? 1 : 0) || b.pip - a.pip);
-  const res: number[] = [];
-  let found: number[] | null = null;
-  const rec = (start: number) => {
-    if (found) return;
-    if (res.length === n) {
-      if (canUse(ctx, slot, res)) found = [...res];
-      return;
-    }
-    for (let i = start; i < ordered.length; i++) {
-      res.push(ordered[i].key);
-      rec(i + 1);
-      res.pop();
-      if (found) return;
-    }
-  };
-  rec(0);
-  return found;
+  for (const n of condCounts(rc.cond, free.length)) {
+    if (n > free.length || n === 0) continue;
+    const res: number[] = [];
+    let found: number[] | null = null;
+    let tries = 0;
+    const rec = (start: number) => {
+      if (found || tries > 400) return;
+      if (res.length === n) {
+        tries++;
+        if (canPlay(ctx, idx, res)) found = [...res];
+        return;
+      }
+      for (let i = start; i < ordered.length; i++) {
+        res.push(ordered[i].key);
+        rec(i + 1);
+        res.pop();
+        if (found) return;
+      }
+    };
+    rec(0);
+    if (found) return found;
+  }
+  return null;
 }
 
-export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key: number; value: number }): boolean {
+export type CardChoice = CardUse['choice'];
+
+/** 카드 사용. idx = 손패 위치 */
+export function playCard(ctx: Ctx, idx: number, keys: number[], choice?: CardChoice): boolean {
   const run = ctx.run;
   const cb = cbOf(ctx);
-  if (!canUse(ctx, slot, keys)) return false;
-  if (cb.phase === 'roll') confirmHand(ctx);
+  if (!canPlay(ctx, idx, keys)) return false;
+  const inst = cb.cards[idx];
+  const rc = resolveFor(ctx.run, inst);
+  if (cb.phase === 'roll' && !rc.rollOnly) confirmHand(ctx);
   if (cb.result) return true;
-  const inst = run.skills[slot];
-  const def = SKILL_BY_ID[inst.id];
+  const cost = cardCost(ctx, inst);
+  const m = getMods(run);
   const dice = keys.map((k) => cb.hand.find((h) => h.key === k)!);
   for (const d of dice) d.used = true;
-  cb.usedSlots[slot] = true;
-  cb.handChips = Math.max(0, cb.handChips - def.cost);
+  cb.handChips = Math.max(0, cb.handChips - cost);
+  if (cost < rc.cost && (cb.turnCounters.discount ?? 0) > 0 && !cb.costFree.includes(inst.uid)) cb.turnCounters.discount--;
+  if ((cb.turnCounters.nextFree ?? 0) > 0) cb.turnCounters.nextFree--;
   cb.diceUsedThisTurn += dice.length;
-  if (def.perTurn) cb.turnCounters['sk_' + def.id] = (cb.turnCounters['sk_' + def.id] ?? 0) + 1;
-  if (def.perCombat) cb.counters['sk_' + def.id] = (cb.counters['sk_' + def.id] ?? 0) + 1;
+  if (rc.perTurn) cb.turnCounters['cd_' + rc.id] = (cb.turnCounters['cd_' + rc.id] ?? 0) + 1;
+  if (rc.perCombat) cb.counters['cd_' + rc.id] = (cb.counters['cd_' + rc.id] ?? 0) + 1;
+  // 손패에서 먼저 뺀다 (효과로 뽑는 카드와 섞이지 않게)
+  const hi = cb.cards.indexOf(inst);
+  if (hi >= 0) cb.cards.splice(hi, 1);
 
-  // 메아리: 직전 스킬을 이 눈으로
-  let runDef = def;
-  let runUp = inst.up;
-  if (def.echo) {
-    const last = cb.lastSkill ? run.skills[cb.lastSkill.slot] : null;
-    if (!last || SKILL_BY_ID[last.id].noEcho) {
-      toast(ctx, '메아리: 따라할 스킬이 없다', 'bad');
-      fire(ctx, 'onSkill');
+  // 메아리: 직전 카드를 이 눈으로
+  let runInst: CardInst = inst;
+  let runCard = rc;
+  let power = 1;
+  if (rc.echo) {
+    const last = cb.lastCard;
+    if (!last || resolveFor(run, last).noEcho) {
+      toast(ctx, '메아리: 따라 할 카드가 없다', 'bad');
+      finishPlay(ctx, inst, rc, 0, dice, cost);
       return true;
     }
-    runDef = SKILL_BY_ID[last.id];
-    runUp = last.up;
+    runInst = last;
+    runCard = resolveFor(run, last);
+    if (rc.n.bo) power *= 1.5;
+    power *= runCard.n.echoMult ?? 1;
   }
 
-  let power = 1 + runUp;
-  const faceMult = { mult: 1 };
   for (const d of dice) {
     const f = faceOf(d);
     if (f?.powerMult) {
@@ -545,60 +677,120 @@ export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key:
     }
   }
   const crit = dice.some((d) => faceOf(d)?.powerMult);
-  if (cb.doubledown && !def.primesDouble) {
+  if (cb.doubledown && !rc.primesDouble) {
     power *= 2;
     cb.doubledown = 0;
   }
+  if (cb.boosted.includes(inst.uid)) power *= 1.5;
+  if (m.collector && run.deck.length >= 25) power *= 1.25;
+  if (m.minimalist && run.deck.length <= 12 && cost === 0) power *= 2;
 
   const vals = dice.map((d) => effValue(ctx, d));
-  const primaryPip = Math.max(...dice.map((d) => d.pip));
+  const pips = dice.map((d) => d.pip);
+  const primaryPip = pips.length ? Math.max(...pips) : undefined;
   let dealtTotal = 0;
   const handMult = cb.handResult?.mult ?? 1;
-  const heatMult = 1 + run.heat * (BALANCE.heatDmgPerStep + getMods(run).heatDmgExtra);
+  const heatMult = 1 + run.heat * (BALANCE.heatDmgPerStep + m.heatDmgExtra);
   const extraMult = sources(run).reduce((acc, s) => acc * (s.dmgMult?.(ctx) ?? 1), 1);
   const steelBonus = dice.reduce((s, d) => s + (MATERIAL_BY_ID[d.material].blockBonus ?? 0), 0);
+  const fx = buffFx(cb);
+  const isAtk = runCard.role === 'atk';
+  // 응수: 모아 둔 보너스는 다음 공격 카드가 가져간다
+  const ripBonus = isAtk ? (cb.counters.ripBonus ?? 0) : 0;
+  if (ripBonus) cb.counters.ripBonus = 0;
+  let ripUsed = false;
 
-  const u: SkillUse = {
-    ctx, slot, dice, vals, v: vals[0], sum: vals.reduce((a, b) => a + b, 0), power, ret: null, choice,
+  const u: CardUse = {
+    ctx, inst: runInst, n: runCard.n, dice, vals, pips, v: vals[0] ?? 0, sum: vals.reduce((a, b) => a + b, 0), power, ret: null, choice,
     dmg: (base, opts = {}) => {
-      // 💪 힘은 한 대마다 더해지고, 🥀 약화는 피해를 25% 줄인다
       const weakM = cb.pWeak > 0 ? BALANCE.frailMult : 1;
-      const amount = opts.flat ? base : (base + cb.pStr) * handMult * heatMult * power * extraMult * weakM;
+      const str = playerStr(cb) * ((opts.strMult ?? 1) + m.strMult);
+      const flatAdd = isAtk ? m.atkFlat + (ripUsed ? 0 : ripBonus) : 0;
+      ripUsed = true;
+      const pct = isAtk ? 1 + (fx.atkPct + (runInst.up ? m.upAtkPct : 0) + (cb.turnCounters.firstAtk ? 0 : m.firstAtkPct)) / 100 : 1;
+      const amount = opts.flat ? base * power : (base + str + flatAdd) * handMult * heatMult * power * extraMult * weakM * pct;
       const hits = opts.hits ?? 1;
       let total = 0;
       for (let i = 0; i < hits; i++) {
-        const targets = opts.aoe ? alive(cb) : opts.random ? [randomEnemy(ctx)].filter((e): e is Enemy => !!e) : [cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? alive(cb)[0]].filter(Boolean) as Enemy[];
-        for (const t of targets) total += damageEnemy(ctx, t, amount, { pip: primaryPip, crit, source: runDef.name });
+        const targets = opts.target ? [opts.target].filter((e) => e.hp > 0)
+          : opts.aoe ? alive(cb) : opts.random ? [randomEnemy(ctx)].filter((e): e is Enemy => !!e) : [targetEnemy(cb)].filter((e): e is Enemy => !!e);
+        for (const t of targets) total += damageEnemy(ctx, t, amount, { pip: primaryPip, crit, source: runCard.name });
       }
       dealtTotal += total;
       return total;
     },
-    block: (base) => {
-      let b = base * handMult * power + steelBonus;
+    block: (base, opts = {}) => {
+      let b = opts.flat ? base * power : base * handMult * power + steelBonus + (runCard.role === 'def' ? m.blockFlat : 0);
+      if (runCard.role === 'def' && runInst.up && m.upBlockPct) b *= 1 + m.upBlockPct / 100;
       if (cb.houseRule === 'halfBlock') b /= 2;
-      gainBlock(ctx, b);
+      if (opts.keep) { const a = Math.max(0, Math.round(b)); cb.keepBlock += a; ctx.emit({ t: 'block', amount: a }); fire(ctx, 'onBlockGain', { amount: a }); }
+      else gainBlock(ctx, b);
     },
-    gold: (base) => gainGold(ctx, base * handMult * power),
+    gold: (base, opts = {}) => gainGold(ctx, opts.flat ? base : base * handMult * power),
     heal: (base) => healPlayer(ctx, base * power),
-    piggy: (base) => { cb.piggy += Math.round(base * handMult * power); },
+    piggy: (base, opts = {}) => { cb.piggy += Math.round(opts.flat ? base : base * handMult * power); },
+    pay: (g) => { if (run.gold < g) return false; if (g) gainGold(ctx, -g); return true; },
+    draw: (k) => (k > 0 ? drawCards(ctx, k) : []),
+    tgt: () => targetEnemy(cb),
+    foes: () => alive(cb),
+    poison: (e, k) => {
+      const amt = Math.max(0, Math.round(k * power)) + (k > 0 ? m.poisonAdd : 0);
+      for (const t of e === 'all' ? alive(cb) : [e]) if (t.hp > 0) addEnemyPoison(t, amt);
+    },
+    frail: (e, t) => { for (const x of e === 'all' ? alive(cb) : [e]) if (x.hp > 0) x.frail += t + m.debuffTurns; },
+    vuln: (e, t) => { for (const x of e === 'all' ? alive(cb) : [e]) if (x.hp > 0) x.vuln += t + m.debuffTurns; },
+    buff: (id, turns, value, owner = 'player') => addBuff(cb, { id, turns, value, owner: owner === 'player' ? 'player' : owner.uid, src: runCard.name }),
+    gamble: (p, label) => {
+      const pp = Math.max(0, Math.min(100, p + gambleOddsBonus(ctx)));
+      const r = rng(ctx, 'combat');
+      const forced = m.fallacy > 0 && (run.flags.gambleFails ?? 0) >= 3;
+      const win = forced || r.next() * 100 < pp;
+      run.flags.gambleFails = win ? 0 : (run.flags.gambleFails ?? 0) + 1;
+      if (forced) toast(ctx, '🔮 도박꾼의 오류: 이번엔 확정 성공!', 'gold');
+      run.stats.gambles++;
+      ctx.emit({ t: 'chanceRoll', kind: 'die', result: win ? 6 : r.int(1, 5), win, label: `${Math.round(pp)}% · ${label}` });
+      fire(ctx, 'onGambleCard', { win });
+      fire(ctx, 'onGambleResult', { win, gamble: 'card' });
+      if (!win) { if (m.gambleFailJackpot) addJackpot(ctx, m.gambleFailJackpot); return m.gambleFailHalf ? 0.5 : 0; }
+      let mult = 1 + m.gambleWinMult;
+      if ((cb.turnCounters.anteup ?? 0) > 0) { mult *= 2; cb.turnCounters.anteup--; }
+      const wd = fx.gambleWinDraw + m.gambleWinDraw;
+      if (wd) drawCards(ctx, wd);
+      if (fx.gambleWinChips) cb.handChips += fx.gambleWinChips;
+      return mult;
+    },
+    jackpot: (pct) => addJackpot(ctx, pct),
+    handRank: () => handRankNow(ctx),
+    rand: (lo, hi) => rng(ctx, 'combat').int(lo, hi),
+    str: () => playerStr(cb),
+    persist: () => buffFx(cb).keepBlock > 0,
   };
 
   // 운명 조작: 다른 주사위 눈 변경
-  if (def.needsChoice && choice) {
+  if (runCard.choose === 'otherDie' && choice?.key !== undefined && choice.value !== undefined) {
     const t = cb.hand.find((h) => h.key === choice.key && !h.used);
     if (t) {
       forcePip(ctx, t, Math.max(1, Math.min(6, choice.value)));
+      if (runCard.n.two) {
+        const o = cb.hand.filter((h) => !h.used && h !== t && !dice.includes(h)).sort((a, b) => a.pip - b.pip)[0];
+        if (o) forcePip(ctx, o, Math.max(1, Math.min(6, choice.value)));
+      }
       ctx.emit({ t: 'roll', keys: [t.key] });
     }
   }
 
-  runDef.run(u);
+  const times = isAtk && m.firstAtkTwice && !cb.turnCounters.firstAtk ? 2 : 1;
+  for (let i = 0; i < times && !cb.result; i++) runCard.run(u);
+  if (isAtk && !cb.turnCounters.firstAtk) {
+    cb.turnCounters.firstAtk = 1;
+    if (m.firstAtkDraw) drawCards(ctx, m.firstAtkDraw);
+  }
 
   // 면 사용 효과
-  for (const d of dice) faceOf(d)?.onUse?.({ ctx, hd: d, power: faceMult });
+  for (const d of dice) faceOf(d)?.onUse?.({ ctx, hd: d, power: { mult: 1 } });
 
-  // 주사위를 소모하지 않는 스킬 (운명 조작 등): 쓴 주사위를 그대로 돌려준다
-  if (runDef.keepDie || def.keepDie) {
+  // 주사위를 소모하지 않는 카드 (운명 조작 등)
+  if (runCard.keepDie || rc.keepDie) {
     for (const d of dice) d.used = false;
     cb.diceUsedThisTurn -= dice.length;
   }
@@ -611,23 +803,56 @@ export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key:
       const nd: HandDie = i === 0
         ? { ...src, used: false, locked: false, pip, sticker: undefined, rolledFx: true }
         : { ...src, key: cb.nextKey++, dieIdx: -1, temp: true, used: false, locked: false, pip, sticker: undefined, rolledFx: true };
-      if (i === 0) {
-        const idx = cb.hand.indexOf(src);
-        cb.hand[idx] = nd;
-      } else cb.hand.push(nd);
+      if (i === 0) cb.hand[cb.hand.indexOf(src)] = nd;
+      else cb.hand.push(nd);
     });
     cb.diceUsedThisTurn -= 1;
     refreshDerived(cb);
     ctx.emit({ t: 'roll', keys: cb.hand.filter((h) => !h.used).map((h) => h.key) });
   }
+  if ((runCard.retDie || u.ret) && m.retDraw && (cb.turnCounters.retDraw ?? 0) < 2) {
+    cb.turnCounters.retDraw = (cb.turnCounters.retDraw ?? 0) + 1;
+    drawCards(ctx, m.retDraw);
+  }
+  // 패 섞기: 남은 주사위 다시 굴림
+  if (cb.turnCounters.repack) {
+    const low = cb.turnCounters.repack === 2;
+    cb.turnCounters.repack = 0;
+    const targets = cb.hand.filter((h) => !h.used && !h.gone && (!low || h.pip <= 3));
+    for (const hd of targets) rollHandDie(ctx, hd);
+    postRoll(ctx, targets);
+    refreshDerived(cb);
+    ctx.emit({ t: 'roll', keys: targets.map((h) => h.key) });
+  }
+  if (isAtk) cb.turnCounters.atkPlayed = (cb.turnCounters.atkPlayed ?? 0) + 1;
+  finishPlay(ctx, inst, rc, dealtTotal, dice, cost);
+  return true;
+}
 
+function finishPlay(ctx: Ctx, inst: CardInst, rc: ResolvedCard, dealt: number, dice: HandDie[], cost = rc.cost) {
+  const cb = cbOf(ctx);
+  const m = getMods(ctx.run);
+  if (!inst.temp) (rc.exhaust ? cb.exhausted : cb.discard).push(inst);
+  cb.cardsPlayed++;
+  if (m.drawOnNth && cb.cardsPlayed === m.drawOnNth) drawCards(ctx, 1);
   rescoreHand(ctx);
-  cb.lastSkillDamage = dealtTotal || cb.lastSkillDamage;
-  if (!def.echo) cb.lastSkill = { slot };
+  cb.lastSkillDamage = dealt || cb.lastSkillDamage;
+  if (!rc.echo) cb.lastCard = inst;
+  // 천 개의 칼날: 카드를 쓸 때마다
+  const cuts = buffFx(cb).cardPlayDmg;
+  if (cuts && !cb.result) {
+    const t = randomEnemy(ctx);
+    if (t) damageEnemy(ctx, t, cuts + playerStr(cb), { source: '천 개의 칼날' });
+    if (m.cutsStr && (cb.counters.cutsStr ?? 0) < 5) {
+      cb.counters.cutsStr = (cb.counters.cutsStr ?? 0) + 1;
+      addBuff(cb, { id: 'str', owner: 'player', turns: 1, value: m.cutsStr, src: '검의 비' });
+    }
+  }
+  fire(ctx, 'onCardPlay', { card: inst, amount: cost });
   fire(ctx, 'onSkill');
   fire(ctx, 'onPlace');
+  void dice;
   refreshIntents(ctx);
-  return true;
 }
 
 /** 손가락 튕기기 (±1) */
@@ -685,7 +910,10 @@ export function endTurn(ctx: Ctx) {
   cb.handChips = Math.min(BALANCE.chipCarryMax, cb.handChips);
   if (cb.pWeak > 0) cb.pWeak--;
   if (cb.pVuln > 0) cb.pVuln--;
-  if (cb.doubledown) {
+  // 저주 카드: 턴 끝에 손에 있으면
+  for (const c of cb.cards) CARD_BY_ID[c.id]?.inHandEnd?.(ctx);
+  discardHand(cb);
+  if (cb.doubledown > 0) {
     damagePlayer(ctx, cb.doubledown, '더블다운', { ignoreBlock: true });
     cb.doubledown = 0;
   }
@@ -698,12 +926,14 @@ export function endTurn(ctx: Ctx) {
 
   // 미리보기 (다음 턴 첫 주사위)
   const m = getMods(run);
-  if (m.preview > 0) {
-    const first = run.dice.findIndex((_, i) => !cb.brokenDice.includes(i));
-    if (first >= 0) {
-      const tmp: HandDie = { key: -1, dieIdx: first, temp: false, face: 0, pip: 1, material: run.dice[first].material, locked: false, used: false, rolledFx: false, golden: false, gone: false };
-      cb.next.preview = [rollFaceIdx(ctx, tmp)];
-    }
+  const nPrev = Math.max(m.preview, cb.next.previewN);
+  cb.next.previewN = 0;
+  if (nPrev > 0) {
+    const idxs = run.dice.map((_, i) => i).filter((i) => !cb.brokenDice.includes(i)).slice(0, nPrev);
+    cb.next.preview = idxs.map((di) => {
+      const tmp: HandDie = { key: -1, dieIdx: di, temp: false, face: 0, pip: 1, material: run.dice[di].material, locked: false, used: false, rolledFx: false, golden: false, gone: false };
+      return rollFaceIdx(ctx, tmp);
+    });
   }
 
   enemyTurn(ctx);
@@ -711,13 +941,17 @@ export function endTurn(ctx: Ctx) {
   startTurn(ctx);
 }
 
-export function previewPip(ctx: Ctx): number | null {
+/** 다음 턴 첫 굴림 미리보기 (주사위 순서대로) */
+export function previewPips(ctx: Ctx): number[] {
   const cb = ctx.run.combat;
-  if (!cb || !cb.next.preview.length) return null;
-  const first = ctx.run.dice.findIndex((_, i) => !cb.brokenDice.includes(i));
-  const die = ctx.run.dice[first];
-  const f = die.faces[cb.next.preview[0]];
-  return f.sticker && FACE_BY_ID[f.sticker].pip !== undefined ? FACE_BY_ID[f.sticker].pip! : f.pip;
+  if (!cb || !cb.next.preview.length) return [];
+  const idxs = ctx.run.dice.map((_, i) => i).filter((i) => !cb.brokenDice.includes(i));
+  return cb.next.preview.map((fi, k) => {
+    const die = ctx.run.dice[idxs[k]];
+    const f = die?.faces[fi];
+    if (!f) return 0;
+    return f.sticker && FACE_BY_ID[f.sticker].pip !== undefined ? FACE_BY_ID[f.sticker].pip! : f.pip;
+  });
 }
 
 function enemyAttack(ctx: Ctx, e: Enemy, amount: number, hits = 1) {
@@ -725,9 +959,14 @@ function enemyAttack(ctx: Ctx, e: Enemy, amount: number, hits = 1) {
   const m = getMods(ctx.run);
   for (let i = 0; i < hits; i++) {
     if (cb.result) return;
+    const blk0 = cb.block + cb.keepBlock;
     damagePlayer(ctx, amount, e.name);
-    const reflect = cb.thorns + m.reflect;
-    if (reflect > 0 && e.hp > 0) damageEnemy(ctx, e, reflect, { source: '반사' });
+    const fx = buffFx(cb);
+    const rm = 1 + m.reflectMult;
+    const reflect = cb.thorns + m.reflect + fx.reflect;
+    if (reflect > 0 && e.hp > 0) damageEnemy(ctx, e, (reflect + m.reflectAdd) * rm, { source: '반사' });
+    if (fx.counter > 0 && e.hp > 0) damageEnemy(ctx, e, (fx.counter + m.reflectAdd) * rm, { source: '반격' });
+    if (m.spikes && cb.block + cb.keepBlock < blk0 && e.hp > 0) damageEnemy(ctx, e, m.spikes, { source: '가시 갑주' });
     fire(ctx, 'onPlayerHit', { enemy: e });
   }
   e.nextMult = 1;
@@ -741,8 +980,7 @@ export function enemyTurn(ctx: Ctx) {
     if (cb.result) return;
     // 독
     if (e.poison > 0) {
-      damageEnemy(ctx, e, e.poison, { source: '독' });
-      e.poison = Math.max(0, e.poison - 1);
+      poisonTick(ctx, e);
       if (e.hp <= 0) continue;
     }
     e.block = 0;
@@ -801,6 +1039,24 @@ export function enemyTurn(ctx: Ctx) {
   }
 }
 
+/** 독 피해: 죽음의 표식 배율, 역병(모두에게/일부 전염), 감소 속도 */
+function poisonTick(ctx: Ctx, e: Enemy) {
+  const cb = cbOf(ctx);
+  const m = getMods(ctx.run);
+  const amt = Math.round(e.poison * (1 + buffFx(cb, e.uid).poisonMult));
+  const others = alive(cb).filter((x) => x !== e);
+  damageEnemy(ctx, e, amt, { source: '독' });
+  if (m.poisonAll) for (const x of others) damageEnemy(ctx, x, amt, { source: '독' });
+  else if (m.poisonSplash && others.length) {
+    const t = rng(ctx, 'combat').pick(others);
+    damageEnemy(ctx, t, Math.round(amt * m.poisonSplash / 100), { source: '독' });
+  }
+  fire(ctx, 'onPoisonTick', { enemy: e, amount: amt });
+  // 저주 1단계: 독이 2턴에 1씩만 줄어든다
+  const slow = m.poisonSlow > 0;
+  if (!slow || (cb.turn % 2 === 0)) e.poison = Math.max(0, e.poison - 1);
+}
+
 export function setTarget(ctx: Ctx, uid: number) {
   const cb = cbOf(ctx);
   if (cb.enemies.some((e) => e.uid === uid && e.hp > 0)) cb.target = uid;
@@ -822,7 +1078,7 @@ export interface EnemyHit {
   kill: boolean;
 }
 
-export interface SkillPreview {
+export interface CardPreview {
   keys: number[] | null;
   dmg: number; // 실제로 깎이는 체력 합 (방어도에 막힌 부분 제외)
   blocked: number;
@@ -830,34 +1086,38 @@ export interface SkillPreview {
   heal: number;
   gold: number;
   piggy: number;
+  draw: number;
   chance: boolean;
   hits: EnemyHit[];
 }
 
 /**
- * 스킬을 실제 규칙으로 복제 상태에서 미리 실행해 예상 효과를 구한다 (실제 상태·RNG는 건드리지 않음).
- * 족보·열기·약점·힘·약화·취약·적 특수 능력·방어도·유물이 모두 반영된다.
- * targetUid를 주면 그 적을 대상으로 계산한다.
+ * 카드를 실제 규칙으로 복제 상태에서 미리 실행해 예상 효과를 구한다 (실제 상태·RNG는 건드리지 않음).
+ * 족보·열기·약점·힘·약화·취약·적 특수 능력·방어도·유물·버프가 모두 반영된다.
  */
-export function previewSkill(ctx: Ctx, slot: number, prefer: number[], targetUid: number | null = null): SkillPreview {
-  const empty: SkillPreview = { keys: null, dmg: 0, blocked: 0, block: 0, heal: 0, gold: 0, piggy: 0, chance: false, hits: [] };
+export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: number | null = null): CardPreview {
+  const empty: CardPreview = { keys: null, dmg: 0, blocked: 0, block: 0, heal: 0, gold: 0, piggy: 0, draw: 0, chance: false, hits: [] };
   const cb = ctx.run.combat;
-  if (!cb || cb.phase === 'over' || !skillUsable(ctx, slot)) return empty;
-  const keys = canUse(ctx, slot, prefer) ? prefer : autoPick(ctx, slot, prefer);
+  if (!cb || cb.phase === 'over' || !cb.cards[idx] || !cardUsable(ctx, idx)) return empty;
+  const keys = canPlay(ctx, idx, prefer) ? prefer : autoPick(ctx, idx, prefer);
   if (!keys) return empty;
-  const def = SKILL_BY_ID[ctx.run.skills[slot].id];
+  const rc = resolveFor(ctx.run, cb.cards[idx]);
+  if (rc.choose) return { ...empty, keys };
   const run2 = structuredClone(ctx.run);
   const c2: Ctx = { run: run2, emit: () => {} };
   const cb2 = run2.combat!;
   if (targetUid !== null && cb2.enemies.some((e) => e.uid === targetUid && e.hp > 0)) cb2.target = targetUid;
-  if (cb2.phase === 'roll') confirmHand(c2);
+  if (cb2.phase === 'roll' && !rc.rollOnly) confirmHand(c2);
   if (cb2.result) return { ...empty, keys };
+  const i2 = cb2.cards.findIndex((c) => c.uid === cb.cards[idx].uid);
+  if (i2 < 0) return { ...empty, keys };
   const before = new Map(cb2.enemies.map((e) => [e.uid, { hp: e.hp, block: e.block, poison: e.poison }]));
   const b0 = cb2.block + cb2.keepBlock;
   const h0 = run2.hp;
   const g0 = run2.gold;
   const p0 = cb2.piggy;
-  useSkill(c2, slot, keys);
+  const n0 = cb2.cards.length;
+  playCard(c2, i2, keys);
   const hits: EnemyHit[] = [];
   for (const e of cb2.enemies) {
     const o = before.get(e.uid);
@@ -875,7 +1135,8 @@ export function previewSkill(ctx: Ctx, slot: number, prefer: number[], targetUid
     heal: Math.max(0, run2.hp - h0),
     gold: Math.max(0, run2.gold - g0),
     piggy: Math.max(0, cb2.piggy - p0),
-    chance: !!def.chance,
+    draw: Math.max(0, cb2.cards.length - (n0 - 1)),
+    chance: !!rc.chance,
     hits,
   };
 }
@@ -885,57 +1146,5 @@ export function hasMoves(ctx: Ctx): boolean {
   const cb = ctx.run.combat;
   if (!cb || cb.phase === 'over') return false;
   if (cb.phase === 'roll' && canReroll(ctx)) return true;
-  return ctx.run.skills.some((_, i) => skillUsable(ctx, i) && !!autoPick(ctx, i));
-}
-
-/** 강화 미리보기용: 조건에 맞는 대표 주사위로 스킬을 실행했을 때의 기본 효과 (족보·열기 배율 없이) */
-export function skillSample(run: RunState, slot: number, up: number): { pips: number[]; dmg: number; block: number; heal: number; gold: number; piggy: number; poison: number; chance: boolean } | null {
-  const inst = run.skills[slot];
-  if (!inst) return null;
-  const def = SKILL_BY_ID[inst.id];
-  const c = def.cond;
-  const pips =
-    c.k === 'range' ? [c.hi] : c.k === 'even' ? [6] : c.k === 'odd' ? [5] : c.k === 'exact' ? [c.v]
-      : c.k === 'same' ? Array(c.n).fill(6) : c.k === 'seq' ? Array.from({ length: c.n }, (_, i) => 7 - c.n + i)
-        : c.k === 'sumPair' ? [3, 4] : c.k === 'sumMin' ? [6, 5, 4] : c.k === 'all' ? [6, 5, 4, 3, 2] : [6];
-  const r2 = structuredClone(run);
-  r2.combat = null;
-  r2.heat = 0;
-  r2.jackpot = 0;
-  r2.skills[slot] = { id: inst.id, up };
-  r2.dice = pips.map((_, i) => ({ uid: 9000 + i, material: 'wood', faces: [1, 2, 3, 4, 5, 6].map((p) => ({ pip: p })) }));
-  const c2: Ctx = { run: r2, emit: () => {} };
-  try {
-    startCombat(c2, 'normal', ['golem']);
-    const cb = r2.combat!;
-    cb.enemies.forEach((e) => { e.hp = e.maxHp = 99999; e.block = 0; });
-    cb.hand.forEach((h, i) => { h.pip = pips[i]; h.sticker = undefined; h.used = false; h.gone = false; h.locked = false; h.golden = false; });
-    cb.phase = 'place';
-    cb.turnCounters.confirmed = 1;
-    cb.handChips = 99;
-    cb.handResult = { id: 'none', name: '', mult: 1, heat: 0, jackpot: 0 };
-    const presetBlock = def.sampleBlock ?? 0;
-    cb.block = presetBlock;
-    cb.keepBlock = 0;
-    cb.piggy = 0;
-    const hp0 = cb.enemies.reduce((s, e) => s + e.hp, 0);
-    const h0 = r2.hp = Math.max(1, r2.maxHp - 50);
-    const g0 = r2.gold;
-    const keys = cb.hand.map((h) => h.key);
-    if (!canUse(c2, slot, keys)) return null;
-    useSkill(c2, slot, keys);
-    const chanceDmg = def.chanceHit ? Math.round(def.chanceHit(pips[0]) * (1 + up)) : 0;
-    return {
-      pips,
-      chance: !!def.chanceHit,
-      poison: cb.enemies.reduce((s, e) => s + e.poison, 0),
-      dmg: def.chanceHit ? chanceDmg : Math.max(0, hp0 - cb.enemies.reduce((s, e) => s + e.hp, 0)),
-      block: Math.max(0, cb.block + cb.keepBlock - presetBlock),
-      heal: Math.max(0, r2.hp - h0),
-      gold: Math.max(0, r2.gold - g0),
-      piggy: cb.piggy,
-    };
-  } catch {
-    return null;
-  }
+  return cb.cards.some((_, i) => cardUsable(ctx, i) && !!autoPick(ctx, i));
 }

@@ -8,8 +8,8 @@ import { EVENTS, EVENT_BY_ID } from '../data/events';
 import { FACE_BY_ID } from '../data/faces';
 import { MATERIAL_BY_ID } from '../data/materials';
 import { ACT1_MANIP_CHANCE, MANIP_SKILLS, META_LOCKED_START } from '../data/meta';
+import { CARD_BY_ID, cardName, isPoolCard } from '../data/cards';
 import { RELIC_BY_ID } from '../data/relics';
-import { SKILL_BY_ID } from '../data/skills';
 import { STAKES } from '../data/stakes';
 import { HIGHROLLER } from '../data/casino';
 import { TABLE_BY_ID } from '../data/tables';
@@ -21,8 +21,11 @@ import {
 } from './dda';
 import { newDie } from './dice';
 import {
-  acquire, basePrice, giveRelic, itemRarity, onNodeMove, rollItemId, rollOption, rollRarity, type ItemKind,
+  acquire, addCurse, basePrice, cardPool, giveRelic, itemRarity, onNodeMove, rollCardReward, rollItemId, rollOption, rollRarity, type ItemKind,
 } from './economy';
+import { startDeck } from './deck';
+import { offerAugment, syncSets } from './sets';
+import { deckChanged } from './economy';
 import { genActMap, pickEncounter } from './map';
 import { gainChips, gainGold, healPlayer, maxHpChange } from './ops';
 import { highroller, shopRerollDie } from './casino';
@@ -41,7 +44,7 @@ registerSources((run) => {
   return out;
 });
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export interface MetaPool {
   unlocked: string[]; // "kind:id"
@@ -54,15 +57,17 @@ export function newRun(seed: number, charId: string, stake = 0, meta: MetaPool =
   const run: RunState = {
     version: SAVE_VERSION, seed, rng: makeRngState(seed), charId, stake, table: opts.table ?? 'classic', dailyKey: opts.dailyKey, dailyRule: opts.dailyRule,
     hp: ch.hp, maxHp: ch.hp, gold: BALANCE.startGold, chips: 0,
-    dice: [], skills: ch.skills.map((id) => ({ id, up: 0 })), maxSlots: BALANCE.startSlots,
+    dice: [], deck: [], augments: [], augmentOffer: null,
     relics: [], consumables: [], act: 1, floor: 0, map: [], path: [], nodesReached: 0, bossesKilled: 0,
     heat: 0, jackpot: 0, screen: 'map', combat: null, reward: null, shop: null, event: null,
     pending: null, offer: null, flags: {},
-    stats: { yahtzees: 0, jackpotTurns: 0, gambles: 0, megaJackpots: 0, kills: 0, deathBy: null, combatsWon: 0, goldEarned: 0 },
+    stats: { yahtzees: 0, jackpotTurns: 0, gambles: 0, megaJackpots: 0, kills: 0, deathBy: null, combatsWon: 0, goldEarned: 0, removals: 0 },
     dda: { flow: 60, recentScores: [], shopsSinceEpic: 0, forceEpic: false, combatsTurns: [] },
     nextUid: 1, pendingFreeSpins: 0, pendingEliteFromSlot: false, log: [],
   };
   run.dice = ch.dice.map((m) => newDie(run.nextUid++, m));
+  run.deck = startDeck(run);
+  syncSets({ run, emit: () => {} });
   TABLE_BY_ID[run.table]?.setup?.(run, newDie);
   if (opts.dailyKey) run.flags.daily = 1;
   for (const l of META_LOCKED_START) {
@@ -142,7 +147,7 @@ export function finishCombat(ctx: Ctx) {
   if (cb.kind === 'boss' && run.hp <= run.maxHp * 0.1) run.flags.ach_close_boss = 1;
   if (cb.kind === 'elite' && cb.dmgTaken === 0) run.flags.ach_perfect_elite = 1;
   const m = getMods(run);
-  const base = BALANCE.rewardGold[cb.kind] * cb.rewardMult;
+  const base = (BALANCE.rewardGold[cb.kind] + m.rewardGold) * cb.rewardMult;
   let piggyPct = 1 + run.heat * BALANCE.heatPiggyPerStep + m.piggyPct;
   if (run.flags.luckycat > 0) {
     piggyPct += 0.2;
@@ -153,9 +158,8 @@ export function finishCombat(ctx: Ctx) {
   const ex: string[] = [];
   const add = (o: RewardOption | null) => { if (o) { options.push(o); ex.push(o.id); } };
   if (cb.kind === 'normal') {
-    add(rollOption(ctx, 'skill', 'common', 'loot', ex));
-    add(rollOption(ctx, 'skill', 'common', 'loot', ex));
-    add(rollOption(ctx, 'face', 'common', 'loot', ex));
+    // 일반 전투: 카드 보상 + 면 스티커 1장 중 택1은 사라지고, 면 스티커는 3장 중 1 (건너뛰기 가능)
+    for (let i = 0; i < 3; i++) add(rollOption(ctx, 'face', 'common', 'loot', ex));
   } else if (cb.kind === 'elite') {
     for (let i = 0; i < 3; i++) add(rollOption(ctx, 'relic', 'common', 'loot', ex));
   } else {
@@ -166,6 +170,7 @@ export function finishCombat(ctx: Ctx) {
   run.reward = {
     base: Math.round(base), piggy, heatMult: piggyPct, gold: Math.round(base) + piggy, donStreak: 0, donDone: false,
     donLastRoll: null, options, picked: false, chips: 0, heal, insuranceUsed: false,
+    cards: rollCardReward(ctx, cb.kind), cardDone: false, combatKind: cb.kind,
   };
   if (cb.kind === 'boss') {
     run.bossesKilled++;
@@ -184,6 +189,15 @@ export function collectRewardGold(ctx: Ctx) {
   rw.gold = 0;
   rw.donDone = true;
   rw.base = -1; // 수령 완료 표시
+}
+
+/** 카드 보상: i번째 카드를 덱에 (null이면 건너뛰기 → 골드 +5) */
+export function pickCardReward(ctx: Ctx, i: number | null) {
+  const rw = ctx.run.reward;
+  if (!rw || rw.cardDone) return;
+  rw.cardDone = true;
+  if (i === null || !rw.cards[i]) { gainGold(ctx, BALANCE.cardSkipGold); return; }
+  acquire(ctx, { kind: 'card', id: rw.cards[i] }, 'reward');
 }
 
 export function pickReward(ctx: Ctx, i: number) {
@@ -221,11 +235,15 @@ export function advance(ctx: Ctx) {
       return;
     }
     nextAct(ctx);
+    if (run.act <= 3) offerAugment(ctx, 'boss', 'map');
     return;
   }
+  const first = run.floor === 0;
   run.floor++;
   updateFlow(run);
   run.screen = 'map';
+  // 증강: 1층 노드를 마친 직후
+  if (first && run.act <= 3) offerAugment(ctx, 'floor', 'map');
 }
 
 function nextAct(ctx: Ctx) {
@@ -248,7 +266,8 @@ function nextAct(ctx: Ctx) {
       toast(ctx, `사채 ${owe}G 상환`, 'info');
     } else {
       maxHpChange(run, -20);
-      toast(ctx, '사채를 갚지 못했다: 최대 체력 -20', 'bad');
+      addCurse(ctx, 'debtnote');
+      toast(ctx, '사채를 갚지 못했다: 최대 체력 -20, 빚 문서 카드', 'bad');
     }
     run.flags.loan = 0;
   }
@@ -265,19 +284,21 @@ export function restHeal(ctx: Ctx) {
 }
 
 export function restUpgrade(ctx: Ctx) {
-  ctx.run.pending = { kind: 'upgrade', amount: BALANCE.restUpgrade, then: 'rest' };
-  ctx.run.flags.restDone = 1;
+  ctx.run.pending = { kind: 'upgradeCard', then: 'rest' };
+}
+
+export function restRemove(ctx: Ctx) {
+  ctx.run.pending = { kind: 'removeCard', then: 'rest', count: 1 };
 }
 
 // ───────────── 상점 ─────────────
 function shopItem(ctx: Ctx, kind: ItemKind, minRarity: 'common' | 'epic' = 'common', exclude: string[] = []): ShopItem | null {
   const run = ctx.run;
   let o: RewardOption | null = null;
-  if (kind === 'skill' && run.act === 1 && rng(ctx, 'shop').chance(ACT1_MANIP_CHANCE)) {
-    const cands = MANIP_SKILLS.filter((id) => !run.skills.some((s) => s.id === id) && run.flags['pool_skill_' + id] !== 0 && !exclude.includes(id));
-    const pick = cands.filter((id) => SKILL_BY_ID[id].rarity !== 'legendary');
-    const c = pick.length ? pick : cands;
-    if (c.length) o = { kind: 'skill', id: rng(ctx, 'shop').pick(c) };
+  if (kind === 'card' && run.act === 1 && !exclude.some((id) => MANIP_SKILLS.includes(id)) && rng(ctx, 'shop').chance(ACT1_MANIP_CHANCE)) {
+    const pool = cardPool(run).map((c) => c.id);
+    const cands = MANIP_SKILLS.filter((id) => pool.includes(id) && !exclude.includes(id));
+    if (cands.length) o = { kind: 'card', id: rng(ctx, 'shop').pick(cands) };
   }
   if (!o) {
     const r = kind === 'consumable' ? undefined : rollRarity(ctx, minRarity);
@@ -294,10 +315,12 @@ function shopItem(ctx: Ctx, kind: ItemKind, minRarity: 'common' | 'epic' = 'comm
 function fillShop(ctx: Ctx): ShopItem[] {
   const run = ctx.run;
   const m = getMods(run);
-  const kinds: ItemKind[] = ['skill', 'face', 'relic', 'consumable'];
-  const extra = BALANCE.shopSlotCount - kinds.length + m.shopSlots;
+  // 카드 3칸 + 무작위 2칸 (유물 / 면 스티커·재질 / 소모품)
+  const kinds: ItemKind[] = ['card', 'card', 'card'];
   const r = rng(ctx, 'shop');
-  for (let i = 0; i < extra; i++) kinds.push(r.pick(['skill', 'face', 'relic', 'consumable', 'material'] as ItemKind[]));
+  const extra = BALANCE.shopSlotCount - kinds.length + m.shopSlots;
+  const groups: ItemKind[][] = [['relic'], ['face', 'material'], ['consumable']];
+  for (let i = 0; i < extra; i++) kinds.push(r.pick(r.pick(groups)));
   const items: ShopItem[] = [];
   const ex: string[] = [];
   const forceEpic = ddaForceShopEpic(run);
@@ -322,8 +345,10 @@ export function openShop(ctx: Ctx) {
   const m = getMods(run);
   run.shop = {
     items: fillShop(ctx), rerollCost: BALANCE.shopRerollStart, rerollFree: m.shopFirstRerollFree > 0, rerolls: 0,
-    bought: false, lastRerollDie: null, discountNext: false,
+    bought: false, lastRerollDie: null, discountNext: false, removeUsed: false,
   };
+  // 상점 VIP: 카드 1장 무료
+  if (m.shopFreeCard) { const c = run.shop.items.find((x) => x.opt.kind === 'card'); if (c) c.price = 0; }
   run.screen = 'shop';
   fire(ctx, 'onShopEnter');
 }
@@ -458,31 +483,64 @@ export function applyMaterial(ctx: Ctx, dieIdx: number) {
   run.pending = null;
 }
 
-export function replaceSkill(ctx: Ctx, slot: number | null) {
-  const run = ctx.run;
-  const p = run.pending;
-  if (!p || p.kind !== 'skillReplace') return;
-  if (slot !== null && run.skills[slot]) run.skills[slot] = { id: p.id, up: 0 };
-  run.pending = null;
+/** 카드 강화 (분기형): 덱의 카드를 A 또는 B로. 카드당 1회 */
+export function canUpgradeCard(run: RunState, uid: number): boolean {
+  const c = run.deck.find((x) => x.uid === uid);
+  return !!c && !c.up && !!CARD_BY_ID[c.id]?.upgrades;
 }
 
-export function upgradeSkill(ctx: Ctx, slot: number) {
+export function upgradeCard(ctx: Ctx, uid: number, branch: 'A' | 'B') {
   const run = ctx.run;
   const p = run.pending;
-  if (!p || p.kind !== 'upgrade') return;
-  const s = run.skills[slot];
-  if (!s) return;
-  s.up = Math.round((s.up + p.amount) * 100) / 100;
-  toast(ctx, `「${SKILL_BY_ID[s.id].name}」 강화 +${Math.round(p.amount * 100)}%`, 'good');
+  if (!p || p.kind !== 'upgradeCard' || !canUpgradeCard(run, uid)) return;
+  const c = run.deck.find((x) => x.uid === uid)!;
+  c.up = branch;
+  toast(ctx, `「${cardName(c)}」 강화: ${CARD_BY_ID[c.id].upgrades![branch].label}`, 'good');
+  const then = p.then;
+  run.pending = null;
+  if (then === 'rest') advance(ctx);
+}
+
+/** 상점 카드 삭제 서비스 가격: 50 → 75 → 100… (판 단위 누적) */
+export function removePrice(run: RunState): number {
+  const m = getMods(run);
+  return Math.max(0, BALANCE.removeBase + BALANCE.removeStep * (run.flags.shopRemovals ?? 0) - m.removeDiscount);
+}
+
+export function canRemoveMore(run: RunState, count = 1): boolean {
+  return run.deck.length - count >= BALANCE.minDeck;
+}
+
+export function shopRemoveService(ctx: Ctx): boolean {
+  const run = ctx.run;
+  const s = run.shop;
+  const price = removePrice(run);
+  if (!s || s.removeUsed || run.gold < price || !canRemoveMore(run)) return false;
+  run.pending = { kind: 'removeCard', then: 'shop', count: 1, cost: price };
+  return true;
+}
+
+/** 카드 삭제 확정. uids = 지울 카드들 */
+export function removeCards(ctx: Ctx, uids: number[]) {
+  const run = ctx.run;
+  const p = run.pending;
+  if (!p || p.kind !== 'removeCard' || uids.length !== p.count || !canRemoveMore(run, uids.length)) return;
+  if (p.cost && run.gold < p.cost) return;
+  if (p.cost) gainGold(ctx, -p.cost);
+  if (p.hpCost) { run.hp = Math.max(1, run.hp - p.hpCost); ctx.emit({ t: 'dmgPlayer', amount: p.hpCost, blocked: 0, src: '소각로' }); }
+  const names = uids.map((u) => run.deck.find((c) => c.uid === u)).filter(Boolean).map((c) => cardName(c!));
+  run.deck = run.deck.filter((c) => !uids.includes(c.uid));
+  run.stats.removals += uids.length;
+  if (p.then === 'shop' && run.shop) { run.shop.removeUsed = true; run.flags.shopRemovals = (run.flags.shopRemovals ?? 0) + 1; }
+  toast(ctx, `🗑 ${names.join(', ')} 삭제`, 'good');
+  deckChanged(ctx);
   const then = p.then;
   run.pending = null;
   if (then === 'rest') advance(ctx);
 }
 
 export function cancelPending(ctx: Ctx) {
-  const p = ctx.run.pending;
   ctx.run.pending = null;
-  if (p?.then === 'rest' && p.kind === 'upgrade') advance(ctx);
 }
 
 export function pickOffer(ctx: Ctx, i: number | null) {
@@ -531,4 +589,5 @@ export function continueEndless(ctx: Ctx) {
   if (run.screen !== 'victory') return;
   run.flags.endless = 1;
   nextAct(ctx);
+  offerAugment(ctx, 'boss', 'map');
 }

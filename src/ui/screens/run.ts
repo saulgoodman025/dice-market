@@ -4,17 +4,22 @@ import { BALANCE } from '../../data/balance';
 import { EVENT_BY_ID } from '../../data/events';
 import { FACE_BY_ID } from '../../data/faces';
 import { MATERIAL_BY_ID } from '../../data/materials';
-import { condText, SKILL_BY_ID } from '../../data/skills';
+import { CARD_BY_ID, cardDesc, resolveCard } from '../../data/cards';
+import { COMBOS, COMBO_BY_ID, TAG_TIER_FX } from '../../data/sets';
+import { TAG_INFO, TAGS, type Tag } from '../../data/tags';
+import { AUGMENT_BY_ID, AUG_TIER_INFO } from '../../data/augments';
+import { activeCombos, augmentOdds, augRerollsLeft, nextTierAt, PRISM_ROULETTE, tagCounts, tierOf } from '../../rules/sets';
+import { canRemoveMore, canUpgradeCard, removePrice } from '../../rules/run';
+import { gambleOddsBonus } from '../../rules/combat';
 import { RELIC_BY_ID } from '../../data/relics';
 import { CONSUMABLE_BY_ID } from '../../data/consumables';
 import { currentChoices } from '../../rules/run';
-import { skillSample } from '../../rules/combat';
-import type { RunState } from '../../core/state';
+import type { CardInst, RunState } from '../../core/state';
 import { NODE_INFO } from '../../rules/map';
 import { donMaxStreak, donMin, haggleOdds } from '../../rules/casino';
 import { getMods } from '../../rules/ctx';
 import { interestFor, itemRarity } from '../../rules/economy';
-import { dieFace, esc, fmt, itemHtml, optInfo, pipsHtml, rarityTag } from '../components/parts';
+import { cardFace, cardInstFace, dieFace, esc, fmt, itemHtml, optInfo, pipsHtml, RAR_NAME, rarityTag } from '../components/parts';
 import { consumablesRow, relicStrip, topbar } from './common';
 import { slotMachine } from './casino';
 
@@ -77,7 +82,8 @@ export function rewardScreen(app: App): string {
   const rw = run.reward!;
   const collected = rw.base === -1; // 1단계(골드) 끝 → 2단계(보상 선택)
   const ui = app.ui;
-  const steps = `<div class="steps"><span class="${collected ? 'done' : 'on'}">① 골드 정산</span><i></i><span class="${collected ? 'on' : ''}">② 보상 선택</span></div>`;
+  const cardStep = collected && !rw.cardDone;
+  const steps = `<div class="steps"><span class="${collected ? 'done' : 'on'}">① 골드</span><i></i><span class="${cardStep ? 'on' : rw.cardDone ? 'done' : ''}">② 카드</span><i></i><span class="${rw.cardDone ? 'on' : ''}">③ ${rw.combatKind === 'normal' ? '면 스티커' : '유물'}</span></div>`;
   if (!collected) {
     const rolling = ui.don.rolling && !!ui.don.before;
     const gold = rolling ? ui.don.before!.gold : rw.gold;
@@ -107,13 +113,14 @@ export function rewardScreen(app: App): string {
       <button class="btn primary big" data-act="collect" ${rolling ? 'disabled' : ''}>${rolling ? '결과를 기다리는 중…' : gold > 0 ? `💰 ${gold}G 받고 다음 ▶` : '다음 ▶'}</button>
     </div>`;
   }
-  const kind = rw.options[0]?.kind === 'relic' ? '유물' : '보상';
+  if (cardStep) return cardRewardScreen(app, steps);
+  const kind = rw.options[0]?.kind === 'relic' ? '유물' : '면 스티커';
   const sel = ui.rewardSel;
   const RN = { common: '일반', rare: '희귀', epic: '영웅', legendary: '전설' } as const;
   const cards = rw.options.map((o, i) => {
     const info = optInfo(o);
-    const icon = o.kind === 'skill' ? SKILL_BY_ID[o.id].icon : info.emoji;
-    const cost = o.kind === 'skill' ? `<span class="rccost">${SKILL_BY_ID[o.id].cost}</span>` : '';
+    const icon = info.emoji;
+    const cost = o.kind === 'card' ? `<span class="rccost">${CARD_BY_ID[o.id].cost}</span>` : '';
     return `<button class="rcard rar-${info.rarity} ${sel === i ? 'sel' : ''} ${rw.picked ? 'done' : ''}" style="animation-delay:${i * 0.08}s" ${rw.picked ? 'disabled' : `data-act="rewardSel" data-arg="${i}"`}>
       <span class="rrib">${RN[info.rarity]}</span>${cost}
       <span class="ricon">${icon}</span>
@@ -134,6 +141,53 @@ export function rewardScreen(app: App): string {
   </div>`;
 }
 
+/** 카드 보상: 3장 중 1장 (건너뛰면 골드) · 태그 진행·콤보 암시 */
+function cardRewardScreen(app: App, steps: string): string {
+  const run = app.run!;
+  const rw = run.reward!;
+  const sel = app.ui.cardSel;
+  const counts = tagCounts(run);
+  const RN = { normal: '일반 전투', elite: '엘리트', boss: '보스' } as const;
+  const w = BALANCE.cardRewardWeights[rw.combatKind];
+  const tot = w.common + w.rare + w.epic + w.legendary;
+  const pct = (x: number) => `${Math.round((x / tot) * 100)}%`;
+  const cards = rw.cards.map((id, i) => {
+    const rc = resolveCard({ id, up: null });
+    const extra = `${tagPreview(counts, rc.tag)}${comboHint(app, id)}`;
+    return `<div class="rcwrap ${sel === null ? 'anim' : ''}" style="animation-delay:${i * 0.08}s">${cardFace(rc, { cls: `big ${sel === i ? 'sel' : ''}`, attrs: `data-act="cardSel" data-arg="${i}"`, oddsBonus: gambleOddsBonus({ run, emit: () => {} }) })}${extra}</div>`;
+  }).join('');
+  const chosen = sel !== null && rw.cards[sel] ? CARD_BY_ID[rw.cards[sel]].name : '';
+  return `${topbar(app)}<div class="screen rewardpick">
+    <h2 class="center">카드 보상</h2>
+    ${steps}
+    <div class="odds center">${RN[rw.combatKind]} 등급 확률: 일반 ${pct(w.common)} · 희귀 ${pct(w.rare)} · 영웅 ${pct(w.epic)} · 전설 ${pct(w.legendary)}</div>
+    <div class="dgrid three">${cards}</div>
+    <button class="btn primary big" data-act="cardConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '카드를 고르세요' : `「${esc(chosen)}」 덱에 넣기`}</button>
+    <button class="btn ghost big" data-act="cardSkip">건너뛰기 (골드 +${BALANCE.cardSkipGold}) ▶</button>
+  </div>`;
+}
+
+/** 고르면 바뀌는 태그 단계를 미리 보여준다 */
+function tagPreview(counts: Record<Tag, number>, tag?: Tag): string {
+  if (!tag) return '<div class="tagpv muted">태그 없음</div>';
+  const a = counts[tag];
+  const b = a + 1;
+  const up = tierOf(b) > tierOf(a);
+  const nt = nextTierAt(a);
+  return `<div class="tagpv ${up ? 'up' : ''}">${TAG_INFO[tag].icon} ${TAG_INFO[tag].name} ${a} → <b>${b}</b>${up ? ` <span class="gold">(${tierOf(b)}단계 달성!)</span>` : nt ? ` <span class="muted">/ ${nt}</span>` : ''}</div>`;
+}
+
+/** 숨은 콤보 암시: 덱에 짝이 있으면 (발견한 콤보면 이름까지) */
+function comboHint(app: App, id: string): string {
+  const run = app.run!;
+  const deck = new Set(run.deck.map((c) => c.id));
+  const hits = COMBOS.filter((c) => (c.a === id && deck.has(c.b)) || (c.b === id && deck.has(c.a)));
+  return hits.map((c) => {
+    const pair = CARD_BY_ID[c.a === id ? c.b : c.a];
+    return app.meta.codex.combos.includes(c.id) ? `<div class="combohint known">🔗 ${esc(c.name)}: ${esc(pair.name)}와 반응</div>` : '<div class="combohint">❔ 덱의 무언가와 반응합니다</div>';
+  }).join('');
+}
+
 export function shopScreen(app: App): string {
   const run = app.run!;
   const s = run.shop!;
@@ -148,18 +202,22 @@ export function shopScreen(app: App): string {
       <button class="btn ${can ? 'primary' : ''}" style="min-width:70px" data-act="buy" data-arg="${i}">${it.price}G${it.price !== it.basePrice ? `<br><s class="small">${it.basePrice}</s>` : ''}</button>
       <div class="row" style="gap:4px">${it.haggles < maxH ? `<button class="btn ghost" style="min-height:36px;padding:2px 8px;font-size:12px" data-act="haggle" data-arg="${i}" data-tip="흥정 주사위: 6 → 공짜, 2~5 → 눈×5% 할인, 1 → ${m.haggleKeepOnOne ? '가격 그대로(말굽)' : '50% 비싸짐'}">🎲흥정</button>` : `<span class="small muted">🎲${it.lastHaggle ?? ''}</span>`}
       ${hasTag ? `<button class="btn ghost" style="min-height:36px;padding:2px 6px" data-act="pricetag" data-arg="${i}">🏷️</button>` : ''}</div></div>`;
-    return itemHtml(it.opt, `${it.sold ? 'sold' : ''} ${r === 'legendary' && !it.sold ? 'legend-glow' : ''}`, right);
+    return itemHtml(it.opt, `${it.sold ? 'sold' : ''} ${r === 'legendary' && !it.sold ? 'legend-glow' : ''} ${it.opt.kind === 'card' ? 'cardItem' : ''}`, right);
   }).join('');
+  const rp = removePrice(run);
+  const canRm = !s.removeUsed && run.gold >= rp && canRemoveMore(run);
+  const removeRow = `<div class="item"><div class="ic">🗑️</div><div class="grow"><div class="tt">카드 삭제 서비스</div><div class="ds">${s.removeUsed ? '이번 상점에서는 이미 썼다' : `덱에서 카드 1장 삭제 · 쓸 때마다 +${BALANCE.removeStep}G`}${canRemoveMore(run) ? '' : ` · 덱이 ${BALANCE.minDeck}장 미만이 될 수 없다`}</div></div>
+    <button class="btn ${canRm ? 'primary' : ''}" style="min-width:70px" data-act="shopRemove" ${canRm ? '' : 'disabled'}>${s.removeUsed ? '완료' : `${rp}G`}</button></div>`;
   return `${topbar(app)}<div class="screen">
     <h2 class="center">🛒 상점</h2>
     <div class="odds center">🎲흥정: 6 → 공짜 · 2~5 → 눈×5% 할인 · 1 → 50% 비싸짐</div>
-    <div class="col">${items}</div>
+    <div class="col">${items}${removeRow}</div>
     <div class="row">
       <button class="btn grow" data-act="shopReroll" ${s.rerolls >= BALANCE.shopRerollMax ? 'disabled' : ''}>${s.rerolls >= BALANCE.shopRerollMax ? '🔄 리롤 끝' : `🔄 리롤 ${s.rerollFree ? '무료' : s.rerollCost + 'G'} (1회)`}</button>
       <button class="btn grow" data-act="buyChip">🎰 칩 1 = ${BALANCE.chipPrice}G</button>
     </div>
     <div class="muted small center">리롤은 상점마다 1번 · 🎲6이면 비용 환급</div>
-    <button class="btn ghost" data-act="shopEdit">🎲 내 주사위 보기</button>
+    <div class="row"><button class="btn ghost grow" data-act="shopEdit">🎲 내 주사위</button><button class="btn ghost grow" data-act="deck" data-always="1">🂠 내 덱 (${run.deck.length})</button></div>
     ${app.ui.shopEdit ? diceViewer(app, false) : ''}
     <div class="row">${consumablesRow(app)}<div class="grow"></div><button class="btn primary" data-act="leaveShop">나가기 ▶</button></div>
   </div>`;
@@ -186,15 +244,20 @@ export function restScreen(app: App): string {
   const run = app.run!;
   const pick = app.ui.restPick;
   const heal = Math.min(run.maxHp - run.hp, Math.round(run.maxHp * BALANCE.restHealPct));
-  const opt = (id: 'heal' | 'up', icon: string, title: string, desc: string) =>
-    `<button class="item restopt ${pick === id ? 'picked' : ''}" style="width:100%" data-act="restPick" data-arg="${id}"><div class="ic">${icon}</div><div class="grow" style="text-align:left"><div class="tt">${pick === id ? '✔ ' : ''}${title}</div><div class="ds">${desc}</div></div></button>`;
+  const upN = run.deck.filter((c) => canUpgradeCard(run, c.uid)).length;
+  const rmOk = canRemoveMore(run);
+  const opt = (id: 'heal' | 'up' | 'remove', icon: string, title: string, desc: string, ok = true) =>
+    `<button class="item restopt ${pick === id ? 'picked' : ''}" style="width:100%;${ok ? '' : 'opacity:.45'}" ${ok ? `data-act="restPick" data-arg="${id}"` : 'disabled'}><div class="ic">${icon}</div><div class="grow" style="text-align:left"><div class="tt">${pick === id ? '✔ ' : ''}${title}</div><div class="ds">${desc}</div></div></button>`;
+  const label = pick === 'heal' ? '✔ 휴식하기' : pick === 'up' ? '강화할 카드 고르기 ▶' : pick === 'remove' ? '지울 카드 고르기 ▶' : '하나를 고르세요';
   return `${topbar(app)}<div class="screen" style="justify-content:center">
     <div class="center" style="font-size:64px">🛏️</div>
     <h2 class="center">휴게실</h2>
     <div class="center small">하나 고르고 확정</div>
     ${opt('heal', '❤️', '휴식', `체력 ${run.hp} → ${run.hp + heal} (+${heal})`)}
-    ${opt('up', '⬆️', '수련', `스킬 1개 강화 +${Math.round(BALANCE.restUpgrade * 100)}% · 다음 화면에서 스킬 선택`)}
-    <button class="btn primary big" data-act="restConfirm" ${pick ? '' : 'disabled'}>${pick === 'heal' ? '✔ 휴식하기' : pick === 'up' ? '강화할 스킬 고르기 ▶' : '하나를 고르세요'}</button>
+    ${opt('up', '⬆️', '수련', upN ? `카드 1장 강화 · A/B 중 하나를 고른다 (강화 가능 ${upN}장)` : '강화할 수 있는 카드가 없다', upN > 0)}
+    ${opt('remove', '🗑️', '제거', rmOk ? '덱에서 카드 1장 삭제' : `덱이 ${BALANCE.minDeck}장 미만이 될 수 없다`, rmOk)}
+    <button class="btn primary big" data-act="restConfirm" ${pick ? '' : 'disabled'}>${label}</button>
+    <button class="btn ghost" data-act="deck" data-always="1">🂠 내 덱 보기 (${run.deck.length})</button>
   </div>`;
 }
 
@@ -246,34 +309,161 @@ function pendingModal(app: App): string {
       <button class="btn ghost" data-act="cancelPending">버리기</button>
     </div></div>`;
   }
-  if (p.kind === 'skillReplace' || p.kind === 'upgrade') {
-    const isUp = p.kind === 'upgrade';
-    const nd = !isUp ? SKILL_BY_ID[p.id] : null;
-    const sel = app.ui.pickSlot;
-    const list = run.skills.map((s, i) => {
-      const d = SKILL_BY_ID[s.id];
-      const change = isUp ? upgradeLine(run, i, p.amount) : '';
-      const locked = isUp && !canUpgrade(run, i, p.amount);
-      return `<button class="item r-${d.rarity} ${sel === i ? 'picked' : ''} ${locked ? 'noup' : ''}" style="width:100%" ${locked ? 'disabled' : `data-act="pickSlot" data-arg="${i}"`}>
-        <div class="grow" style="text-align:left">
-          <div class="tt">${sel === i ? '✔ ' : ''}${d.name} ${rarityTag(d.rarity)} ${s.up ? `<span class="green small">강화 +${Math.round(s.up * 100)}%</span>` : ''}</div>
-          <div class="ds">[${condText(d.cond)}] ${esc(fmt(d.desc, d.v))}</div>
-          ${change}
-        </div></button>`;
-    }).join('');
-    const selName = sel !== null && run.skills[sel] ? SKILL_BY_ID[run.skills[sel].id].name : '';
-    const confirm = isUp
-      ? `<button class="btn primary big" data-act="upgradeConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '강화할 스킬을 고르세요' : `⬆ 「${selName}」 강화하기`}</button>`
-      : `<button class="btn primary big" data-act="replaceConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '버릴 스킬을 고르세요' : `「${selName}」 버리고 「${nd!.name}」 넣기`}</button>`;
-    return `<div class="modal"><div class="box">
-      <h3>${isUp ? `⬆️ 스킬 강화 (효과 +${Math.round(p.amount * 100)}%)` : '스킬 칸이 가득 찼다'}</h3>
-      ${nd ? `<div class="item r-${nd.rarity} newskill"><div class="grow"><div class="tt">새 스킬: ${nd.name} ${rarityTag(nd.rarity)}</div><div class="ds">[${condText(nd.cond)}] ${esc(fmt(nd.desc, nd.v))}</div></div></div><div class="small center">버릴 스킬을 고르고 확정</div>` : '<div class="small center">고르고 확정 · 족보 배율 제외 수치</div>'}
-      <div class="col">${list}</div>
-      ${confirm}
-      ${isUp && p.then === 'rest' ? '<button class="btn ghost" data-act="restBack">← 뒤로 (휴식/수련 다시 고르기)</button>' : `<button class="btn ghost" data-act="${isUp ? 'cancelPending' : 'replaceSkill'}" data-arg="-1">${isUp ? '강화 안 함' : '새 스킬 가져가지 않음'}</button>`}
-    </div></div>`;
-  }
+  if (p.kind === 'upgradeCard') return upgradeModal(app);
+  if (p.kind === 'removeCard') return removeModal(app);
   return '';
+}
+
+/** 덱 정렬 */
+function sortedDeck(app: App) {
+  const run = app.run!;
+  const RO = ['basic', 'common', 'rare', 'epic', 'legendary', 'curse'];
+  const key = (id: string) => {
+    const d = CARD_BY_ID[id];
+    if (app.ui.deckSort === 'rarity') return RO.indexOf(d.rarity) * 100 + d.cost;
+    if (app.ui.deckSort === 'cost') return d.cost * 100 + RO.indexOf(d.rarity);
+    return (d.tag ? TAGS.indexOf(d.tag) + 1 : d.rarity === 'curse' ? 20 : 0) * 100 + RO.indexOf(d.rarity);
+  };
+  return [...run.deck].sort((a, b) => key(a.id) - key(b.id) || a.id.localeCompare(b.id));
+}
+
+function sortTabs(app: App): string {
+  const t = app.ui.deckSort;
+  return `<div class="tabs small">${(['tag', 'rarity', 'cost'] as const).map((k) => `<button class="${t === k ? 'on' : ''}" data-act="deckSort" data-arg="${k}" data-always="1">${{ tag: '태그별', rarity: '등급별', cost: '비용별' }[k]}</button>`).join('')}</div>`;
+}
+
+function upgradeModal(app: App): string {
+  const run = app.run!;
+  const p = run.pending!;
+  const sel = app.ui.pickCard[0];
+  const inst = run.deck.find((c) => c.uid === sel);
+  const grid = sortedDeck(app).map((c) => {
+    const ok = canUpgradeCard(run, c.uid);
+    return cardInstFace(c, { cls: `${sel === c.uid ? 'sel' : ''} ${ok ? '' : 'noup'}`, attrs: ok ? `data-act="pickCard" data-arg="${c.uid}"` : '' });
+  }).join('');
+  let compare = '';
+  if (inst) {
+    const def = CARD_BY_ID[inst.id];
+    const base = resolveCard({ id: inst.id, up: null });
+    const nums = (t: string): string[] => [...(t.match(/\d+(\.\d+)?%?/g) ?? [])];
+    const baseNums = nums(cardDesc(base));
+    const branch = (b: 'A' | 'B') => {
+      const rc = resolveCard({ id: inst.id, up: b });
+      const changed = nums(cardDesc(rc)).filter((x) => !baseNums.includes(x));
+      const costCh = rc.cost !== base.cost ? `<div class="upnote">비용 ${base.cost} → <mark>${rc.cost}</mark></div>` : '';
+      return `<div class="upcol ${app.ui.upBranch === b ? 'sel' : ''}" data-act="upBranch" data-arg="${b}">
+        <div class="uplabel">강화 ${b}: ${esc(def.upgrades![b].label)}</div>
+        ${cardFace(rc, { up: b, highlight: changed })}${costCh}</div>`;
+    };
+    compare = `<div class="upcmp">${branch('A')}${branch('B')}</div>`;
+  }
+  return `<div class="modal"><div class="box wide">
+    <h3>⬆️ 카드 강화 <span class="muted small">카드당 1번 · A/B 중 하나</span></h3>
+    ${inst ? `<div class="small center">원래: ${esc(cardDesc(resolveCard({ id: inst.id, up: null })))}</div>${compare}` : `<div class="small center">강화할 카드를 고르세요</div>${sortTabs(app)}<div class="dgrid">${grid}</div>`}
+    ${inst ? `<button class="btn primary big" data-act="upgradeConfirm" ${app.ui.upBranch ? '' : 'disabled'}>${app.ui.upBranch ? `⬆ 강화 ${app.ui.upBranch}로 확정` : 'A 또는 B를 고르세요'}</button>
+      <button class="btn ghost" data-act="pickCard" data-arg="${inst.uid}">← 다른 카드 고르기</button>` : ''}
+    ${p.then === 'rest' ? '<button class="btn ghost" data-act="restBack">← 뒤로 (휴게실 선택지)</button>' : '<button class="btn ghost" data-act="cancelPending">강화 안 함</button>'}
+  </div></div>`;
+}
+
+function removeModal(app: App): string {
+  const run = app.run!;
+  const p = run.pending as Extract<NonNullable<RunState['pending']>, { kind: 'removeCard' }>;
+  const sel = app.ui.pickCard;
+  const grid = sortedDeck(app).map((c) => cardInstFace(c, { cls: sel.includes(c.uid) ? 'sel rm' : '', attrs: `data-act="pickCard" data-arg="${c.uid}"` })).join('');
+  const ok = sel.length === p.count && canRemoveMore(run, p.count);
+  const title = p.shredder ? '🗑 파쇄기 룰렛' : '🗑 카드 삭제';
+  const odds = p.shredder ? `<div class="odds center">🎰 칩 ${BALANCE.shredderChips} · ${Math.round(shredderOddsPct(app))}%: 삭제 / ${100 - Math.round(shredderOddsPct(app))}%: 저주 카드 1장 추가</div>` : '';
+  const cost = [p.cost ? `${p.cost}G` : '', p.hpCost ? `체력 -${p.hpCost}` : ''].filter(Boolean).join(' · ');
+  return `<div class="modal"><div class="box wide">
+    <h3>${title} <span class="muted small">${p.count}장 고르기${cost ? ` · ${cost}` : ''}</span></h3>
+    ${odds}
+    ${canRemoveMore(run, p.count) ? '' : `<div class="red small center">덱이 ${BALANCE.minDeck}장 미만이 될 수 없다</div>`}
+    ${sortTabs(app)}
+    <div class="dgrid">${grid}</div>
+    <button class="btn ${p.shredder ? 'danger' : 'primary'} big" data-act="removeConfirm" ${ok ? '' : 'disabled'}>${ok ? (p.shredder ? '🎰 파쇄기 돌리기' : `🗑 ${sel.map((u) => CARD_BY_ID[run.deck.find((c) => c.uid === u)!.id].name).join(', ')} 삭제`) : `카드 ${p.count}장을 고르세요`}</button>
+    ${p.then === 'rest' ? '<button class="btn ghost" data-act="restBack">← 뒤로 (휴게실 선택지)</button>' : '<button class="btn ghost" data-act="cancelPending">그만두기</button>'}
+  </div></div>`;
+}
+
+function shredderOddsPct(app: App): number {
+  return Math.min(100, (BALANCE.shredderWin * 100) + getMods(app.run!).casinoOdds);
+}
+
+/** 🂠 덱 보기 (맵·상점·전투 어디서나) */
+function deckModal(app: App): string {
+  const run = app.run!;
+  const counts = tagCounts(run);
+  const tags = TAGS.filter((t) => counts[t] > 0).map((t) => {
+    const tier = tierOf(counts[t]);
+    const nt = nextTierAt(counts[t]);
+    const fx = TAG_TIER_FX[t].slice(0, Math.max(1, tier)).map((x, i) => `<div class="small ${i < tier ? '' : 'muted'}">${i + 1}단계: ${esc(x.desc)}</div>`).join('');
+    return `<div class="tagrow ${tier ? 't' + tier : ''}"><b>${TAG_INFO[t].icon} ${TAG_INFO[t].name} ${counts[t]}${nt ? `/${nt}` : ' (최대)'}</b>${fx}</div>`;
+  }).join('') || '<div class="muted small">아직 태그 카드가 없다 (3장 모으면 1단계)</div>';
+  const combos = activeCombos(run).map((c) => `<div class="small">🔗 <b>${esc(c.name)}</b>: ${esc(c.desc)}</div>`).join('');
+  const augs = run.augments.map((id) => { const a = AUGMENT_BY_ID[id]; return `<span class="aug t-${a.tier}" data-tip="${esc(`${a.name} (${AUG_TIER_INFO[a.tier].name}${a.tag ? ' · ' + TAG_INFO[a.tag].icon + '+1' : ''})\n${a.desc}`)}">${a.icon}</span>`; }).join('');
+  return `<div class="modal"><div class="box wide">
+    <div class="row"><h3 class="grow">🂠 내 덱 ${run.deck.length}장</h3><button class="btn ghost" data-act="closeModal" data-always="1">✕</button></div>
+    <div class="col" style="gap:4px">${tags}</div>
+    ${combos ? `<div class="col" style="gap:2px">${combos}</div>` : ''}
+    ${augs ? `<div class="row augrow"><b class="small">증강</b>${augs}</div>` : ''}
+    ${sortTabs(app)}
+    <div class="dgrid">${groupCards(sortedDeck(app)).map(([c, k]) => cardInstFace(c, { extra: k > 1 ? `<span class="dcount">×${k}</span>` : '' })).join('')}</div>
+  </div></div>`;
+}
+
+/** 같은 카드(강화 포함)를 묶어 ×N으로 */
+function groupCards(list: CardInst[]): [CardInst, number][] {
+  const out: [CardInst, number][] = [];
+  for (const c of list) {
+    const g = out.find(([x]) => x.id === c.id && x.up === c.up);
+    if (g) g[1]++; else out.push([c, 1]);
+  }
+  return out;
+}
+
+/** 전투 중 더미 보기 */
+function pileModal(app: App, which: 'draw' | 'discard' | 'exhaust'): string {
+  const cb = app.run!.combat;
+  if (!cb) return '';
+  const list = which === 'draw' ? [...cb.drawPile].sort((a, b) => a.id.localeCompare(b.id)) : which === 'discard' ? cb.discard : cb.exhausted;
+  const title = { draw: '🂠 뽑을 카드 (순서는 비밀)', discard: '🗑 버린 카드', exhaust: '🔥 소멸한 카드' }[which];
+  return `<div class="modal"><div class="box wide">
+    <div class="row"><h3 class="grow">${title} ${list.length}장</h3><button class="btn ghost" data-act="closeModal" data-always="1">✕</button></div>
+    <div class="dgrid">${groupCards(list).map(([c, k]) => cardInstFace(c, { extra: k > 1 ? `<span class="dcount">×${k}</span>` : '' })).join('') || '<span class="muted">비었다</span>'}</div>
+  </div></div>`;
+}
+
+/** 증강 선택 */
+function augmentModal(app: App): string {
+  const run = app.run!;
+  const of = run.augmentOffer!;
+  const sel = app.ui.rewardSel;
+  const counts = tagCounts(run);
+  const odds = augmentOdds(run, (run.flags.augOffers ?? 1) % 2 === 1 && run.floor <= 1 ? 'floor' : 'boss');
+  const ti = AUG_TIER_INFO[of.tier];
+  const cards = of.ids.map((id, i) => {
+    const a = AUGMENT_BY_ID[id];
+ return `<div class="augwrap"><button class="augcard t-${a.tier} ${sel === i ? 'sel' : ''} ${sel === null ? 'anim' : ''}" style="animation-delay:${i * 0.1}s" data-act="augSel" data-arg="${i}">
+      <span class="augtier">${AUG_TIER_INFO[a.tier].name}</span>
+      <span class="augicon">${a.icon}</span>
+      <span class="augname">${esc(a.name)}</span>
+      ${a.tag ? `<span class="augtag">${TAG_INFO[a.tag].icon} +1</span>` : '<span class="augtag muted">무색</span>'}
+      <span class="augdesc">${esc(a.desc)}</span>
+    </button>${a.tag ? tagPreview(counts, a.tag) : ''}<button class="btn ghost small" data-act="augReroll" data-arg="${i}" ${augRerollsLeft(run) > 0 ? '' : 'disabled'}>🔄</button></div>`;
+  }).join('');
+  const prism = of.tier === 'gold' && run.flags.prismRolled !== run.flags.augOffers
+    ? `<button class="btn danger" data-act="prismRoll" ${run.chips >= PRISM_ROULETTE.chips ? '' : 'disabled'}>🎰 프리즘 룰렛 (칩 ${PRISM_ROULETTE.chips}) · 25% 프리즘 / 75% 실버</button>` : '';
+  const owned = run.augments.map((id) => `<span class="aug t-${AUGMENT_BY_ID[id].tier}" data-tip="${esc(AUGMENT_BY_ID[id].name + '\n' + AUGMENT_BY_ID[id].desc)}">${AUGMENT_BY_ID[id].icon}</span>`).join('');
+  return `<div class="modal"><div class="box wide augbox t-${of.tier}">
+    <h3 class="center">✨ 증강 선택 <span style="color:${ti.color}">${ti.name}</span></h3>
+    <div class="odds center">${esc(odds.label)}: 실버 ${odds.w[0]}% · 골드 ${odds.w[1]}% · 프리즘 ${odds.w[2]}%${odds.ceiling ? ' (천장: 프리즘 확정)' : ''}</div>
+    ${owned ? `<div class="row augrow"><b class="small">보유</b>${owned}</div>` : ''}
+    <div class="augs">${cards}</div>
+    <div class="small center muted">카드별 🔄 리롤 (등급 유지) · 이번 판 남은 리롤 ${augRerollsLeft(run)}</div>
+    ${prism}
+    <button class="btn primary big" data-act="augPick" data-arg="${sel ?? -1}" ${sel === null ? 'disabled' : ''}>${sel === null ? '증강을 고르세요' : `「${esc(AUGMENT_BY_ID[of.ids[sel]].name)}」 선택`}</button>
+  </div></div>`;
 }
 
 function offerModal(app: App): string {
@@ -290,12 +480,12 @@ function bagModal(app: App): string {
   const run = app.run!;
   const relics = run.relics.map((id) => itemHtml({ kind: 'relic', id })).join('') || '<div class="muted small">유물 없음</div>';
   const cons = run.consumables.map((id, i) => itemHtml({ kind: 'consumable', id }, '', CONSUMABLE_BY_ID[id].when !== 'passive' ? `<button class="btn" data-act="useCons" data-arg="${i}">사용</button>` : '<span class="small muted">자동</span>')).join('') || '<div class="muted small">소모품 없음</div>';
-  const skills = run.skills.map((s) => { const d = SKILL_BY_ID[s.id]; return `<div class="item r-${d.rarity}"><div class="grow"><div class="tt">${d.name} ${rarityTag(d.rarity)} ${s.up ? `<span class="green small">+${Math.round(s.up * 100)}%</span>` : ''}</div><div class="ds">[${condText(d.cond)}] ${esc(fmt(d.desc, d.v))}</div></div></div>`; }).join('');
+
   return `<div class="modal"><div class="box">
     <div class="row"><h3 class="grow">🎒 가방</h3><button class="btn ghost" data-act="closeModal" data-always="1">✕</button></div>
     <b>유물 ${run.relics.length}</b><div class="col">${relics}</div>
     <b>소모품 ${run.consumables.length}/${BALANCE.maxConsumables}</b><div class="col">${cons}</div>
-    <b>스킬 ${run.skills.length}/${run.maxSlots}</b><div class="col">${skills}</div>
+    <button class="btn" data-act="deck" data-always="1">🂠 덱 보기 (${run.deck.length}장)</button>
     <div class="row"><b class="grow">주사위 ${run.dice.length}</b><button class="btn ghost" style="min-height:36px" data-act="modal" data-arg="hands" data-always="1">📖 재질·족보 설명</button></div>${diceViewer(app, false)}
     <div class="row"><button class="btn ghost" data-act="settings" data-always="1">⚙️ 설정</button><button class="btn ghost" data-act="back" data-always="1">타이틀</button><button class="btn danger" data-act="quit" data-always="1">포기</button></div>
   </div></div>`;
@@ -313,6 +503,9 @@ export function runModals(app: App, extra: { paytable: () => string; scratch: ()
   const run = app.run!;
   if (run.offer) return offerModal(app);
   if (run.pending) return pendingModal(app);
+  if (ui.modal === 'deck') return deckModal(app);
+  if (ui.modal?.startsWith('pile:')) return pileModal(app, ui.modal.slice(5) as 'draw' | 'discard' | 'exhaust');
+  if (run.augmentOffer && !ui.modal) return augmentModal(app);
   switch (ui.modal) {
     case 'bag': return bagModal(app);
     case 'paytable': return extra.paytable();
@@ -324,28 +517,6 @@ export function runModals(app: App, extra: { paytable: () => string; scratch: ()
 }
 
 export { optInfo, RELIC_BY_ID };
-
-/** 강화 전후 실제 수치 (대표 주사위 기준) */
-function upgradeLine(run: RunState, slot: number, amount: number): string {
-  const s = run.skills[slot];
-  const before = skillSample(run, slot, s.up);
-  const after = skillSample(run, slot, s.up + amount);
-  const mult = `<span class="muted">효과 ×${(1 + s.up).toFixed(1)} → ×${(1 + s.up + amount).toFixed(1)}</span>`;
-  if (!before || !after) return `<div class="upline none">${mult}</div>`;
-  const parts: string[] = [];
-  const stat = (icon: string, cls: string, a: number, b: number) => { if (a || b) parts.push(`<span class="${cls}">${icon} ${a} → <b>${b}</b></span> <span class="green">(+${b - a})</span>`); };
-  stat('⚔', 'dmgc', before.dmg, after.dmg);
-  stat('🛡', 'blkc', before.block, after.block);
-  stat('❤', 'green', before.heal, after.heal);
-  stat('☠', 'green', before.poison, after.poison);
-  stat('🪙', 'gold', before.gold, after.gold);
-  stat('🐷', 'gold', before.piggy, after.piggy);
-  const def = SKILL_BY_ID[s.id];
-  const basis = def.sampleBlock ? `방어도 ${def.sampleBlock}일 때` : before.chance ? '명중하면' : `🎲${before.pips.join('·')} 기준`;
-  const changed = parts.some((x) => !x.includes('(+0)'));
-  if (!parts.length || !changed) return `<div class="upline none">🚫 강화해도 수치가 바뀌지 않아 강화할 수 없음</div>`;
-  return `<div class="upline"><span class="muted">${basis}:</span> ${parts.join(' · ')}</div>`;
-}
 
 /** 주사위 눈 범위를 "3·4·5·6" 형태로 */
 function faces(lo: number, hi: number): string {
@@ -364,11 +535,3 @@ function faceConfirm(app: App, name: string): string {
     <button class="btn primary big" data-act="confirmFace">✔ 여기에 「${name}」 붙이기</button>`;
 }
 
-/** 강화해서 수치가 실제로 오르는 스킬인가 */
-function canUpgrade(run: RunState, slot: number, amount: number): boolean {
-  const s = run.skills[slot];
-  const a = skillSample(run, slot, s.up);
-  const b = skillSample(run, slot, s.up + amount);
-  if (!a || !b) return false;
-  return b.dmg + b.block + b.heal + b.gold + b.piggy + b.poison > a.dmg + a.block + a.heal + a.gold + a.piggy + a.poison;
-}

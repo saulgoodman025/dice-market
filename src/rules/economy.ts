@@ -5,7 +5,8 @@ import { CONSUMABLES, CONSUMABLE_BY_ID } from '../data/consumables';
 import { FACES, FACE_BY_ID } from '../data/faces';
 import { MATERIALS, MATERIAL_BY_ID } from '../data/materials';
 import { RELICS, RELIC_BY_ID } from '../data/relics';
-import { SKILLS, SKILL_BY_ID } from '../data/skills';
+import { CARDS, CARD_BY_ID, isPoolCard } from '../data/cards';
+import { COMBOS } from '../data/sets';
 import { fire, getMods, rng, toast, type Ctx } from './ctx';
 import { ddaRarityBonus } from './dda';
 import { addConsumable, gainGold } from './ops';
@@ -52,7 +53,7 @@ const RARITY_FALLBACK = (r: Rarity): Rarity[] => {
 
 function poolOf(run: RunState, kind: ItemKind): { id: string; rarity: Rarity }[] {
   switch (kind) {
-    case 'skill': return SKILLS.filter((s) => run.flags['pool_skill_' + s.id] !== 0 && !run.skills.some((k) => k.id === s.id));
+    case 'card': return cardPool(run).map((c) => ({ id: c.id, rarity: c.rarity as Rarity }));
     case 'relic': return RELICS.filter((r) => run.flags['pool_relic_' + r.id] !== 0 && !run.relics.includes(r.id));
     case 'face': return FACES.filter((f) => run.flags['pool_face_' + f.id] !== 0);
     case 'consumable': return CONSUMABLES;
@@ -81,7 +82,7 @@ function rollConsumableRarity(ctx: Ctx): Rarity {
 
 export function itemRarity(o: RewardOption): Rarity {
   switch (o.kind) {
-    case 'skill': return SKILL_BY_ID[o.id].rarity;
+    case 'card': return CARD_BY_ID[o.id].rarity as Rarity;
     case 'relic': return RELIC_BY_ID[o.id].rarity;
     case 'face': return FACE_BY_ID[o.id].rarity;
     case 'consumable': return CONSUMABLE_BY_ID[o.id].rarity;
@@ -91,7 +92,7 @@ export function itemRarity(o: RewardOption): Rarity {
 
 export function itemName(o: RewardOption): string {
   switch (o.kind) {
-    case 'skill': return SKILL_BY_ID[o.id].name;
+    case 'card': return CARD_BY_ID[o.id].name;
     case 'relic': return RELIC_BY_ID[o.id].name;
     case 'face': return FACE_BY_ID[o.id].name + ' 면';
     case 'consumable': return CONSUMABLE_BY_ID[o.id].name;
@@ -112,13 +113,8 @@ export function basePrice(run: RunState, o: RewardOption): number {
 export function acquire(ctx: Ctx, o: RewardOption, then: RunState['screen']): void {
   const run = ctx.run;
   switch (o.kind) {
-    case 'skill':
-      if (run.skills.length < run.maxSlots) {
-        run.skills.push({ id: o.id, up: 0 });
-        toast(ctx, `스킬 「${SKILL_BY_ID[o.id].name}」 획득`, 'good');
-      } else {
-        run.pending = { kind: 'skillReplace', id: o.id, then };
-      }
+    case 'card':
+      addCard(ctx, o.id);
       break;
     case 'relic':
       giveRelic(ctx, o.id);
@@ -163,4 +159,62 @@ export function onNodeMove(ctx: Ctx) {
     toast(ctx, `이자 +${i}G`, 'gold');
   }
   fire(ctx, 'onNodeMove');
+}
+
+// ───────────── 카드 ─────────────
+/** 이 판에서 보상·상점에 나올 수 있는 카드 (공용 + 내 캐릭터 전용, 메타 해금 반영) */
+export function cardPool(run: RunState, owner?: 'common' | 'char') {
+  return CARDS.filter((c) => isPoolCard(c)
+    && (c.owner === 'common' || c.owner === run.charId)
+    && (owner === undefined || (owner === 'common' ? c.owner === 'common' : c.owner === run.charId))
+    && run.flags['pool_card_' + c.id] !== 0);
+}
+
+let deckListener: ((ctx: Ctx) => void) | null = null;
+/** 덱이 바뀔 때 부를 함수 등록 (태그·콤보 갱신) */
+export function onDeckChange(fn: (ctx: Ctx) => void) { deckListener = fn; }
+export function deckChanged(ctx: Ctx) { deckListener?.(ctx); }
+
+export function addCard(ctx: Ctx, id: string) {
+  const run = ctx.run;
+  run.deck.push({ uid: run.nextUid++, id, up: null });
+  const d = CARD_BY_ID[id];
+  toast(ctx, `${d.icon} 「${d.name}」 카드가 덱에 들어왔다`, d.rarity === 'curse' ? 'bad' : 'good');
+  deckChanged(ctx);
+}
+
+export function addCurse(ctx: Ctx, id: string) {
+  addCard(ctx, id);
+}
+
+/** 카드 보상 3장: 등급 가중치(표시, DDA 미적용) + 장마다 40% 캐릭터 전용, 중복 없음 */
+export function rollCardReward(ctx: Ctx, kind: 'normal' | 'elite' | 'boss'): string[] {
+  const run = ctx.run;
+  const r = rng(ctx, 'reward');
+  const w = BALANCE.cardRewardWeights[kind];
+  const out: string[] = [];
+  const n = BALANCE.cardChoices + getMods(run).cardRewardChoices;
+  for (let i = 0; i < n; i++) {
+    const own = r.chance(BALANCE.charCardChance) ? 'char' : 'common';
+    const rar = r.weighted(RARITIES, (x) => w[x]);
+    const pick = (pool: ReturnType<typeof cardPool>) => {
+      const free = pool.filter((c) => !out.includes(c.id));
+      for (const rr of RARITY_FALLBACK(rar)) {
+        const c = free.filter((x) => x.rarity === rr && (kind !== 'boss' || rr !== 'common'));
+        if (c.length) return r.pick(c).id;
+      }
+      return null;
+    };
+    const id = pick(cardPool(run, own)) ?? pick(cardPool(run));
+    if (id) out.push(id);
+  }
+  // 숨은 콤보 유도: 덱에 짝이 있는 카드가 보상 마지막 칸에 나올 확률
+  if (out.length && r.chance(BALANCE.comboPartnerChance)) {
+    const deck = new Set(run.deck.map((c) => c.id));
+    const pool = new Set(cardPool(run).map((c) => c.id));
+    const partners = COMBOS.flatMap((c) => [deck.has(c.a) ? c.b : null, deck.has(c.b) ? c.a : null])
+      .filter((x): x is string => !!x && !deck.has(x) && pool.has(x) && !out.includes(x) && (kind !== 'boss' || CARD_BY_ID[x].rarity !== 'common'));
+    if (partners.length) out[out.length - 1] = r.pick(partners);
+  }
+  return out;
 }

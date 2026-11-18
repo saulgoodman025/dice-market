@@ -28,8 +28,8 @@ export const TABLES: TableDef[] = [
     setup: (r) => { r.dice.forEach((d) => { d.material = 'glass'; }); r.maxHp += 10; r.hp += 10; },
   },
   {
-    id: 'chips', name: '칩 테이블', icon: '🔶', desc: '족보 칩을 매 턴 1개 더 받습니다. 대신 스킬 칸이 3개입니다.', unlock: 'chips9',
-    mods: { handChips: 1 }, setup: (r) => { r.maxSlots = 3; r.skills = r.skills.slice(0, 3); },
+    id: 'chips', name: '칩 테이블', icon: '🔶', desc: '족보 칩을 매 턴 1개 더 받습니다. 대신 매 턴 카드를 4장만 뽑습니다.', unlock: 'chips9',
+    mods: { handChips: 1, drawPerTurn: -1 },
   },
   {
     id: 'highroller', name: '하이롤러 테이블', icon: '🎰', desc: '카지노 칩 6개와 도박 배당 +30%로 시작합니다. 대신 최대 체력이 절반입니다.', unlock: 'gamble30',

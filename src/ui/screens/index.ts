@@ -1,4 +1,5 @@
 import type { App } from '../app';
+import { tutorialHand } from '../coach';
 import { combatScreen, handsModal, tutorialModal } from './combat';
 import { casinoScreen, mysteryModal, paytableModal, scratchModal } from './casino';
 import { achievementsScreen, charScreen, codexScreen, endScreen, settingsScreen, titleScreen } from './menus';
@@ -16,7 +17,7 @@ export function renderScreen(app: App): string {
   let body = '';
   switch (run.screen) {
     case 'combat':
-      if (run.combat && !app.meta.tutorialDone && ui.tut === 0 && !run.flags.tutorialSeen) { ui.tut = 1; run.flags.tutorial = 1; run.flags.tutorialSeen = 1; }
+      if (run.combat && !app.meta.tutorialDone && ui.tut === 0 && !run.flags.tutorialSeen) { ui.tut = 1; run.flags.tutorial = 1; run.flags.tutorialSeen = 1; tutorialHand(run); }
       body = run.combat ? combatScreen(app) : mapScreen(app);
       break;
     case 'map': body = mapScreen(app); break;

@@ -10,7 +10,7 @@ export interface Meta {
   unlocked: string[]; // "kind:id"
   flags: Record<string, number>; // act1boss, act2, clear
   maxStake: number;
-  codex: { relics: string[]; faces: string[]; enemies: string[]; hands: string[] };
+  codex: { relics: string[]; faces: string[]; enemies: string[]; hands: string[]; combos: string[]; cards: string[] };
   stats: { runs: number; wins: number; yahtzees: number; megaJackpots: number; bestNodes: number };
   tutorialDone: boolean;
   achievements: string[];
@@ -31,7 +31,7 @@ export interface Settings {
 
 export const defaultMeta = (): Meta => ({
   points: 0, spent: 0, unlocked: [], flags: {}, maxStake: 0,
-  codex: { relics: [], faces: [], enemies: [], hands: [] },
+  codex: { relics: [], faces: [], enemies: [], hands: [], combos: [], cards: [] },
   stats: { runs: 0, wins: 0, yahtzees: 0, megaJackpots: 0, bestNodes: 0 },
   tutorialDone: false,
   achievements: [], mastery: {}, owned: [], daily: {}, bestEndless: 0,
@@ -60,8 +60,18 @@ export const loadRun = (version: number): RunState | null => {
   const r = read<RunState>(RUN_KEY);
   return r && r.version === version ? r : null;
 };
+export const hasStaleRun = (version: number): boolean => {
+  const r = read<RunState>(RUN_KEY);
+  return !!r && r.version !== version;
+};
 export const clearRun = () => { try { localStorage.removeItem(RUN_KEY); } catch { /* */ } };
-export const loadMeta = (): Meta => ({ ...defaultMeta(), ...(read<Meta>(META_KEY) ?? {}) });
+export const loadMeta = (): Meta => {
+  const m = { ...defaultMeta(), ...(read<Meta>(META_KEY) ?? {}) };
+  m.codex = { ...defaultMeta().codex, ...m.codex };
+  // 스킬 → 카드 업데이트: 스킬 해금은 같은 id의 카드 해금으로 옮긴다
+  m.unlocked = m.unlocked.map((u) => u.replace(/^skill:/, 'card:'));
+  return m;
+};
 export const saveMeta = (m: Meta) => write(META_KEY, m);
 export const loadSettings = (): Settings => ({ ...defaultSettings(), ...(read<Settings>(SET_KEY) ?? {}) });
 export const saveSettings = (s: Settings) => write(SET_KEY, s);

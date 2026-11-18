@@ -2,14 +2,17 @@ import type { App } from './app';
 import { sfx } from '../audio/sfx';
 import { clearRun, saveMeta } from '../core/save';
 import { CONSUMABLE_BY_ID } from '../data/consumables';
-import { SKILL_BY_ID, condText } from '../data/skills';
+import { resolveFor } from '../rules/cardfx';
+import { burnDie } from '../rules/deck';
+import { centralBank, pickAugment, prismRoulette, rerollAugment, shredder } from '../rules/sets';
+import { CARD_BY_ID } from '../data/cards';
 import {
-  autoPick, canUse, chipsAvailable, confirmHand, endTurn, nudgeDie, reroll, setDieValue, setTarget, toggleLock, useConsumable, useSkill,
+  autoPick, canPlay, cardBlockReason, confirmHand, endTurn, nudgeDie, playCard, reroll, setDieValue, setTarget, toggleLock, useConsumable,
 } from '../rules/combat';
 import {
   applyFace, applyMaterial, buyChip, cancelPending, casinoHighroller, collectRewardGold, enterNode, eventChoose, leaveCasino,
-  leaveReward, leaveShop, offerFaces, pickOffer, pickReward, replaceSkill, restHeal, restUpgrade, shopApplyPricetag, shopBuy,
-  shopReroll, upgradeSkill, useConsumableOutside, advance, continueEndless,
+  leaveReward, leaveShop, offerFaces, pickOffer, pickReward, restHeal, restUpgrade, shopApplyPricetag, shopBuy,
+  shopReroll, useConsumableOutside, advance, continueEndless, pickCardReward, upgradeCard, removeCards, restRemove, shopRemoveService,
 } from '../rules/run';
 import { doubleOrNothing, haggle, openMystery, rouletteSpin, scratchCard, slotSpin } from '../rules/casino';
 import type { RouletteBet } from '../data/casino';
@@ -125,11 +128,11 @@ function runAction(app: App, act: string, arg: string, n: number) {
     }
     case 'target': {
       if (!cb) break;
-      if (ui.selCard !== null) {
+      if (ui.selCard !== null && cb.cards[ui.selCard]) {
         const slot = ui.selCard;
-        const def = SKILL_BY_ID[run.skills[slot]?.id];
+        const def = resolveFor(run, cb.cards[slot]);
         ui.selCard = null;
-        playSkill(app, slot, def?.target === 'enemy' ? n : null);
+        playSkill(app, slot, def.target === 'enemy' ? n : null);
         return;
       }
       setTarget(ctx, n);
@@ -149,10 +152,10 @@ function runAction(app: App, act: string, arg: string, n: number) {
     }
     case 'field': {
       // 선택한 카드를 테이블에 놓기 (대상 없는 스킬 / 적이 하나뿐일 때)
-      if (!cb || ui.selCard === null) return;
-      const def = SKILL_BY_ID[run.skills[ui.selCard]?.id];
+      if (!cb || ui.selCard === null || !cb.cards[ui.selCard]) return;
+      const def = resolveFor(run, cb.cards[ui.selCard]);
       const alive = cb.enemies.filter((e) => e.hp > 0);
-      if (def?.target === 'enemy' && alive.length > 1) { app.toast('공격할 적을 탭하세요', 'info'); return; }
+      if (def.target === 'enemy' && alive.length > 1) { app.toast('공격할 적을 탭하세요', 'info'); return; }
       const slot = ui.selCard;
       ui.selCard = null;
       playSkill(app, slot, null);
@@ -171,13 +174,24 @@ function runAction(app: App, act: string, arg: string, n: number) {
       return;
     }
     case 'openSet': ui.picker = { mode: 'set' }; app.render(); return;
+    case 'openBurn': ui.picker = { mode: 'burn' }; app.render(); return;
+    case 'openBank': ui.picker = { mode: 'bank' }; app.render(); return;
+    case 'pile': ui.modal = `pile:${arg}` as typeof ui.modal; break;
+    case 'deck': ui.modal = 'deck'; break;
+    case 'deckSort': ui.deckSort = arg as typeof ui.deckSort; break;
     case 'openNudge': ui.picker = { mode: 'nudge' }; app.render(); return;
     case 'cancelPicker': ui.picker = null; app.render(); return;
     case 'pickerDie': pickerDie(app, n); return;
     case 'pickerVal': {
       const p = ui.picker;
-      if (!p || p.target === undefined || !cb) return;
-      if (p.mode === 'fate') useSkill(ctx, p.slot!, p.keys!, { key: p.target, value: n });
+      if (!p || !cb) return;
+      if (p.mode === 'value') playCard(ctx, p.slot!, p.keys!, { value: n });
+      else if (p.mode === 'pile') playCard(ctx, p.slot!, p.keys!, { cardUid: n || undefined });
+      else if (p.mode === 'bank') centralBank(ctx, n);
+      else if (p.target === undefined) return;
+      else if (p.mode === 'fate') playCard(ctx, p.slot!, p.keys!, { key: p.target, value: n });
+      else if (p.mode === 'otherDie') playCard(ctx, p.slot!, p.keys!, { key: p.target });
+      else if (p.mode === 'burn') burnDie(ctx, p.target);
       else if (p.mode === 'set') setDieValue(ctx, p.target, n);
       else if (p.mode === 'nudge') nudgeDie(ctx, p.target, n > 0 ? 1 : -1);
       ui.picker = null;
@@ -216,6 +230,48 @@ function runAction(app: App, act: string, arg: string, n: number) {
       break;
     }
     case 'leaveReward': ui.rewardSel = null; leaveReward(ctx); break;
+    case 'cardSel': ui.cardSel = n; app.render(); return;
+    case 'cardConfirm': if (ui.cardSel !== null) pickCardReward(ctx, ui.cardSel); ui.cardSel = null; break;
+    case 'cardSkip': pickCardReward(ctx, null); ui.cardSel = null; break;
+    // ── 덱 편집 (강화·삭제) ──
+    case 'pickCard': {
+      const p = run.pending;
+      if (!p) return;
+      const max = p.kind === 'removeCard' ? p.count : 1;
+      if (ui.pickCard.includes(n)) ui.pickCard = ui.pickCard.filter((x) => x !== n);
+      else ui.pickCard = max === 1 ? [n] : [...ui.pickCard, n].slice(-max);
+      ui.upBranch = null;
+      app.render();
+      return;
+    }
+    case 'upBranch': ui.upBranch = arg as 'A' | 'B'; app.render(); return;
+    case 'upgradeConfirm': if (ui.pickCard[0] !== undefined && ui.upBranch) { upgradeCard(ctx, ui.pickCard[0], ui.upBranch); ui.restPick = null; } ui.pickCard = []; ui.upBranch = null; break;
+    case 'removeConfirm': {
+      const p = run.pending;
+      if (p?.kind === 'removeCard' && p.shredder) {
+        const r = shredder(ctx, ui.pickCard[0]);
+        run.pending = null;
+        if (r) app.toast(r.win ? '🗑 파쇄 성공! 카드가 사라졌다' : `💥 파쇄 실패… ${CARD_BY_ID[r.curse!].icon} ${CARD_BY_ID[r.curse!].name} 카드가 들어왔다`, r.win ? 'gold' : 'bad');
+        if (r) { if (r.win) sfx.jackpot(); else sfx.lose(); }
+      } else removeCards(ctx, ui.pickCard);
+      ui.pickCard = [];
+      ui.restPick = null;
+      break;
+    }
+    case 'shopRemove': if (!shopRemoveService(ctx)) app.toast('골드가 부족하거나 이미 썼다', 'bad'); ui.pickCard = []; break;
+    case 'shredder': run.pending = { kind: 'removeCard', then: 'casino', count: 1, shredder: true }; ui.pickCard = []; break;
+    // ── 증강 ──
+    case 'augPick': pickAugment(ctx, n); ui.rewardSel = null; break;
+    case 'augSel': ui.rewardSel = n; app.render(); return;
+    case 'augReroll': if (!rerollAugment(ctx, n)) app.toast('리롤이 남지 않았다', 'bad'); ui.rewardSel = null; break;
+    case 'prismRoll': {
+      const r = prismRoulette(ctx);
+      if (r === null) { app.toast('칩이 부족하다', 'bad'); return; }
+      app.toast(r ? '🌈 프리즘!' : '실버로 떨어졌다…', r ? 'gold' : 'bad');
+      if (r) sfx.jackpot(); else sfx.lose();
+      ui.rewardSel = null;
+      break;
+    }
     // ── 상점 ──
     case 'haggle': {
       const d = haggle(ctx, n);
@@ -240,12 +296,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'confirmMat': if (ui.pickMat !== null) applyMaterial(ctx, ui.pickMat); ui.pickMat = null; break;
     case 'applyFace': applyFace(ctx, Math.min(ui.editDie, run.dice.length - 1), n); break;
     case 'applyMat': applyMaterial(ctx, n); break;
-    case 'pickSlot': ui.pickSlot = n; app.render(); return;
-    case 'replaceSkill': replaceSkill(ctx, n < 0 ? null : n); ui.pickSlot = null; break;
-    case 'replaceConfirm': if (ui.pickSlot !== null) replaceSkill(ctx, ui.pickSlot); ui.pickSlot = null; break;
-    case 'upgradeConfirm': if (ui.pickSlot !== null) { upgradeSkill(ctx, ui.pickSlot); ui.restPick = null; } ui.pickSlot = null; break;
-    case 'upgrade': upgradeSkill(ctx, n); break;
-    case 'cancelPending': cancelPending(ctx); ui.pickSlot = null; break;
+    case 'cancelPending': cancelPending(ctx); ui.pickCard = []; ui.upBranch = null; break;
     case 'offer': pickOffer(ctx, n < 0 ? null : n); break;
     // ── 카지노 ──
     case 'tab': ui.casinoTab = arg as typeof ui.casinoTab; break;
@@ -290,12 +341,13 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'evLeave': advance(ctx); break;
     case 'restHeal': restHeal(ctx); break;
     case 'restUp': restUpgrade(ctx); break;
-    case 'restPick': ui.restPick = arg as 'heal' | 'up'; app.render(); return;
+    case 'restPick': ui.restPick = arg as 'heal' | 'up' | 'remove'; app.render(); return;
     case 'restConfirm':
       if (ui.restPick === 'heal') { ui.restPick = null; restHeal(ctx); }
       else if (ui.restPick === 'up') restUpgrade(ctx);
+      else if (ui.restPick === 'remove') restRemove(ctx);
       break;
-    case 'restBack': run.pending = null; ui.pickSlot = null; break;
+    case 'restBack': run.pending = null; ui.pickCard = []; ui.upBranch = null; break;
     case 'faceOffer': offerFaces(ctx, run.screen); break;
     default: break;
   }
@@ -321,21 +373,18 @@ function finishTutorial(app: App) {
 export function cardPlayable(app: App, slot: number, explain: boolean): boolean {
   const run = app.run!;
   const cb = run.combat;
-  if (!cb || cb.phase === 'over' || app.ui.busy) return false;
-  const def = SKILL_BY_ID[run.skills[slot]?.id];
-  if (!def) return false;
+  if (!cb || cb.phase === 'over' || app.ui.busy || !cb.cards[slot]) return false;
   const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : app.ui.sel;
-  const ok = canUse(app.ctx, slot, sel) || !!autoPick(app.ctx, slot, sel);
+  const ok = canPlay(app.ctx, slot, sel) || !!autoPick(app.ctx, slot, sel);
   if (!ok && explain) {
-    const short = def.cost > chipsAvailable(app.ctx);
-    app.toast(cb.usedSlots[slot] ? '이번 턴에 이미 쓴 카드' : short ? `🔶 족보 칩이 부족하다 (필요 ${def.cost}, 보유 ${chipsAvailable(app.ctx)})` : `이 카드는 ${condText(def.cond)} 주사위가 필요하다`, 'bad');
+    app.toast(cardBlockReason(app.ctx, slot), 'bad');
     sfx.bad();
     vibrate(20);
   }
   return ok;
 }
 
-/** 스킬 카드 사용. targetUid가 있으면 그 적을 대상으로 */
+/** 카드 사용. targetUid가 있으면 그 적을 대상으로 */
 export function playSkill(app: App, slot: number, targetUid: number | null) {
   const run = app.run!;
   const cb = run.combat;
@@ -345,15 +394,18 @@ export function playSkill(app: App, slot: number, targetUid: number | null) {
   if (!cardPlayable(app, slot, true)) return;
   if (targetUid !== null) setTarget(ctx, targetUid);
   const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : ui.sel;
-  const keys = canUse(ctx, slot, sel) ? sel : autoPick(ctx, slot, sel)!;
-  const def = SKILL_BY_ID[run.skills[slot].id];
+  const keys = canPlay(ctx, slot, sel) ? sel : autoPick(ctx, slot, sel)!;
+  const def = resolveFor(run, cb.cards[slot]);
   ui.selCard = null;
-  if (def.needsChoice) {
-    ui.picker = { mode: 'fate', slot, keys };
+  if (def.choose) {
+    const mode = def.choose === 'otherDie' ? 'fate' : def.choose === 'otherDieOnly' ? 'otherDie' : def.choose;
+    const pip = keys.length ? cb.hand.find((h) => h.key === keys[0])?.pip ?? 1 : 1;
+    const values = def.chooseValues ? def.chooseValues({ pip, n: def.n }) : [1, 2, 3, 4, 5, 6];
+    ui.picker = { mode, slot, keys, values };
     app.render();
     return;
   }
-  useSkill(ctx, slot, keys);
+  playCard(ctx, slot, keys);
   ui.sel = [];
   app.after();
 }

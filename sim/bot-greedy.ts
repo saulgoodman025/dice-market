@@ -1,15 +1,23 @@
 import type { Ctx } from '../src/rules/ctx';
-import { endTurn, freeDice, lockLimit, previewSkill, reroll, skillUsable, toggleLock, useSkill } from '../src/rules/combat';
+import { autoPick, cardUsable, endTurn, freeDice, lockLimit, playCard, previewCard, reroll, toggleLock } from '../src/rules/combat';
+import { burnDie, canBurn } from '../src/rules/deck';
+import { resolveFor } from '../src/rules/cardfx';
+import { CARD_BY_ID } from '../src/data/cards';
+import { AUGMENT_BY_ID } from '../src/data/augments';
+import { COMBOS } from '../src/data/sets';
+import { pickAugment, tagCounts, topTag } from '../src/rules/sets';
 import { RARITIES, type HandDie, type RewardOption } from '../src/core/state';
-import { SKILL_BY_ID, type Cond } from '../src/data/skills';
+import type { Cond } from '../src/data/cond';
 import { FACE_BY_ID } from '../src/data/faces';
 import { CONSUMABLE_BY_ID } from '../src/data/consumables';
 import { HAND_BY_ID } from '../src/data/hands';
 import { evalFixed } from '../src/rules/hands';
 import {
   advance, applyFace, applyMaterial, collectRewardGold, currentOptions, enterNode, eventChoose, leaveCasino, leaveReward,
-  leaveShop, offerFaces, pickOffer, pickReward, replaceSkill, restHeal, restUpgrade, shopBuy, upgradeSkill, useConsumableOutside,
+  leaveShop, offerFaces, pickOffer, pickReward, restHeal, restUpgrade, shopBuy, useConsumableOutside,
+  canUpgradeCard, canRemoveMore, pickCardReward, removeCards, removePrice, restRemove, shopRemoveService, upgradeCard,
 } from '../src/rules/run';
+import type { RunState } from '../src/core/state';
 import { donEV, doubleOrNothing, haggle, haggleOdds, slotOdds, slotSpin } from '../src/rules/casino';
 import { itemRarity } from '../src/rules/economy';
 import { EVENT_BY_ID } from '../src/data/events';
@@ -98,32 +106,65 @@ function incoming(ctx: Ctx): number {
 function placePhase(ctx: Ctx) {
   const run = ctx.run;
   const cb = run.combat!;
-  // 칩이 남아 있는 동안: 실제 예상 결과가 가장 이득인 카드부터 쓴다
-  for (let guard = 0; guard < 8 && !cb.result; guard++) {
+  // 칩이 남아 있는 동안: 비용 대비 실제 예상 이득이 가장 큰 카드부터 쓴다
+  for (let guard = 0; guard < 14 && !cb.result; guard++) {
     const need = Math.max(0, incoming(ctx) - cb.block - cb.keepBlock);
     const lowHp = run.hp <= run.maxHp * 0.45;
     let best: { i: number; keys: number[]; v: number } | null = null;
-    for (let i = 0; i < run.skills.length; i++) {
-      if (!skillUsable(ctx, i)) continue;
-      const def = SKILL_BY_ID[run.skills[i].id];
-      // 약점 눈을 우선 사용
-      const tgt = cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? cb.enemies.find((e) => e.hp > 0);
-      const weakKeys = tgt ? freeDice(cb).filter((h) => h.pip === tgt.weakPip).map((h) => h.key) : [];
-      const pv = previewSkill(ctx, i, def.role === 'atk' ? weakKeys : []);
+    const tgt = cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? cb.enemies.find((e) => e.hp > 0);
+    const weakKeys = tgt ? freeDice(cb).filter((h) => h.pip === tgt.weakPip).map((h) => h.key) : [];
+    for (let i = 0; i < cb.cards.length; i++) {
+      if (!cardUsable(ctx, i)) continue;
+      const def = resolveFor(run, cb.cards[i]);
+      if (def.choose) continue; // 선택이 필요한 카드는 봇이 다루지 않음
+      const pv = previewCard(ctx, i, def.role === 'atk' ? weakKeys : []);
       if (!pv.keys) continue;
       const enemyHp = cb.enemies.reduce((s2, e) => s2 + Math.max(0, e.hp), 0);
       let v = Math.min(pv.dmg, enemyHp) * 1.0
         + Math.min(pv.block, need) * (lowHp ? 1.4 : 1.0) + Math.max(0, pv.block - need) * 0.15
-        + pv.heal * (lowHp ? 1.0 : 0.4) + pv.gold * 0.3 + pv.piggy * 0.2;
-      if (pv.chance) v = 30 / 6 + 2; // 운 스킬: 기대값
-      if (def.role === 'util') v = 0; // 유틸은 봇이 다루지 않음
+        + pv.heal * (lowHp ? 1.0 : 0.4) + pv.gold * 0.3 + pv.piggy * 0.2 + pv.draw * 3
+        + pv.hits.reduce((s2, h) => s2 + h.poisonGain * 1.5, 0);
+      if (pv.chance) v = 6 + (def.n.d ?? 0) * (def.n.p ?? 30) / 100;
+      if (def.role === 'util' && !pv.draw) v = def.cond.k === 'instant' ? 3 : 0.4;
       if (def.cond.k === 'all' && freeDice(cb).reduce((s2, h) => s2 + h.pip, 0) < 15) v = 0;
       v = v / Math.max(0.6, def.cost + pv.keys.length * 0.35); // 칩·주사위 대비 효율
       if (!best || v > best.v) best = { i, keys: pv.keys, v };
     }
-    if (!best || best.v <= 0.5) break;
-    useSkill(ctx, best.i, best.keys);
+    if (!best || best.v <= 0.5) {
+      // 쓸 카드가 없으면 남은 주사위 하나를 태워 카드를 뽑아 본다
+      if (canBurn(ctx) && freeDice(cb).length > 1 && !cb.turnCounters.botBurn) {
+        cb.turnCounters.botBurn = 1;
+        const lo = [...freeDice(cb)].sort((a, b) => a.pip - b.pip)[0];
+        burnDie(ctx, lo.key);
+        continue;
+      }
+      break;
+    }
+    playCard(ctx, best.i, best.keys);
   }
+}
+
+/** 카드 보상·상점 평가: 가장 많은 태그 우선, 공격 카드 가산 */
+export function cardScore(run: RunState, id: string): number {
+  const d = CARD_BY_ID[id];
+  const top = topTag(run);
+  const c = tagCounts(run);
+  const RI = { basic: 0, common: 1, rare: 2, epic: 3, legendary: 4, curse: -5 } as Record<string, number>;
+  let v = RI[d.rarity] + (d.role === 'atk' ? 1 : 0) + (d.cond.k === 'instant' && d.role === 'util' ? 0.5 : 0);
+  if (d.tag && d.tag === top) v += 2.5;
+  else if (d.tag && c[d.tag] >= 2) v += 1.2;
+  if (d.choose) v -= 1.5;
+  // 보상 화면의 "❔ 덱의 무언가와 반응" 암시를 따라간다
+  const deck = new Set(run.deck.map((c) => c.id));
+  if (COMBOS.some((c) => (c.a === id && deck.has(c.b)) || (c.b === id && deck.has(c.a)))) v += 2.5;
+  return v;
+}
+
+/** 지울 카드: 저주 → 베기 → 방패 → 가장 약한 카드 */
+function removeTargets(run: RunState, n: number): number[] {
+  const RI = { curse: -10, basic: 0, common: 1, rare: 2, epic: 3, legendary: 4 } as Record<string, number>;
+  const order = (id: string) => (CARD_BY_ID[id].rarity === 'curse' ? -20 : id === 'slash' ? -10 : id === 'guard' ? -9 : RI[CARD_BY_ID[id].rarity]);
+  return [...run.deck].sort((a, b) => order(a.id) - order(b.id)).slice(0, n).map((c) => c.uid);
 }
 
 function useCombatConsumables(ctx: Ctx) {
@@ -141,6 +182,14 @@ function useCombatConsumables(ctx: Ctx) {
 
 export const resolveGreedy = (ctx: Ctx) => {
   const run = ctx.run;
+  if (run.augmentOffer) {
+    const of = run.augmentOffer;
+    const top = topTag(run);
+    const sc = (id: string) => (AUGMENT_BY_ID[id].tag === top ? 2 : 0) + (AUGMENT_BY_ID[id].mods?.drawPerTurn ? 1 : 0) + (AUGMENT_BY_ID[id].mods?.atkFlat ? 1 : 0);
+    const i = of.ids.map((id, k) => [sc(id), k]).sort((a, b) => b[0] - a[0])[0][1];
+    pickAugment(ctx, i);
+    return;
+  }
   if (run.offer) {
     const best = run.offer.options.map((o, i) => [rIdx(o), i]).sort((a, b) => b[0] - a[0])[0];
     pickOffer(ctx, best ? best[1] : null);
@@ -160,13 +209,11 @@ export const resolveGreedy = (ctx: Ctx) => {
   } else if (p.kind === 'material') {
     const i = run.dice.findIndex((d) => d.material === 'wood');
     applyMaterial(ctx, i >= 0 ? i : 0);
-  } else if (p.kind === 'skillReplace') {
-    const nr = RARITIES.indexOf(SKILL_BY_ID[p.id].rarity);
-    const worst = run.skills.map((s, i) => [RARITIES.indexOf(SKILL_BY_ID[s.id].rarity), i] as const).filter(([, i]) => i >= 2).sort((a, b) => a[0] - b[0])[0];
-    replaceSkill(ctx, worst && worst[0] < nr ? worst[1] : null);
-  } else if (p.kind === 'upgrade') {
-    const i = run.skills.findIndex((s) => SKILL_BY_ID[s.id].role === 'atk');
-    upgradeSkill(ctx, i >= 0 ? i : 0);
+  } else if (p.kind === 'upgradeCard') {
+    const cands = run.deck.filter((c) => canUpgradeCard(run, c.uid)).sort((a, b) => cardScore(run, b.id) - cardScore(run, a.id));
+    if (cands[0]) upgradeCard(ctx, cands[0].uid, 'A'); else run.pending = null;
+  } else if (p.kind === 'removeCard') {
+    if (canRemoveMore(run, p.count)) removeCards(ctx, removeTargets(run, p.count)); else run.pending = null;
   } else run.pending = null;
 };
 
@@ -215,7 +262,10 @@ export const greedyBot: Bot = {
       if (res?.elite) run.pendingEliteFromSlot = true;
       if (res?.faceChoice) resolveFaces(ctx);
     }
-    const idx = rw.options.map((o, i) => [rIdx(o) + (o.kind === 'relic' ? 0.5 : 0) + (o.kind === 'skill' && run.skills.length < run.maxSlots ? 1 : 0) + (o.kind === 'skill' && SKILL_BY_ID[o.id].role === 'atk' ? 1 : 0), i]).sort((a, b) => b[0] - a[0])[0];
+    // 카드 보상: 가장 많은 태그 우선, 덱이 크면 아주 좋은 카드만
+    const cs = rw.cards.map((id, i) => [cardScore(run, id), i]).sort((a, b) => b[0] - a[0])[0];
+    pickCardReward(ctx, cs && cs[0] >= (run.deck.length > 24 ? 4.5 : 0.9) ? cs[1] : null);
+    const idx = rw.options.map((o, i) => [rIdx(o) + (o.kind === 'relic' ? 0.5 : 0), i]).sort((a, b) => b[0] - a[0])[0];
     if (idx) pickReward(ctx, idx[1]);
     if (run.pending || run.offer) resolveGreedy(ctx);
     leaveReward(ctx);
@@ -227,13 +277,16 @@ export const greedyBot: Bot = {
     const prio = (o: RewardOption) => {
       if (o.kind === 'consumable') return o.id === 'potion' && run.hp < run.maxHp * 0.6 ? 6 : 0;
       if (o.kind === 'material') return rIdx(o) >= 1 ? 2 + rIdx(o) : -1;
-      return { relic: 5, skill: 4, face: 3 }[o.kind] + rIdx(o);
+      if (o.kind === 'card') return cardScore(run, o.id) >= 2 ? 4 + rIdx(o) : -1;
+      return { relic: 5, face: 3 }[o.kind as 'relic' | 'face'] + rIdx(o);
     };
     const order = s.items.map((it, i) => [prio(it.opt), i]).sort((a, b) => b[0] - a[0]);
     for (const [p, i] of order) {
       if (p <= 0) continue;
       if (shopBuy(ctx, i)) { if (run.pending || run.offer) resolveGreedy(ctx); }
     }
+    // 카드 삭제 서비스: 베기·방패가 남아 있고 골드가 되면
+    if (run.gold >= removePrice(run) && run.deck.some((c) => ['slash', 'guard'].includes(c.id) || CARD_BY_ID[c.id].rarity === 'curse') && shopRemoveService(ctx)) resolveGreedy(ctx);
     leaveShop(ctx);
   },
   casino: (ctx) => {
@@ -262,7 +315,9 @@ export const greedyBot: Bot = {
   rest: (ctx) => {
     const run = ctx.run;
     if (run.hp < run.maxHp * 0.65) restHeal(ctx);
-    else { restUpgrade(ctx); resolveGreedy(ctx); }
+    else if (run.deck.filter((c) => ['slash', 'guard'].includes(c.id)).length > 5 && canRemoveMore(run)) { restRemove(ctx); resolveGreedy(ctx); }
+    else if (run.deck.some((c) => canUpgradeCard(run, c.uid))) { restUpgrade(ctx); resolveGreedy(ctx); }
+    else restHeal(ctx);
   },
   resolve: (ctx) => resolveGreedy(ctx),
 };

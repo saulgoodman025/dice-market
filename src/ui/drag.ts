@@ -3,7 +3,7 @@
 // 🎯 공격 카드: 적 위에 놓으면 그 적에게 사용 (적이 하나뿐이면 테이블 어디든)
 // ✋ 대상 없는 카드: 손패 위쪽 아무 곳에나 놓으면 사용
 import type { App } from './app';
-import { SKILL_BY_ID } from '../data/skills';
+import { resolveFor } from '../rules/cardfx';
 import { cardPlayable, playSkill } from './actions';
 
 interface DragState {
@@ -62,8 +62,9 @@ export function initCardDrag(app: App) {
     const card = (e.target as HTMLElement).closest<HTMLElement>('.scard');
     if (!card || app.ui.busy || e.button > 0) return;
     const slot = Number(card.dataset.card);
-    const def = SKILL_BY_ID[app.run?.skills[slot]?.id ?? ''];
-    if (!def) return;
+    const inst = app.run?.combat?.cards[slot];
+    if (!inst || !app.run) return;
+    const def = resolveFor(app.run, inst);
     st = { slot, x0: e.clientX, y0: e.clientY, card, arrow: null, ghost: null, lastUid: null, enemyTarget: def.target === 'enemy', hoverUid: null, armed: false };
   });
 

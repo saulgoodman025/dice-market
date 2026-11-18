@@ -1,9 +1,9 @@
 import { EventBus } from '../core/events';
-import { clearRun, loadMeta, loadRun, loadSettings, saveMeta, saveRun, saveSettings, type Meta, type Settings } from '../core/save';
+import { clearRun, hasStaleRun, loadMeta, loadRun, loadSettings, saveMeta, saveRun, saveSettings, type Meta, type Settings } from '../core/save';
 import type { GameEvent, RunState } from '../core/state';
 import type { Ctx } from '../rules/ctx';
 import { finishCombat, newRun, SAVE_VERSION, updateFlow } from '../rules/run';
-import { previewSkill } from '../rules/combat';
+import { previewCard } from '../rules/combat';
 import { settleRun, type SettleResult } from '../rules/meta';
 import { dailySetup, todayKey } from '../rules/daily';
 import { sfx, setSound, setTempo } from '../audio/sfx';
@@ -17,6 +17,9 @@ import { handleAction } from './actions';
 import { initCardDrag } from './drag';
 import { drawCoach, coachActive } from './coach';
 import { ENEMY_BY_ID } from '../data/enemies';
+import { COMBO_BY_ID, TAG_TIER_FX } from '../data/sets';
+import { CARD_BY_ID } from '../data/cards';
+import { TAG_INFO } from '../data/tags';
 
 /** 강한 공격 연출 기준 피해량 */
 const HIT_STRONG = 15;
@@ -28,10 +31,10 @@ export type Page = 'title' | 'charselect' | 'codex' | 'settings' | 'run' | 'achi
 export interface Ui {
   page: Page;
   sel: number[];
-  picker: null | { mode: 'fate' | 'set' | 'nudge'; slot?: number; keys?: number[]; target?: number };
-  casinoTab: 'slot' | 'roulette' | 'high';
+  picker: null | { mode: 'fate' | 'set' | 'nudge' | 'value' | 'otherDie' | 'pile' | 'burn' | 'bank'; slot?: number; keys?: number[]; target?: number; values?: number[] };
+  casinoTab: 'slot' | 'roulette' | 'high' | 'shred';
   bets: Record<string, number>;
-  modal: null | 'paytable' | 'bag' | 'settings' | 'scratch' | 'mystery' | 'quit' | 'hands';
+  modal: null | 'paytable' | 'bag' | 'settings' | 'scratch' | 'mystery' | 'quit' | 'hands' | 'deck' | 'pile:draw' | 'pile:discard' | 'pile:exhaust';
   editDie: number;
   busy: boolean;
   charSel: string;
@@ -45,14 +48,18 @@ export interface Ui {
   high: { d: [number, number] | null; win: boolean; text: string };
   don: { rolling: boolean; face: number; text: string; before?: { gold: number; streak: number } };
   end: SettleResult | null;
-  codexTab: 'relic' | 'face' | 'enemy' | 'hand';
+  codexTab: 'relic' | 'face' | 'enemy' | 'hand' | 'card' | 'combo';
   shopEdit: boolean;
   infoKey: number;
   helpTab: 'hands' | 'dice';
   pickSlot: number | null;
   pickFace: number | null;
-  selCard: number | null; // 탭으로 고른 스킬 카드
-  restPick: 'heal' | 'up' | null;
+  selCard: number | null; // 탭으로 고른 카드
+  restPick: 'heal' | 'up' | 'remove' | null;
+  pickCard: number[]; // 강화·삭제할 카드 uid
+  upBranch: 'A' | 'B' | null;
+  deckSort: 'tag' | 'rarity' | 'cost';
+  cardSel: number | null; // 보상 카드 선택
   rewardSel: number | null;
   pickMat: number | null;
   /** 연출 중에는 결과가 반영되기 전 숫자를 보여준다 (결과 미리 노출 방지) */
@@ -74,7 +81,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, tableSel: 'classic', achTab: 'ach', scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, rewardSel: null, freeze: null,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, rewardSel: null, freeze: null, pickCard: [], upBranch: null, deckSort: 'tag', cardSel: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
@@ -96,6 +103,7 @@ export class App {
     this.bus.on((e) => this.queue.push(e));
     const saved = loadRun(SAVE_VERSION);
     if (saved) this.run = saved;
+    else if (hasStaleRun(SAVE_VERSION)) { clearRun(); setTimeout(() => this.toast('업데이트로 진행 중이던 판이 초기화됐습니다', 'info'), 300); }
     this.bindInput();
     initCardDrag(this);
     this.render();
@@ -193,7 +201,7 @@ export class App {
     const cb = this.run?.combat;
     if (!cb) return;
     const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : this.ui.sel;
-    const pv = previewSkill(this.ctx, slot, sel, targetUid);
+    const pv = previewCard(this.ctx, slot, sel, targetUid);
     if (pv.chance) return; // 운에 달린 카드는 미리 보여주지 않는다
     for (const h of pv.hits) {
       const e = cb.enemies.find((x) => x.uid === h.uid);
@@ -654,6 +662,9 @@ export class App {
           break;
         }
         case 'toast': { const tx = e.text; const tone = e.tone; at(delay, () => this.toast(tx, tone)); break; }
+        case 'draw': at(delay, () => { sfx.tick(); this.retrigger(this.el('.hand'), 'drew'); }); break;
+        case 'combo': { const id = e.id; at(delay + 200, () => this.comboFx(id)); delay += 400; break; }
+        case 'tierUp': { const tg = e.tag; const tr = e.tier; at(delay + 100, () => this.tierFx(tg, tr)); break; }
         case 'megaJackpot': at(delay + 400, () => this.megaFx()); break;
         case 'sfx': break;
       }
@@ -672,6 +683,35 @@ export class App {
     d.innerHTML = `<span class="a"></span><span class="b"></span><em>-${blocked}🛡</em>`;
     host.appendChild(d);
     sfx.shieldBreak();
+  }
+
+  /** 숨은 콤보 발견: 두 카드가 합쳐지는 전체 화면 연출 */
+  private comboFx(id: string) {
+    const c = COMBO_BY_ID[id];
+    if (!c) return;
+    const a = CARD_BY_ID[c.a];
+    const b = CARD_BY_ID[c.b];
+    const d = document.createElement('div');
+    d.className = 'combofx';
+    d.innerHTML = `<div class="cfx-cards"><span class="cfx a">${a.icon}</span><span class="cfx b">${b.icon}</span></div>
+      <div class="cfx-title">🔓 숨은 콤보 발견!</div><div class="cfx-name">${c.name}</div><div class="cfx-desc">${a.name} + ${b.name}<br>${c.desc}</div>`;
+    this.root.appendChild(d);
+    sfx.jackpot();
+    vibrate([30, 40, 60]);
+    d.addEventListener('click', () => d.remove());
+    setTimeout(() => d.remove(), 2600 / this.settings.speed);
+  }
+
+  /** 태그 단계 상승 배너 */
+  private tierFx(tag: string, tier: number) {
+    const t = TAG_INFO[tag as keyof typeof TAG_INFO];
+    if (!t) return;
+    const d = document.createElement('div');
+    d.className = 'tierfx';
+    d.innerHTML = `<b>${t.icon} ${t.name} ${tier}단계!</b><span>${TAG_TIER_FX[tag as keyof typeof TAG_TIER_FX][tier - 1].desc}</span>`;
+    this.root.appendChild(d);
+    sfx.chip();
+    setTimeout(() => d.remove(), 1800 / this.settings.speed);
   }
 
   private enemyShield(el: Element | null) {

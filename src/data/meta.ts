@@ -1,11 +1,12 @@
 // 메타 진행: 처음엔 각 카테고리 약 60%만 상점/보상 풀에 있다. 해금 포인트로 나머지를 연다.
-export const META_LOCKED_START: { kind: 'skill' | 'relic' | 'face'; id: string }[] = [
-  // 스킬 13개 (32 중 ~40%)
-  { kind: 'skill', id: 'oddcut' }, { kind: 'skill', id: 'execute' }, { kind: 'skill', id: 'lucky7' },
-  { kind: 'skill', id: 'split' }, { kind: 'skill', id: 'triple' }, { kind: 'skill', id: 'roulette' },
-  { kind: 'skill', id: 'chain' }, { kind: 'skill', id: 'echo' }, { kind: 'skill', id: 'reload' },
-  { kind: 'skill', id: 'allin' }, { kind: 'skill', id: 'yahtzeehammer' }, { kind: 'skill', id: 'midas' },
-  { kind: 'skill', id: 'doubledown' }, { kind: 'skill', id: 'warcry' },
+export const META_LOCKED_START: { kind: 'card' | 'relic' | 'face'; id: string }[] = [
+  // 공용 카드 18장 (60 중 30%) — 처음엔 70%만 풀에 있다
+  { kind: 'card', id: 'oddcut' }, { kind: 'card', id: 'execute' }, { kind: 'card', id: 'lucky7' },
+  { kind: 'card', id: 'split' }, { kind: 'card', id: 'triple' }, { kind: 'card', id: 'roulette' },
+  { kind: 'card', id: 'chain' }, { kind: 'card', id: 'echo' }, { kind: 'card', id: 'reload' },
+  { kind: 'card', id: 'allin' }, { kind: 'card', id: 'yahtzeehammer' }, { kind: 'card', id: 'midas' },
+  { kind: 'card', id: 'doubledown' }, { kind: 'card', id: 'warcry' }, { kind: 'card', id: 'deathmark' },
+  { kind: 'card', id: 'infinitechain' }, { kind: 'card', id: 'bulwark' }, { kind: 'card', id: 'catalyst' },
   // 면 8개 (20 중 40%)
   { kind: 'face', id: 'chip' }, { kind: 'face', id: 'clone' }, { kind: 'face', id: 'magnet' },
   { kind: 'face', id: 'ice' }, { kind: 'face', id: 'mirror' }, { kind: 'face', id: 'skull' },
@@ -23,6 +24,6 @@ export const META_LOCKED_START: { kind: 'skill' | 'relic' | 'face'; id: string }
 /** 해금 1개당 필요한 포인트 */
 export const META_POINTS_PER_UNLOCK = 6;
 
-/** 1막 상점 스킬 칸에 눈 조작 스킬이 나올 확률 (가드레일 ≥60%) */
+/** 1막 상점 카드 칸 하나에 눈 조작 카드가 나올 확률 (가드레일 ≥60%) */
 export const ACT1_MANIP_CHANCE = 0.65;
-export const MANIP_SKILLS = ['bump', 'flip', 'fate'];
+export const MANIP_SKILLS = ['bump', 'flip', 'split'];

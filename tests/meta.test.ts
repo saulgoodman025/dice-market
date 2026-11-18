@@ -65,6 +65,6 @@ describe('업적 · 숙련도 · 엔드리스 · 일일 도전 · 테이블', ()
     expect(mk(1, 'gambler', 'six').run.dice.length).toBe(6);
     expect(mk(1, 'gambler', 'golden').run.gold).toBe(60);
     expect(mk(1, 'gambler', 'glass').run.dice.every((d) => d.material === 'glass')).toBe(true);
-    expect(mk(1, 'gambler', 'chips').run.skills.length).toBe(3);
+    expect(mk(1, 'gambler', 'chips').run.deck.length).toBe(10);
   });
 });

@@ -1,4 +1,6 @@
 import type { App } from '../app';
+import { shredderLeft, shredderOdds } from '../../rules/sets';
+import { BALANCE } from '../../data/balance';
 import { SLOT_SYMBOLS, ROULETTE_BETS, HIGHROLLER, SCRATCH_SYMBOLS } from '../../data/casino';
 import {
   evText, pct, rouletteOdds, slotOdds, ROULETTE_RED, type SlotResult, HIGHROLLER_P, highrollerTierBonus, scratchOdds, mysteryOdds,
@@ -29,9 +31,20 @@ export function casinoScreen(app: App): string {
     <button class="${ui.casinoTab === 'slot' ? 'on' : ''}" data-act="tab" data-arg="slot">🎰 슬롯</button>
     <button class="${ui.casinoTab === 'roulette' ? 'on' : ''}" data-act="tab" data-arg="roulette">🎡 룰렛</button>
     <button class="${ui.casinoTab === 'high' ? 'on' : ''}" data-act="tab" data-arg="high">🤵 하이롤러</button>
+    <button class="${ui.casinoTab === 'shred' ? 'on' : ''}" data-act="tab" data-arg="shred">🗑 파쇄기</button>
   </div>`;
   let body = '';
-  if (ui.casinoTab === 'slot') {
+  if (ui.casinoTab === 'shred') {
+    const left = shredderLeft(run);
+    const pct = Math.round(shredderOdds(run) * 100);
+    const ok = left > 0 && run.chips >= BALANCE.shredderChips && run.deck.length > BALANCE.minDeck;
+    body = `<div class="center" style="font-size:64px">🗑️</div>
+      <div class="card col center"><b>파쇄기 룰렛</b>
+        <div class="small">덱의 카드 1장을 골라 파쇄기에 넣는다.</div>
+        <div class="row center"><span class="odds">${pct}%: 그 카드 삭제 · ${100 - pct}%: 저주 카드 1장이 덱에 들어옴</span></div>
+        <div class="small muted">칩 ${BALANCE.shredderChips}개 · 이번 판 남은 횟수 ${left}/${BALANCE.shredderMax}</div></div>
+      <button class="btn danger big" data-act="shredder" ${ok ? '' : 'disabled'}>${left <= 0 ? '이번 판은 다 썼다' : run.chips < BALANCE.shredderChips ? '칩이 부족하다' : run.deck.length <= BALANCE.minDeck ? `덱이 ${BALANCE.minDeck}장 이하` : '🗑 카드 고르기'}</button>`;
+  } else if (ui.casinoTab === 'slot') {
     const o = slotOdds(run);
     const ticket = run.consumables.includes('freespin') ? ' (무료 스핀권 사용)' : '';
     body = `${slotMachine(app)}

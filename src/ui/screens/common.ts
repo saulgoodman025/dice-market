@@ -5,6 +5,10 @@ import { RELIC_BY_ID } from '../../data/relics';
 import { CHAR_BY_ID } from '../../data/characters';
 import { esc } from '../components/parts';
 import { interestFor } from '../../rules/economy';
+import { tagCounts, nextTierAt, tierOf } from '../../rules/sets';
+import { TAGS, TAG_INFO } from '../../data/tags';
+import { TAG_TIER_FX } from '../../data/sets';
+import { AUGMENT_BY_ID, AUG_TIER_INFO } from '../../data/augments';
 
 export function topbar(app: App): string {
   const run = app.run!;
@@ -24,7 +28,24 @@ export function topbar(app: App): string {
     <span class="stat muted" style="white-space:nowrap">${r.act}막 ${r.floor >= 4 ? '보스' : `${r.floor + 1}층`}${r.stake ? ` S${r.stake}` : ''}</span>
     ${cb ? '<button class="iconbtn" data-act="tutOpen" data-always="1" aria-label="도움말">?</button>' : ''}
     <button class="iconbtn" data-act="modal" data-arg="bag" data-always="1" aria-label="가방">☰</button>
-  </div>`;
+  </div>${tagBar(app)}`;
+}
+
+/** 태그 트래커: 덱 버튼 + 활성 태그 진행 + 증강 */
+export function tagBar(app: App): string {
+  const run = app.run!;
+  if (!['map', 'combat', 'shop', 'rest', 'event', 'casino'].includes(run.screen)) return '';
+  const c = tagCounts(run);
+  const chips = TAGS.filter((t) => c[t] > 0).map((t) => {
+    const tier = tierOf(c[t]);
+    const nt = nextTierAt(c[t]);
+    const prev = tier ? [3, 5, 7][tier - 1] : 0;
+    const pct = nt ? ((c[t] - prev) / (nt - prev)) * 100 : 100;
+    const tip = `${TAG_INFO[t].icon} ${TAG_INFO[t].name} ${c[t]}장${nt ? ` (다음 단계 ${nt})` : ' (최대)'}\n${TAG_TIER_FX[t].map((x, i) => `${i < tier ? '✔' : '·'} ${i + 1}단계(${[3, 5, 7][i]}): ${x.desc}`).join('\n')}`;
+    return `<span class="tchip ${tier ? 'tier' + tier : ''}" data-tip="${esc(tip)}"><span class="ti">${TAG_INFO[t].icon}</span><span class="tn">${c[t]}${nt ? `/${nt}` : ''}</span><i style="width:${pct}%"></i></span>`;
+  }).join('');
+  const augs = run.augments.map((id) => { const a = AUGMENT_BY_ID[id]; return `<span class="aug t-${a.tier}" data-tip="${esc(`${a.icon} ${a.name} (${AUG_TIER_INFO[a.tier].name})\n${a.desc}`)}">${a.icon}</span>`; }).join('');
+  return `<div class="tagbar"><button class="deckbtn" data-act="deck" data-always="1" data-tip="내 덱 보기">🂠${run.deck.length}</button>${chips}<span class="grow"></span>${augs}</div>`;
 }
 
 export function consumablesRow(app: App): string {

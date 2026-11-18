@@ -1,8 +1,10 @@
 import type { RewardOption } from '../core/state';
 import { fire, rng, type Ctx } from '../rules/ctx';
-import { giveRelic, relicOfRarity, rollItemId } from '../rules/economy';
+import { addCurse, deckChanged, giveRelic, relicOfRarity, rollItemId } from '../rules/economy';
+import { BALANCE } from './balance';
 import { addJackpot, gainChips, gainGold, healPlayer, maxHpChange } from '../rules/ops';
 import { RELIC_BY_ID } from './relics';
+import { CARD_BY_ID } from './cards';
 
 export interface EventChoice {
   label: string;
@@ -37,7 +39,7 @@ export const EVENTS: EventDef[] = [
     choices: [
       {
         label: '10G를 건다', odds: '컵 3개 중 정답 1개 → 30G · 틀리면 10G 잃음', can: (c) => c.run.gold >= 10,
-        run: (c) => { gainGold(c, -10); const win = rng(c, 'casino').int(1, 3) === 1; gambleDone(c, win); if (win) { gainGold(c, 30); return '정답! 30G를 받았다.'; } return '빈 컵이다. 10G를 잃었다.'; },
+        run: (c) => { gainGold(c, -10); const win = rng(c, 'casino').int(1, 3) === 1; gambleDone(c, win); if (win) { gainGold(c, 30); return '정답! 30G를 받았다.'; } addCurse(c, 'badluck'); return '빈 컵이다. 10G를 잃고 🐈‍⬛ 불운 카드가 덱에 들어왔다.'; },
       },
       { label: '지나간다', run: () => '야바위꾼이 혀를 찬다.' },
     ],
@@ -45,7 +47,7 @@ export const EVENTS: EventDef[] = [
   {
     id: 'devil', name: '악마의 거래', emoji: '😈', text: '계약서를 내미는 붉은 정장의 사내.',
     choices: [
-      { label: '최대 체력 -15 → 전설 유물', can: (c) => c.run.maxHp > 25, run: (c) => { maxHpChange(c.run, -15); const id = relicOfRarity(c, 'legendary'); if (id) giveRelic(c, id); return '계약이 성립했다.'; } },
+      { label: '최대 체력 -15 → 전설 유물 (+🥴 금단 증상 카드)', can: (c) => c.run.maxHp > 25, run: (c) => { maxHpChange(c.run, -15); const id = relicOfRarity(c, 'legendary'); if (id) giveRelic(c, id); addCurse(c, 'withdrawal'); return '계약이 성립했다. 대가로 금단 증상 카드가 덱에 들어왔다.'; } },
       { label: '거절한다', run: () => '사내는 웃으며 사라졌다.' },
     ],
   },
@@ -160,8 +162,8 @@ export const EVENTS: EventDef[] = [
         },
       },
       {
-        label: '스킬 1개 강화 (+50%)',
-        run: (c) => { c.run.pending = { kind: 'upgrade', amount: 0.5, then: 'event' }; return '강화할 스킬을 고른다.'; },
+        label: '카드 1장 강화 (A/B 중 택1)',
+        run: (c) => { c.run.pending = { kind: 'upgradeCard', then: 'event' }; return '강화할 카드를 고른다.'; },
       },
     ],
   },
@@ -186,6 +188,50 @@ export const EVENTS: EventDef[] = [
         },
       },
       { label: '지나간다', run: () => '슬롯이 깜빡인다.' },
+    ],
+  },
+  // ── 카드 삭제 이벤트 ──
+  {
+    id: 'incinerator', name: '소각로', emoji: '🔥', text: '"필요 없는 건 태워 버려."',
+    choices: [
+      { label: '카드 1장 삭제', can: (c) => c.run.deck.length > BALANCE.minDeck, run: (c) => { c.run.pending = { kind: 'removeCard', then: 'event', count: 1 }; return '태울 카드를 고른다.'; } },
+      { label: '카드 2장 삭제, 체력 -8', can: (c) => c.run.deck.length > BALANCE.minDeck + 1 && c.run.hp > 8, run: (c) => { c.run.pending = { kind: 'removeCard', then: 'event', count: 2, hpCost: 8 }; return '태울 카드 2장을 고른다.'; } },
+      { label: '지나간다', run: () => '불길이 사그라든다.' },
+    ],
+  },
+  {
+    id: 'confession', name: '고해성사', emoji: '⛪', text: '"죄를 고하면 짐을 덜어 주리라."',
+    choices: [
+      { label: '골드 15: 카드 1장 삭제', can: (c) => c.run.gold >= 15 && c.run.deck.length > BALANCE.minDeck, run: (c) => { c.run.pending = { kind: 'removeCard', then: 'event', count: 1, cost: 15 }; return '고백할 카드를 고른다.'; } },
+      {
+        label: '골드 30: 저주 카드 전부 삭제', can: (c) => c.run.gold >= 30 && c.run.deck.some((x) => CARD_BY_ID[x.id]?.rarity === 'curse'),
+        run: (c) => { gainGold(c, -30); const n = c.run.deck.length; c.run.deck = c.run.deck.filter((x) => CARD_BY_ID[x.id]?.rarity !== 'curse'); c.run.stats.removals += n - c.run.deck.length; deckChanged(c); return `저주 카드 ${n - c.run.deck.length}장이 사라졌다.`; },
+      },
+      { label: '지나간다', run: () => '종소리가 울린다.' },
+    ],
+  },
+  {
+    id: 'lethe', name: '망각의 샘', emoji: '🌫️', text: '마시면 무언가를 잊는다. 무엇을 잊을지는 모른다.',
+    choices: [
+      {
+        label: '마신다', odds: '무작위 카드 2장 삭제 (어떤 카드인지 모름, 50%는 기본 카드)', can: (c) => c.run.deck.length > BALANCE.minDeck + 1,
+        run: (c) => {
+          const r = rng(c, 'map');
+          const gone: string[] = [];
+          for (let i = 0; i < 2 && c.run.deck.length > BALANCE.minDeck; i++) {
+            const basics = c.run.deck.filter((x) => CARD_BY_ID[x.id]?.rarity === 'basic');
+            const others = c.run.deck.filter((x) => CARD_BY_ID[x.id]?.rarity !== 'basic');
+            const pool = (r.chance(0.5) && basics.length) || !others.length ? basics : others;
+            const pick = r.pick(pool);
+            c.run.deck = c.run.deck.filter((x) => x !== pick);
+            c.run.stats.removals++;
+            gone.push(CARD_BY_ID[pick.id]?.name ?? pick.id);
+          }
+          deckChanged(c);
+          return `머리가 맑아졌다. 잊은 카드: ${gone.join(', ')}`;
+        },
+      },
+      { label: '지나간다', run: () => '물빛이 흔들린다.' },
     ],
   },
 ];
