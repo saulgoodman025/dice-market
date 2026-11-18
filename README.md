@@ -2,6 +2,10 @@
 
 지하 카지노 던전 “하우스”에서 주사위 5개로 싸우고, 아낀 눈으로 돈을 벌고, 슬롯·룰렛·더블 오어 낫싱으로 판돈을 불려 하우스를 이기는 로그라이크. 사양: [GAME_SPEC.md](GAME_SPEC.md) · 결정 기록: [DECISIONS.md](DECISIONS.md)
 
+## 플레이
+
+- 공개 주소: https://saulgoodman025.github.io/dice-market/ (main에 push하면 GitHub Actions가 테스트 → 빌드 → 배포)
+
 ## 실행
 
 ```bash
