@@ -522,3 +522,15 @@ h1, h2, h3 { margin: 0; }
 .card .row.total { border-top: 1px solid rgba(255,255,255,.15); padding-top: 6px; font-size: 16px; }
 .actseg span, .flabel, .mnode .ml { color: #e6eee9; }
 .mnode .ml { text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+
+/* v0.7 스킬 선택 확정 */
+.item.picked { border-color: var(--gold) !important; box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(245,197,66,.45); background: #2a2a12; }
+.item.newskill { border-style: dashed; }
+.upline { font-size: 13px; margin-top: 3px; line-height: 1.5; }
+.upline b { font-size: 15px; }
+.upline .dmgc { color: #ff9a90; } .upline .blkc { color: #9fd0ff; }
+.upline.none { color: #ffcf7a; font-size: 12px; }
+
+.donrule { display: flex; flex-direction: column; gap: 4px; align-items: center; font-weight: 900; font-size: 15px; }
+.donrule .win { color: #2a1a00; background: var(--gold); border-radius: 10px; padding: 2px 10px; }
+.donrule .lose { color: #ffd0d3; background: #5a1a22; border-radius: 10px; padding: 2px 10px; }

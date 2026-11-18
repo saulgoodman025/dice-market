@@ -35,7 +35,7 @@ export function casinoScreen(app: App): string {
     const o = slotOdds(run);
     const ticket = run.consumables.includes('freespin') ? ' (무료 스핀권 사용)' : '';
     body = `${slotMachine(app)}
-      <div class="row center"><span class="odds">3개 일치 ${pct(o.rows.reduce((a, r) => a + r.three, 0))} · 2개 일치 ${pct(o.rows.reduce((a, r) => a + r.two, 0))} · ${evText(o.ev)}</span></div>
+      <div class="row center"><span class="odds">같은 그림 3개 또는 2개 → 당첨 · 그 외 → 꽝 (📋 배당표에서 보상 확인)</span></div>
       <button class="btn primary big" data-act="spin" ${ui.slot.spinning ? 'disabled' : ''}>스핀 (칩 1)${ticket}</button>
       <button class="btn ghost" data-act="modal" data-arg="paytable">📋 배당표</button>`;
   } else if (ui.casinoTab === 'roulette') {
@@ -48,23 +48,23 @@ export function casinoScreen(app: App): string {
     const ballColor = r.n === null ? '#fff' : r.n === 0 ? '#3ddc84' : ROULETTE_RED.has(r.n) ? '#ff5a5f' : '#ddd';
     body = `<div class="wheel-wrap"><div class="wheel" id="wheel"></div><div class="wheel-ball" id="ball" style="color:${ballColor}">${r.spinning ? '…' : ball}</div></div>
       <div class="center small" style="min-height:18px">${r.n !== null && !r.spinning ? (r.won > 0 ? `<span class="gold">칩 +${r.won}</span>` : '<span class="muted">꽝</span>') : ''}</div>
-      <div class="betgrid">${ROULETTE_BETS.map((b) => btn(b.id, `${b.label}<br><span class="small muted">×${b.payout} · ${pct(o.rows.find((x) => x.id === b.id)!.p)}</span>`, b.id === 'red' ? 'red' : b.id === 'black' ? 'black' : b.id === 'zero' ? 'zero' : '')).join('')}</div>
-      <details><summary class="muted small">단일 숫자 (×36 · ${pct(o.single.p)} · ${evText(o.single.ev)})</summary><div class="betgrid" style="grid-template-columns:repeat(6,1fr);margin-top:6px">${nums}</div></details>
-      <div class="row center"><span class="odds">빨강/검정·홀/짝 ${evText(o.rows[0].ev)} · 0 적중 시 칩 ×36 + 잭팟 100%</span></div>
+      <div class="betgrid">${ROULETTE_BETS.map((b) => btn(b.id, `${b.label}<br><span class="small muted">당첨 시 ×${b.payout}</span>`, b.id === 'red' ? 'red' : b.id === 'black' ? 'black' : b.id === 'zero' ? 'zero' : '')).join('')}</div>
+      <details><summary class="muted small">숫자 하나에 걸기 (맞히면 ×36)</summary><div class="betgrid" style="grid-template-columns:repeat(6,1fr);margin-top:6px">${nums}</div></details>
+      <div class="row center"><span class="odds">공이 내가 건 칸에 멈추면 당첨 · 0이 나오면 0에 건 것만 당첨 (칩 ×36 + 잭팟 100%)</span></div>
       <div class="row"><button class="btn ghost" data-act="clearBets">베팅 취소</button><button class="btn primary grow" data-act="spinRoulette" ${totalBet ? '' : 'disabled'}>돌리기 (칩 ${totalBet})</button></div>`;
   } else {
     if (run.act < 2) body = `<div class="card center">🚫 하이롤러 테이블은 2막부터 열린다.<br><span class="muted small">(초반 판을 망치지 않도록)</span></div>`;
     else {
       const bonus = highrollerTierBonus(run, ddaHighrollerBonus(run));
       const h = ui.high;
-      body = `<div class="card center">주사위 2개 합이 8 이상이면 승리 <span class="odds">확률 ${pct(HIGHROLLER_P)}</span></div>
+      body = `<div class="card center donrule"><span class="win">🎲🎲 합 8~12 → 승리</span><span class="lose">🎲🎲 합 2~7 → 패배</span></div>
         ${h.d ? `<div class="row center">${h.d.map((d) => `<div class="die">${pipsHtml(d)}</div>`).join('')}<b class="${h.win ? 'gold' : 'red'}">${h.d[0] + h.d[1]} — ${esc(h.text)}</b></div>` : ''}
         ${HIGHROLLER.map((o) => {
           const tier = RARITIES[Math.min(3, RARITIES.indexOf(o.prize) + bonus)];
           return `<button class="item" style="width:100%" data-act="high" data-arg="${o.id}">
             <div class="ic">${o.kind === 'maxHp' ? '💔' : '🩸'}</div>
             <div class="grow"><div class="tt">${esc(o.label)}</div><div class="ds">승리: ${{ common: '일반', rare: '희귀', epic: '영웅', legendary: '전설' }[tier]} 유물${bonus > 0 ? ' (등급 보너스)' : ''} · 패배: ${o.kind === 'maxHp' ? `최대 체력 -${o.stake}` : `체력 -${o.stake}`}</div></div>
-            <span class="odds">${pct(HIGHROLLER_P)}</span></button>`;
+            </button>`;
         }).join('')}`;
     }
   }
@@ -86,11 +86,11 @@ export function paytableModal(app: App): string {
   const sc = scratchOdds(app.run!).map((s) => `<tr><td>${s.emoji}×3+</td><td colspan="2">${pct(s.p)} · ${esc(s.reward)}</td></tr>`).join('');
   const mo = mysteryOdds();
   return `<div class="modal"><div class="box">
-    <h3>📋 배당표 (실제 확률 그대로)</h3>
+    <h3>📋 배당표</h3>
     <table style="width:100%;font-size:12px;border-collapse:collapse">
       <tr class="muted"><td></td><td>3개 일치</td><td>2개 일치</td></tr>${rows}
     </table>
-    <div class="odds">슬롯 1회(칩 1 = 8G) ${evText(o.ev)} · 결과는 스핀 시작 시 확정</div>
+    <div class="odds">슬롯 1회 = 칩 1개 · 결과는 스핀을 누르는 순간 정해진다</div>
     <h3>🎫 스크래치 카드</h3><table style="width:100%;font-size:12px">${sc}</table>
     <h3>🎁 미스터리 박스</h3><div class="small">일반 ${pct(mo.common)} · 희귀 ${pct(mo.rare)} · 영웅 ${pct(mo.epic)} · 전설 ${pct(mo.legendary)}</div>
     <button class="btn" data-act="closeModal">닫기</button>
@@ -197,10 +197,9 @@ export function scratchModal(app: App): string {
   const cols = s.grid.length / 3;
   const emo = Object.fromEntries(SCRATCH_SYMBOLS.map((x) => [x.id, x.emoji]));
   const all = s.rev.every(Boolean);
-  const odds = scratchOdds(app.run!).map((o) => `${o.emoji} ${pct(o.p)}`).join(' · ');
   return `<div class="modal"><div class="box center">
     <h3>🎫 스크래치 카드</h3>
-    <div class="odds">같은 심볼 3개 이상: ${odds}</div>
+    <div class="odds">같은 그림이 3개 이상 나오면 당첨</div>
     <div class="scratch" style="grid-template-columns:repeat(${cols},64px)">${s.grid.map((g, i) => `<div class="${s.rev[i] ? 'rev' : ''} ${all && s.wins.includes(g) ? 'win' : ''}" data-act="scratchCell" data-arg="${i}">${emo[g]}</div>`).join('')}</div>
     <div style="min-height:20px">${all ? (s.wins.length ? `<b class="gold">당첨: ${s.wins.map((w) => SCRATCH_SYMBOLS.find((x) => x.id === w)!.reward).join(', ')}</b>` : '<span class="muted">꽝</span>') : '<span class="muted small">칸을 탭해서 긁자</span>'}</div>
     ${all ? '<button class="btn primary" data-act="closeModal">확인</button>' : '<button class="btn" data-act="scratchAll">전부 긁기</button>'}

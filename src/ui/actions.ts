@@ -192,9 +192,12 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'editDie': ui.editDie = n; break;
     case 'applyFace': applyFace(ctx, Math.min(ui.editDie, run.dice.length - 1), n); break;
     case 'applyMat': applyMaterial(ctx, n); break;
-    case 'replaceSkill': replaceSkill(ctx, n < 0 ? null : n); break;
+    case 'pickSlot': ui.pickSlot = n; app.render(); return;
+    case 'replaceSkill': replaceSkill(ctx, n < 0 ? null : n); ui.pickSlot = null; break;
+    case 'replaceConfirm': if (ui.pickSlot !== null) replaceSkill(ctx, ui.pickSlot); ui.pickSlot = null; break;
+    case 'upgradeConfirm': if (ui.pickSlot !== null) upgradeSkill(ctx, ui.pickSlot); ui.pickSlot = null; break;
     case 'upgrade': upgradeSkill(ctx, n); break;
-    case 'cancelPending': cancelPending(ctx); break;
+    case 'cancelPending': cancelPending(ctx); ui.pickSlot = null; break;
     case 'offer': pickOffer(ctx, n < 0 ? null : n); break;
     // ── 카지노 ──
     case 'tab': ui.casinoTab = arg as typeof ui.casinoTab; break;

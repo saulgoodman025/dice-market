@@ -8,8 +8,10 @@ import { condText, SKILL_BY_ID } from '../../data/skills';
 import { RELIC_BY_ID } from '../../data/relics';
 import { CONSUMABLE_BY_ID } from '../../data/consumables';
 import { currentChoices } from '../../rules/run';
+import { skillSample } from '../../rules/combat';
+import type { RunState } from '../../core/state';
 import { NODE_INFO } from '../../rules/map';
-import { donChance, donEV, donMaxStreak, donMin, evText, haggleOdds, pct } from '../../rules/casino';
+import { donMaxStreak, donMin, haggleOdds } from '../../rules/casino';
 import { getMods } from '../../rules/ctx';
 import { interestFor, itemRarity } from '../../rules/economy';
 import { dieFace, esc, fmt, itemHtml, optInfo, pipsHtml, rarityTag } from '../components/parts';
@@ -91,8 +93,8 @@ export function rewardScreen(app: App): string {
       <div class="card col center">
         <b>🎲 더블 오어 낫싱 <span class="muted small">(선택)</span></b>
         <div class="die bigdie" id="dondie">${pipsHtml(ui.don.face)}</div>
-        <div class="small">주사위 ${donMin(run)}~6 → <b class="gold">2배</b> · 그 외 → <b class="red">0G</b> <span class="muted">(${rw.donStreak}/${donMaxStreak(run)}연속)</span></div>
-        <div class="odds">성공 ${pct(donChance(run))} · ${evText(donEV(run))}</div>
+        <div class="donrule"><span class="win">🎲 ${faces(donMin(run), 6)} → 2배!</span><span class="lose">🎲 ${faces(1, donMin(run) - 1)} → 0G</span></div>
+        <div class="muted small">최대 ${donMaxStreak(run)}번 연속 (${rw.donStreak}/${donMaxStreak(run)})</div>
         <div style="min-height:22px;font-weight:900;font-size:17px" class="${ui.don.text.includes('성공') ? 'gold' : 'red'}">${esc(ui.don.text)}</div>
         ${run.consumables.includes('insurance') ? '<div class="small green">📄 보험증서: 실패 시 원금 반환</div>' : ''}
         <button class="btn danger" data-act="don" ${canDon ? '' : 'disabled'}>${rw.gold}G 걸고 굴리기</button>
@@ -126,19 +128,19 @@ export function shopScreen(app: App): string {
     const can = run.gold >= it.price;
     const right = it.sold ? '<b class="muted">SOLD</b>' : `<div class="col" style="align-items:flex-end;gap:4px">
       <button class="btn ${can ? 'primary' : ''}" style="min-width:70px" data-act="buy" data-arg="${i}">${it.price}G${it.price !== it.basePrice ? `<br><s class="small">${it.basePrice}</s>` : ''}</button>
-      <div class="row" style="gap:4px">${it.haggles < maxH ? `<button class="btn ghost" style="min-height:36px;padding:2px 8px;font-size:12px" data-act="haggle" data-arg="${i}" data-tip="흥정 주사위: 1=+50%${m.haggleKeepOnOne ? '(말굽: 유지)' : ''}, 2~5=눈×5% 할인, 6=무료 · 평균 가격 ×${ho.ev.toFixed(2)}">🎲흥정</button>` : `<span class="small muted">🎲${it.lastHaggle ?? ''}</span>`}
+      <div class="row" style="gap:4px">${it.haggles < maxH ? `<button class="btn ghost" style="min-height:36px;padding:2px 8px;font-size:12px" data-act="haggle" data-arg="${i}" data-tip="흥정 주사위: 6 → 공짜, 2~5 → 눈×5% 할인, 1 → ${m.haggleKeepOnOne ? '가격 그대로(말굽)' : '50% 비싸짐'}">🎲흥정</button>` : `<span class="small muted">🎲${it.lastHaggle ?? ''}</span>`}
       ${hasTag ? `<button class="btn ghost" style="min-height:36px;padding:2px 6px" data-act="pricetag" data-arg="${i}">🏷️</button>` : ''}</div></div>`;
     return itemHtml(it.opt, `${it.sold ? 'sold' : ''} ${r === 'legendary' && !it.sold ? 'legend-glow' : ''}`, right);
   }).join('');
   return `${topbar(app)}<div class="screen">
     <h2 class="center">🛒 상점</h2>
-    <div class="odds center">🎲흥정: 6 무료 · 2~5 할인 · 1 바가지(+50%) · 평균 가격 ×${ho.ev.toFixed(2)}</div>
+    <div class="odds center">🎲흥정: 6 → 공짜 · 2~5 → 눈×5% 할인 · 1 → 50% 비싸짐</div>
     <div class="col">${items}</div>
     <div class="row">
       <button class="btn grow" data-act="shopReroll">🔄 리롤 ${s.rerollFree ? '<span class="green">무료</span>' : s.rerollCost + 'G'}</button>
       <button class="btn grow" data-act="buyChip">🎰 칩 1 = ${BALANCE.chipPrice}G</button>
     </div>
-    <div class="muted small center">리롤 시 주사위를 굴려 6(16.7%)이면 다음 리롤 무료${s.lastRerollDie ? ` · 직전 ${s.lastRerollDie}` : ''}</div>
+    <div class="muted small center">리롤할 때 주사위를 굴려 6이 나오면 다음 리롤 무료${s.lastRerollDie ? ` · 직전 ${s.lastRerollDie}` : ''}</div>
     <button class="btn ghost" data-act="shopEdit">🎲 내 주사위 보기</button>
     ${app.ui.shopEdit ? diceViewer(app, false) : ''}
     <div class="row">${consumablesRow(app)}<div class="grow"></div><button class="btn primary" data-act="leaveShop">나가기 ▶</button></div>
@@ -219,14 +221,27 @@ function pendingModal(app: App): string {
   if (p.kind === 'skillReplace' || p.kind === 'upgrade') {
     const isUp = p.kind === 'upgrade';
     const nd = !isUp ? SKILL_BY_ID[p.id] : null;
+    const sel = app.ui.pickSlot;
+    const list = run.skills.map((s, i) => {
+      const d = SKILL_BY_ID[s.id];
+      const change = isUp ? upgradeLine(run, i, p.amount) : '';
+      return `<button class="item r-${d.rarity} ${sel === i ? 'picked' : ''}" style="width:100%" data-act="pickSlot" data-arg="${i}">
+        <div class="grow" style="text-align:left">
+          <div class="tt">${sel === i ? '✔ ' : ''}${d.name} ${rarityTag(d.rarity)} ${s.up ? `<span class="green small">강화 +${Math.round(s.up * 100)}%</span>` : ''}</div>
+          <div class="ds">[${condText(d.cond)}] ${esc(fmt(d.desc, d.v))}</div>
+          ${change}
+        </div></button>`;
+    }).join('');
+    const selName = sel !== null && run.skills[sel] ? SKILL_BY_ID[run.skills[sel].id].name : '';
+    const confirm = isUp
+      ? `<button class="btn primary big" data-act="upgradeConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '강화할 스킬을 고르세요' : `⬆ 「${selName}」 강화하기`}</button>`
+      : `<button class="btn primary big" data-act="replaceConfirm" ${sel === null ? 'disabled' : ''}>${sel === null ? '버릴 스킬을 고르세요' : `「${selName}」 버리고 「${nd!.name}」 넣기`}</button>`;
     return `<div class="modal"><div class="box">
-      <h3>${isUp ? `⬆️ 강화할 스킬 (+${Math.round(p.amount * 100)}%)` : `스킬 칸이 가득 찼다: 「${nd!.name}」으로 교체할 칸`}</h3>
-      ${nd ? `<div class="small">[${condText(nd.cond)}] ${esc(fmt(nd.desc, nd.v))}</div>` : ''}
-      <div class="col">${run.skills.map((s, i) => {
-        const d = SKILL_BY_ID[s.id];
-        return `<button class="item r-${d.rarity}" style="width:100%" data-act="${isUp ? 'upgrade' : 'replaceSkill'}" data-arg="${i}"><div class="grow" style="text-align:left"><div class="tt">${d.name} ${rarityTag(d.rarity)} ${s.up ? `<span class="green small">+${Math.round(s.up * 100)}%</span>` : ''}</div><div class="ds">[${condText(d.cond)}] ${esc(fmt(d.desc, d.v))}</div></div></button>`;
-      }).join('')}</div>
-      <button class="btn ghost" data-act="${isUp ? 'cancelPending' : 'replaceSkill'}" data-arg="-1">${isUp ? '취소' : '가져가지 않음'}</button>
+      <h3>${isUp ? `⬆️ 스킬 강화 (효과 +${Math.round(p.amount * 100)}%)` : '스킬 칸이 가득 찼다'}</h3>
+      ${nd ? `<div class="item r-${nd.rarity} newskill"><div class="grow"><div class="tt">새 스킬: ${nd.name} ${rarityTag(nd.rarity)}</div><div class="ds">[${condText(nd.cond)}] ${esc(fmt(nd.desc, nd.v))}</div></div></div><div class="small center">교체할 스킬을 탭해서 고른 뒤 아래 버튼으로 확정</div>` : '<div class="small center">스킬을 탭해서 고른 뒤 아래 버튼으로 확정 · 숫자는 족보·열기 배율을 빼고 계산한 값</div>'}
+      <div class="col">${list}</div>
+      ${confirm}
+      <button class="btn ghost" data-act="${isUp ? 'cancelPending' : 'replaceSkill'}" data-arg="-1">${isUp ? '강화 안 함' : '새 스킬 가져가지 않음'}</button>
     </div></div>`;
   }
   return '';
@@ -280,3 +295,31 @@ export function runModals(app: App, extra: { paytable: () => string; scratch: ()
 }
 
 export { optInfo, RELIC_BY_ID };
+
+/** 강화 전후 실제 수치 (대표 주사위 기준) */
+function upgradeLine(run: RunState, slot: number, amount: number): string {
+  const s = run.skills[slot];
+  const before = skillSample(run, slot, s.up);
+  const after = skillSample(run, slot, s.up + amount);
+  const mult = `<span class="muted">효과 ×${(1 + s.up).toFixed(1)} → ×${(1 + s.up + amount).toFixed(1)}</span>`;
+  if (!before || !after) return `<div class="upline none">${mult}</div>`;
+  const parts: string[] = [];
+  const stat = (icon: string, cls: string, a: number, b: number) => { if (a || b) parts.push(`<span class="${cls}">${icon} ${a} → <b>${b}</b></span> <span class="green">(+${b - a})</span>`); };
+  stat('⚔', 'dmgc', before.dmg, after.dmg);
+  stat('🛡', 'blkc', before.block, after.block);
+  stat('❤', 'green', before.heal, after.heal);
+  stat('☠', 'green', before.poison, after.poison);
+  stat('🪙', 'gold', before.gold, after.gold);
+  stat('🐷', 'gold', before.piggy, after.piggy);
+  const def = SKILL_BY_ID[s.id];
+  const basis = def.sampleBlock ? `방어도 ${def.sampleBlock}일 때` : before.chance ? '명중하면' : `🎲${before.pips.join('·')} 기준`;
+  const changed = parts.some((x) => !x.includes('(+0)'));
+  if (!parts.length || !changed) return `<div class="upline none">⚠ 강화해도 수치가 바뀌지 않는 스킬 · ${mult}</div>`;
+  return `<div class="upline"><span class="muted">${basis}:</span> ${parts.join(' · ')}</div>`;
+}
+
+/** 주사위 눈 범위를 "3·4·5·6" 형태로 */
+function faces(lo: number, hi: number): string {
+  if (hi < lo) return '없음';
+  return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).join('·');
+}

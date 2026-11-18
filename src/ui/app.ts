@@ -43,6 +43,7 @@ export interface Ui {
   shopEdit: boolean;
   infoKey: number;
   helpTab: 'hands' | 'dice';
+  pickSlot: number | null;
   tut: number;
 }
 
@@ -60,7 +61,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands',
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
@@ -240,6 +241,7 @@ export class App {
         this.after();
       }, wait + (close ? 500 : 0));
     }
+    if (!run?.pending) this.ui.pickSlot = null;
     if (run && run.screen !== 'reward' && (this.ui.don.text || this.ui.slot.res)) {
       this.ui.don = { rolling: false, face: 6, text: '' };
       this.ui.slot = { res: null, spinning: false };

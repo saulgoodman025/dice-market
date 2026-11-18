@@ -1,5 +1,5 @@
 // 전투 규칙. UI를 모르는 순수 로직. 결과는 ctx.emit 이벤트로 알린다.
-import type { CombatState, Enemy, HandDie, HandResult, Intent, IntentSpec } from '../core/state';
+import type { CombatState, Enemy, HandDie, HandResult, Intent, IntentSpec, RunState } from '../core/state';
 import { BALANCE } from '../data/balance';
 import { ENEMY_BY_ID, JESTER_POOL } from '../data/enemies';
 import { FACE_BY_ID } from '../data/faces';
@@ -740,4 +740,55 @@ export function hasMoves(ctx: Ctx): boolean {
   if (!cb || cb.phase === 'over') return false;
   if (cb.phase === 'roll' && canReroll(ctx)) return true;
   return ctx.run.skills.some((_, i) => skillUsable(ctx, i) && !!autoPick(ctx, i));
+}
+
+/** 강화 미리보기용: 조건에 맞는 대표 주사위로 스킬을 실행했을 때의 기본 효과 (족보·열기 배율 없이) */
+export function skillSample(run: RunState, slot: number, up: number): { pips: number[]; dmg: number; block: number; heal: number; gold: number; piggy: number; poison: number; chance: boolean } | null {
+  const inst = run.skills[slot];
+  if (!inst) return null;
+  const def = SKILL_BY_ID[inst.id];
+  const c = def.cond;
+  const pips =
+    c.k === 'range' ? [c.hi] : c.k === 'even' ? [6] : c.k === 'odd' ? [5] : c.k === 'exact' ? [c.v]
+      : c.k === 'same' ? Array(c.n).fill(6) : c.k === 'seq' ? Array.from({ length: c.n }, (_, i) => 7 - c.n + i)
+        : c.k === 'sumPair' ? [3, 4] : c.k === 'sumMin' ? [6, 5, 4] : c.k === 'all' ? [6, 5, 4, 3, 2] : [6];
+  const r2 = structuredClone(run);
+  r2.combat = null;
+  r2.heat = 0;
+  r2.jackpot = 0;
+  r2.skills[slot] = { id: inst.id, up };
+  r2.dice = pips.map((_, i) => ({ uid: 9000 + i, material: 'wood', faces: [1, 2, 3, 4, 5, 6].map((p) => ({ pip: p })) }));
+  const c2: Ctx = { run: r2, emit: () => {} };
+  try {
+    startCombat(c2, 'normal', ['golem']);
+    const cb = r2.combat!;
+    cb.enemies.forEach((e) => { e.hp = e.maxHp = 99999; e.block = 0; });
+    cb.hand.forEach((h, i) => { h.pip = pips[i]; h.sticker = undefined; h.used = false; h.gone = false; h.locked = false; h.golden = false; });
+    cb.phase = 'place';
+    cb.turnCounters.confirmed = 1;
+    cb.handResult = { id: 'none', name: '', mult: 1, heat: 0, jackpot: 0 };
+    const presetBlock = def.sampleBlock ?? 0;
+    cb.block = presetBlock;
+    cb.keepBlock = 0;
+    cb.piggy = 0;
+    const hp0 = cb.enemies.reduce((s, e) => s + e.hp, 0);
+    const h0 = r2.hp = Math.max(1, r2.maxHp - 50);
+    const g0 = r2.gold;
+    const keys = cb.hand.map((h) => h.key);
+    if (!canUse(c2, slot, keys)) return null;
+    useSkill(c2, slot, keys);
+    const chanceDmg = def.chanceHit ? Math.round(def.chanceHit(pips[0]) * (1 + up)) : 0;
+    return {
+      pips,
+      chance: !!def.chanceHit,
+      poison: cb.enemies.reduce((s, e) => s + e.poison, 0),
+      dmg: def.chanceHit ? chanceDmg : Math.max(0, hp0 - cb.enemies.reduce((s, e) => s + e.hp, 0)),
+      block: Math.max(0, cb.block + cb.keepBlock - presetBlock),
+      heal: Math.max(0, r2.hp - h0),
+      gold: Math.max(0, r2.gold - g0),
+      piggy: cb.piggy,
+    };
+  } catch {
+    return null;
+  }
 }

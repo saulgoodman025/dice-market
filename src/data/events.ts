@@ -36,7 +36,7 @@ export const EVENTS: EventDef[] = [
     id: 'shellgame', name: '야바위', emoji: '🥤', text: '컵 세 개가 빠르게 섞인다. "10G 걸면 30G!"',
     choices: [
       {
-        label: '10G를 건다', odds: '성공 33.3% · 기대 수익 ×1.00', can: (c) => c.run.gold >= 10,
+        label: '10G를 건다', odds: '컵 3개 중 정답 1개 → 30G · 틀리면 10G 잃음', can: (c) => c.run.gold >= 10,
         run: (c) => { gainGold(c, -10); const win = rng(c, 'casino').int(1, 3) === 1; gambleDone(c, win); if (win) { gainGold(c, 30); return '정답! 30G를 받았다.'; } return '빈 컵이다. 10G를 잃었다.'; },
       },
       { label: '지나간다', run: () => '야바위꾼이 혀를 찬다.' },
@@ -53,7 +53,7 @@ export const EVENTS: EventDef[] = [
     id: 'drunkdealer', name: '취한 딜러', emoji: '🍺', text: '"주사위 한 판 어때? 칩 3개 걸고, 높으면 두 배!"',
     choices: [
       {
-        label: '칩 3을 걸고 대결', odds: '승 41.7% (×2) · 무 16.7% (반환) · 기대 수익 ×1.00', can: (c) => c.run.chips >= 3,
+        label: '칩 3을 걸고 대결', odds: '내 눈이 더 크면 칩 6 · 같으면 반환 · 작으면 꽝', can: (c) => c.run.chips >= 3,
         run: (c) => {
           gainChips(c, -3);
           const r = rng(c, 'casino');
@@ -122,7 +122,7 @@ export const EVENTS: EventDef[] = [
     id: 'oldgambler', name: '늙은 도박꾼', emoji: '👴', text: '"자네 유물 하나 걸고 홀짝 어떤가? 이기면 같은 등급 두 개."',
     choices: [
       {
-        label: '가장 최근 유물을 걸고 홀짝', odds: '성공 50.0% · 기대 수익 ×1.00', can: (c) => c.run.relics.length > 0,
+        label: '가장 최근 유물을 걸고 홀짝', odds: '홀짝을 맞히면 같은 등급 유물 2개 · 틀리면 잃음', can: (c) => c.run.relics.length > 0,
         run: (c) => {
           const id = c.run.relics[c.run.relics.length - 1];
           const rar = RELIC_BY_ID[id].rarity;

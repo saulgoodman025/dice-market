@@ -46,6 +46,8 @@ export interface SkillDef {
   needsChoice?: boolean; // 다른 주사위와 눈 선택 필요 (운명 조작)
   noEcho?: boolean;
   chance?: boolean; // 결과가 운에 달려 미리보기 불가
+  chanceHit?: (pip: number) => number; // 운이 따랐을 때 기본 피해 (강화 미리보기용)
+  sampleBlock?: number; // 강화 미리보기 때 가정할 방어도
   echo?: boolean; // 직전 스킬 반복
   primesDouble?: boolean; // 다음 스킬 ×2 준비 (자신에겐 미적용)
   run: (u: SkillUse) => void;
@@ -66,7 +68,7 @@ export const SKILLS: SkillDef[] = [
   // ── R ──
   { id: 'execute', name: '처형', rarity: 'rare', cond: { k: 'exact', v: 6 }, desc: '{d} 공격', v: { d: 18 }, role: 'atk', run: (u) => { u.dmg(18 * (u.vals[0] / 6)); } },
   {
-    id: 'gamble', name: '도박사', rarity: 'rare', chance: true, cond: { k: 'range', lo: 1, hi: 2 }, desc: '다시 굴려 6이면 {d} 공격 (1/6)', v: { d: 30 }, role: 'atk',
+    id: 'gamble', name: '도박사', rarity: 'rare', chance: true, chanceHit: () => 30, cond: { k: 'range', lo: 1, hi: 2 }, desc: '다시 굴려 6이면 {d} 공격 (1/6)', v: { d: 30 }, role: 'atk',
     run: (u) => {
       const r = rng(u.ctx, 'combat').die();
       u.ctx.emit({ t: 'chanceRoll', kind: 'die', result: r, win: r === 6, label: '6이 나오면 30 피해!' });
@@ -83,7 +85,7 @@ export const SKILLS: SkillDef[] = [
     id: 'poison', name: '독침', rarity: 'rare', cond: { k: 'any' }, desc: '눈만큼 독 (매 턴 피해)', role: 'atk',
     run: (u) => { const cb = cbOf(u.ctx); const t = cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? cb.enemies.find((e) => e.hp > 0); if (t) t.poison += Math.round(u.v * u.power); },
   },
-  { id: 'bash', name: '방패치기', rarity: 'rare', cond: { k: 'any' }, desc: '내 방어도만큼 공격', role: 'atk', run: (u) => { const cb = cbOf(u.ctx); u.dmg(cb.block + cb.keepBlock); } },
+  { id: 'bash', name: '방패치기', rarity: 'rare', sampleBlock: 10, cond: { k: 'any' }, desc: '내 방어도만큼 공격', role: 'atk', run: (u) => { const cb = cbOf(u.ctx); u.dmg(cb.block + cb.keepBlock); } },
   { id: 'invest', name: '투자', rarity: 'rare', cond: { k: 'any' }, desc: '저금통에 눈×{m}', v: { m: 2 }, role: 'eco', run: (u) => u.piggy(u.v * 2) },
   { id: 'lucky7', name: '럭키 세븐', rarity: 'rare', cond: { k: 'sumPair', v: 7 }, desc: '{d} 공격 + {g}골드', v: { d: 21, g: 7 }, role: 'atk', run: (u) => { u.dmg(21); u.gold(7); } },
   {
@@ -106,7 +108,7 @@ export const SKILLS: SkillDef[] = [
     run: (u) => { cbOf(u.ctx).doubledown = u.dice[0].pip; },
   },
   {
-    id: 'roulette', name: '룰렛 베팅', rarity: 'epic', chance: true, cond: { k: 'any' }, desc: '반반 확률로 눈×{m} 공격', v: { m: 5 }, role: 'atk',
+    id: 'roulette', name: '룰렛 베팅', rarity: 'epic', chance: true, chanceHit: (p) => p * 5, cond: { k: 'any' }, desc: '반반 확률로 눈×{m} 공격', v: { m: 5 }, role: 'atk',
     run: (u) => {
       const n = rng(u.ctx, 'combat').int(0, 36);
       u.ctx.emit({ t: 'chanceRoll', kind: 'roulette', result: n, win: n <= 18, label: n === 0 ? '0! 잭팟 100%' : '1~18이면 적중' });
