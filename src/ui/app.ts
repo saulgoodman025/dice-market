@@ -13,6 +13,10 @@ import { pipsHtml } from './components/parts';
 import { renderScreen } from './screens/index';
 import { handleAction } from './actions';
 import { ENEMY_BY_ID } from '../data/enemies';
+
+/** 강한 공격 연출 기준 피해량 */
+const HIT_STRONG = 15;
+const HIT_MASSIVE = 30;
 import type { SlotResult } from '../rules/casino';
 
 export type Page = 'title' | 'charselect' | 'codex' | 'settings' | 'run';
@@ -191,6 +195,20 @@ export class App {
   after(opts: { noRender?: boolean; enemyPhase?: { hp0: number; blk0: number } } = {}) {
     const run = this.run;
     const events = this.queue.splice(0);
+    const ci = events.findIndex((e) => e.t === 'chanceRoll');
+    if (ci >= 0 && !opts.enemyPhase) {
+      const ev = events[ci] as Extract<GameEvent, { t: 'chanceRoll' }>;
+      this.playFx(events.slice(0, ci));
+      this.ui.busy = true;
+      const ms = this.chanceFx(ev);
+      setTimeout(() => {
+        this.ui.busy = false;
+        this.queue.unshift(...events.slice(ci + 1));
+        this.after(opts);
+      }, ms / this.settings.speed);
+      this.save();
+      return;
+    }
     const phase = !!opts.enemyPhase && events.some((e) => e.t === 'enemyAct');
     this.veil = phase;
     if (!opts.noRender) this.render();
@@ -259,10 +277,10 @@ export class App {
     el.classList.add(cls);
   }
 
-  private slash(el: Element | null, crit?: boolean) {
+  private slash(el: Element | null, crit?: boolean, dir = '') {
     if (!el) return;
     const s = document.createElement('div');
-    s.className = `slash ${crit ? 'crit' : ''}`;
+    s.className = `slash ${crit ? 'crit' : ''} ${dir}`;
     el.appendChild(s);
     setTimeout(() => s.remove(), 400 / this.settings.speed);
   }
@@ -311,19 +329,24 @@ export class App {
             const el = this.el(`[data-uid="${e.uid}"]`);
             if (e.amount > 0) {
               if (e.blocked) { this.enemyShield(el); floatAt(el, `🛡${e.blocked}`, '#8cc6ff', 15); }
-              this.slash(el, e.crit);
+              const tier = e.amount >= HIT_MASSIVE ? 2 : e.amount >= HIT_STRONG ? 1 : 0;
               this.retrigger(el, 'hit');
+              if (tier === 2) this.massiveHit(el, e.amount, e.crit);
+              else if (tier === 1) this.strongHit(el, e.amount, e.crit);
+              else {
+                this.slash(el, e.crit);
+                floatAt(el, `${e.crit ? '★' : '-'}${e.amount}`, e.crit ? '#ffd34d' : '#ffffff', dmgSize(e.amount) * (e.crit ? 1.6 : 1.15));
+                if (e.crit) { shake(this.root, 8); hitstop(this.root, 100); sfx.crit(); vibrate(40); }
+                else { shake(el, 4); hitstop(this.root, 50); sfx.hit(false); }
+              }
               if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
-              floatAt(el, `${e.crit ? '★' : '-'}${e.amount}`, e.crit ? '#ffd34d' : '#ffffff', dmgSize(e.amount) * (e.crit ? 1.6 : 1.15));
-              if (e.crit) { shake(this.root, 8); hitstop(this.root, 100); sfx.crit(); vibrate(40); }
-              else { shake(el, 4); hitstop(this.root, 50); sfx.hit(e.amount >= 20); }
             } else if (e.blocked) {
               this.enemyShield(el);
               floatAt(el, `🛡 ${e.blocked} 막힘`, '#8cc6ff', 18);
               sfx.clang();
             } else floatAt(el, '무효', '#9aa', 16);
           });
-          delay += 140;
+          delay += e.amount >= HIT_MASSIVE ? 380 : e.amount >= HIT_STRONG ? 220 : 140;
           break;
         }
         case 'dmgPlayer': {
@@ -368,7 +391,15 @@ export class App {
         case 'yahtzee': at(delay + 700, () => this.yahtzeeFx()); break;
         case 'heat': if (e.heat >= BALANCE.heatMax) at(delay, () => this.toast('🔥 온 파이어! 다음 굴림 주사위 1개 = 6', 'gold')); break;
         case 'jackpotFull': at(delay + 300, () => { sfx.jackpot(); this.toast('💰 잭팟 100%! 다음 턴은 잭팟 턴', 'gold'); vibrate([60, 40, 60]); }); break;
-        case 'enemyDie': at(delay + 150, () => { const el = this.el(`[data-uid="${e.uid}"]`); burstAt(el, '#ffd34d', 30); el?.classList.add('dying'); }); break;
+        case 'enemyDie': {
+          const boss = this.run?.combat?.enemies.find((x) => x.uid === e.uid);
+          if (boss && ENEMY_BY_ID[boss.id].tier === 'boss') {
+            const wait = events.some((x) => x.t === 'yahtzee') ? 2600 : 200; // 야찌 연출이 끝난 뒤
+            at(delay + wait, () => this.bossDeathFx(e.uid));
+            delay += wait + 2100;
+          } else at(delay + 150, () => { const el = this.el(`[data-uid="${e.uid}"]`); burstAt(el, '#ffd34d', 30); el?.classList.add('dying'); });
+          break;
+        }
         case 'enemyAct': {
           delay += enemyPhase ? 750 : 280;
           const uid = e.uid;
@@ -423,6 +454,144 @@ export class App {
     shake(this.root, 3);
     if (broke) sfx.shieldBreak(); else sfx.clang();
     vibrate(broke ? [20, 30, 40] : 25);
+  }
+
+  private flash(cls = 'white') {
+    const f = document.createElement('div');
+    f.className = `screenflash ${cls}`;
+    this.root.appendChild(f);
+    setTimeout(() => f.remove(), 400 / this.settings.speed);
+  }
+
+  private ring(el: Element | null, color: string) {
+    if (!el) return;
+    const r = document.createElement('div');
+    r.className = 'shockring';
+    r.style.borderColor = color;
+    el.appendChild(r);
+    setTimeout(() => r.remove(), 600 / this.settings.speed);
+  }
+
+  /** 강타 (15+): 십자 베기 + 충격파 */
+  private strongHit(el: Element | null, amt: number, crit?: boolean) {
+    this.slash(el, crit);
+    setTimeout(() => this.slash(el, true, 'rev'), 70 / this.settings.speed);
+    this.ring(el, '#ffb347');
+    floatAt(el, `${crit ? '★' : ''}${amt}!`, '#ffb347', dmgSize(amt) * 1.6);
+    floatAt(el, '강타!', '#ffd34d', 18);
+    shake(this.root, 7);
+    hitstop(this.root, 90);
+    sfx.heavy();
+    if (crit) sfx.crit();
+    vibrate(50);
+  }
+
+  /** 초강타 (30+): 화면 번쩍 + 줌 펀치 + 큰 충격파 + 거대한 숫자 */
+  private massiveHit(el: Element | null, amt: number, crit?: boolean) {
+    this.flash('white');
+    this.retrigger(this.root, 'punch');
+    this.slash(el, true);
+    setTimeout(() => this.slash(el, true, 'rev'), 60 / this.settings.speed);
+    setTimeout(() => this.slash(el, true, 'flat'), 120 / this.settings.speed);
+    this.ring(el, '#ff5a3c');
+    setTimeout(() => this.ring(el, '#ffd34d'), 120 / this.settings.speed);
+    burstAt(el, '#ff9a3c', 34);
+    floatAt(el, `${crit ? '★' : ''}${amt}!!`, '#ff6a3d', dmgSize(amt) * 2.1);
+    floatAt(el, '초강타!!', '#ffd34d', 22);
+    shake(this.root, 12);
+    hitstop(this.root, 160);
+    sfx.heavy();
+    sfx.crit();
+    vibrate([60, 30, 90]);
+  }
+
+  /** 보스 격파: 체력바가 깨져 흩어지고 보스가 폭발한다 */
+  private bossDeathFx(uid: number) {
+    const el = this.el(`[data-uid="${uid}"]`);
+    if (!el) return;
+    const sp = this.settings.speed;
+    hitstop(this.root, 300);
+    this.flash('white');
+    el.classList.add('bossdie');
+    sfx.heavy();
+    vibrate([100, 50, 100, 50, 300]);
+    // 체력바 산산조각
+    const bar = el.querySelector('.ehp');
+    if (bar) {
+      const r = bar.getBoundingClientRect();
+      const h = this.root.getBoundingClientRect();
+      const N = 12;
+      for (let i = 0; i < N; i++) {
+        const f = document.createElement('div');
+        f.className = 'hpfrag';
+        f.style.left = `${r.left - h.left + (r.width / N) * i}px`;
+        f.style.top = `${r.top - h.top}px`;
+        f.style.width = `${r.width / N + 1}px`;
+        f.style.height = `${r.height}px`;
+        f.style.setProperty('--dx', `${(fxRandom() - 0.5) * 260}px`);
+        f.style.setProperty('--dy', `${-60 - fxRandom() * 160}px`);
+        f.style.setProperty('--rot', `${(fxRandom() - 0.5) * 720}deg`);
+        this.root.appendChild(f);
+        setTimeout(() => f.remove(), 1300 / sp);
+      }
+      (bar as HTMLElement).style.visibility = 'hidden';
+    }
+    sfx.shieldBreak();
+    // 연쇄 폭발
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        const r = el.getBoundingClientRect();
+        const h = this.root.getBoundingClientRect();
+        burstAtXY(r.left - h.left + r.width * (0.2 + fxRandom() * 0.6), r.top - h.top + r.height * (0.2 + fxRandom() * 0.6));
+        shake(this.root, 10);
+        if (i % 2 === 0) sfx.explosion();
+      }, (250 + i * 180) / sp);
+    }
+    setTimeout(() => {
+      this.flash('gold');
+      coinRain(60);
+      sfx.fanfare();
+      const b = document.createElement('div');
+      b.className = 'bossdown';
+      b.innerHTML = `<div class="bd1">BOSS DOWN!</div><div class="bd2">보스 격파</div>`;
+      this.root.appendChild(b);
+      setTimeout(() => b.remove(), 1500 / sp);
+    }, 1200 / sp);
+  }
+
+  /** 운에 맡기는 스킬: 실제로 주사위(또는 룰렛)를 굴려서 보여준다. 소요 ms(배속 전) 반환 */
+  private chanceFx(ev: Extract<GameEvent, { t: 'chanceRoll' }>): number {
+    const sp = this.settings.speed;
+    const host = this.view.querySelector('.table') ?? this.root;
+    const box = document.createElement('div');
+    box.className = 'chanceroll';
+    const die = ev.kind === 'die';
+    box.innerHTML = `<div class="crlabel">${ev.label}</div><div class="${die ? 'die bigdie crdie' : 'crball'}">${die ? pipsHtml(1) : '?'}</div><div class="crres"></div>`;
+    host.appendChild(box);
+    const face = box.querySelector<HTMLElement>(die ? '.crdie' : '.crball')!;
+    const res = box.querySelector<HTMLElement>('.crres')!;
+    // 감속하며 굴러가다 결과에서 멈춤
+    const steps = die ? 14 : 18;
+    let t = 0;
+    for (let i = 0; i < steps; i++) {
+      t += 45 * Math.pow(1.17, i);
+      const last = i === steps - 1;
+      setTimeout(() => {
+        const v = last ? ev.result : die ? 1 + Math.floor(fxRandom() * 6) : Math.floor(fxRandom() * 37);
+        if (die) { face.innerHTML = pipsHtml(v); face.style.transform = `rotate(${last ? 0 : (fxRandom() - 0.5) * 70}deg)`; }
+        else { face.textContent = String(v); face.className = `crball ${v === 0 ? 'z' : v <= 18 ? 'w' : 'l'}`; }
+        sfx.tick();
+      }, t / sp);
+    }
+    setTimeout(() => {
+      face.classList.add(ev.win ? 'crwin' : 'crlose');
+      res.textContent = ev.win ? (die ? '6! 명중!' : '적중!') : ev.result === 0 && !die ? '잭팟 100%!' : '꽝...';
+      res.className = `crres ${ev.win || (!die && ev.result === 0) ? 'win' : 'lose'}`;
+      if (ev.win) { sfx.jackpot(); burstAt(face, '#ffd34d', 30); vibrate(60); } else sfx.bad();
+    }, (t + 80) / sp);
+    const total = t + 900;
+    setTimeout(() => box.remove(), total / sp);
+    return total;
   }
 
   private flashDamage() {

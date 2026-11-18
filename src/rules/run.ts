@@ -21,7 +21,7 @@ import { newDie } from './dice';
 import {
   acquire, basePrice, giveRelic, itemRarity, onNodeMove, rollItemId, rollOption, rollRarity, type ItemKind,
 } from './economy';
-import { genFloor, pickEncounter } from './map';
+import { genActMap, pickEncounter } from './map';
 import { gainChips, gainGold, healPlayer, maxHpChange } from './ops';
 import { highroller, shopRerollDie } from './casino';
 
@@ -35,7 +35,7 @@ registerSources((run) => {
   return out;
 });
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface MetaPool {
   unlocked: string[]; // "kind:id"
@@ -47,7 +47,7 @@ export function newRun(seed: number, charId: string, stake = 0, meta: MetaPool =
     version: SAVE_VERSION, seed, rng: makeRngState(seed), charId, stake,
     hp: ch.hp, maxHp: ch.hp, gold: BALANCE.startGold, chips: 0,
     dice: [], skills: ch.skills.map((id) => ({ id, up: 0 })), maxSlots: BALANCE.startSlots,
-    relics: [], consumables: [], act: 1, floor: 0, map: [], nodesReached: 0, bossesKilled: 0,
+    relics: [], consumables: [], act: 1, floor: 0, map: [], path: [], nodesReached: 0, bossesKilled: 0,
     heat: 0, jackpot: 0, screen: 'map', combat: null, reward: null, shop: null, event: null,
     pending: null, offer: null, flags: {},
     stats: { yahtzees: 0, jackpotTurns: 0, gambles: 0, megaJackpots: 0, kills: 0, deathBy: null, combatsWon: 0, goldEarned: 0 },
@@ -63,14 +63,21 @@ export function newRun(seed: number, charId: string, stake = 0, meta: MetaPool =
     run.maxHp = Math.max(20, run.maxHp + m.startHpDelta);
     run.hp = run.maxHp;
   }
-  run.map[0] = [];
   const ctx: Ctx = { run, emit: () => {} };
-  run.map[0] = genFloor(ctx);
+  run.map = genActMap(ctx);
   return run;
 }
 
+/** 이번 층에서 고를 수 있는 노드의 지도 인덱스 */
+export function currentChoices(run: RunState): number[] {
+  const floor = run.map[run.floor] ?? [];
+  if (run.floor === 0) return floor.map((_, i) => i);
+  const prev = run.map[run.floor - 1]?.[run.path[run.floor - 1]];
+  return prev ? prev.next.filter((j) => j < floor.length) : floor.map((_, i) => i);
+}
+
 export function currentOptions(run: RunState): MapNode[] {
-  return run.map[run.floor] ?? [];
+  return currentChoices(run).map((i) => run.map[run.floor][i]);
 }
 
 function relicRarity(id: string) {
@@ -82,10 +89,13 @@ export function updateFlow(run: RunState) {
 }
 
 // ───────────── 노드 진입 ─────────────
+/** idx = 이번 층 선택지 중 몇 번째인지 (currentChoices 순서) */
 export function enterNode(ctx: Ctx, idx: number) {
   const run = ctx.run;
-  const node = currentOptions(run)[idx];
+  const mapIdx = currentChoices(run)[idx];
+  const node = run.map[run.floor]?.[mapIdx];
   if (!node || run.screen !== 'map') return;
+  run.path[run.floor] = mapIdx;
   run.nodesReached++;
   updateFlow(run);
   onNodeMove(ctx);
@@ -203,7 +213,6 @@ export function advance(ctx: Ctx) {
   }
   run.floor++;
   updateFlow(run);
-  run.map[run.floor] = genFloor(ctx);
   run.screen = 'map';
 }
 
@@ -212,6 +221,7 @@ function nextAct(ctx: Ctx) {
   run.act++;
   run.floor = 0;
   run.map = [];
+  run.path = [];
   if (run.act === 2) run.flags.meta_act2 = 1;
   // 이번 막 한정 주사위 제거
   run.dice = run.dice.filter((d) => {
@@ -231,7 +241,7 @@ function nextAct(ctx: Ctx) {
     run.flags.loan = 0;
   }
   updateFlow(run);
-  run.map[0] = genFloor(ctx);
+  run.map = genActMap(ctx);
   run.screen = 'map';
   toast(ctx, `${run.act}막 시작: ${run.act === 2 ? 'VIP 라운지' : '하우스 금고'}`, 'info');
 }

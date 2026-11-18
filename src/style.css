@@ -425,3 +425,68 @@ h1, h2, h3 { margin: 0; }
 .vignette.blue { box-shadow: inset 0 0 70px 20px rgba(80,160,255,.6); }
 .eshield { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); font-size: 48px; pointer-events: none; z-index: 6; filter: drop-shadow(0 0 10px #6cb8ff); animation: eshield calc(.5s / var(--speed)) ease-out forwards; }
 @keyframes eshield { 0% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { opacity: 0; } }
+
+/* v0.5 전체 지도 */
+.mapscreen { gap: 6px; }
+.acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.actseg { background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; text-align: center; display: flex; flex-direction: column; gap: 2px; opacity: .55; }
+.actseg b { font-size: 13px; } .actseg span { font-size: 10px; color: var(--ink-dim); }
+.actseg.cur { opacity: 1; border-color: var(--gold); box-shadow: 0 0 10px rgba(245,197,66,.35); }
+.actseg.done { opacity: .85; }
+.actdots { display: flex; gap: 3px; justify-content: center; }
+.actdots i { width: 9px; height: 5px; border-radius: 2px; background: #3a4a42; }
+.actdots i.on { background: var(--gold-dim); } .actdots i.now { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+.mapwrap { position: relative; flex: 1; min-height: 360px; margin: 4px 0 0 26px; border-radius: 18px;
+  background: radial-gradient(ellipse at 50% 50%, #17654a, #0c3f2e 70%); border: 6px solid #6b3a1c; box-shadow: inset 0 0 0 2px rgba(245,197,66,.3), inset 0 6px 24px rgba(0,0,0,.5); }
+.maplines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.maplines line { stroke-width: 1.1; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.maplines line { stroke-width: 3px; }
+.maplines line.open { stroke: rgba(255,255,255,.45); stroke-dasharray: 5 5; }
+.maplines line.taken { stroke: var(--gold); }
+.maplines line.dead { stroke: rgba(255,255,255,.1); }
+.mnode { position: absolute; transform: translate(-50%, -50%); width: 50px; height: 50px; border-radius: 50%; background: #1f3a30; border: 3px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2; }
+.mnode .me { font-size: 24px; }
+.mnode .ml { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 800; white-space: nowrap; margin-top: 1px; text-shadow: 0 1px 2px #000; }
+.mnode .mbadge { position: absolute; right: -6px; top: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--gold); color: #000; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+.mnode.t-boss { width: 62px; height: 62px; border-color: #ff6b6b; background: #4a1418; }
+.mnode.t-boss .me { font-size: 30px; }
+.mnode.choice { border-color: var(--gold); background: #2d5a46; animation: mpulse 1.1s ease-in-out infinite; cursor: pointer; z-index: 3; }
+@keyframes mpulse { 50% { box-shadow: 0 0 0 5px rgba(245,197,66,.35), 0 0 18px 4px rgba(245,197,66,.6); transform: translate(-50%, -50%) scale(1.08); } }
+.mnode.visited { border-color: var(--gold); background: #4b3d12; }
+.mnode.skipped { opacity: .3; filter: grayscale(1); }
+.mnode.skipped::after { content: '✕'; position: absolute; font-size: 30px; color: rgba(255,255,255,.5); font-weight: 900; }
+.mnode.unreach { opacity: .3; filter: grayscale(.8); }
+.mnode.future { opacity: .9; }
+.flabel { position: absolute; left: -28px; transform: translateY(-50%); font-size: 10px; color: var(--ink-dim); font-weight: 800; width: 24px; text-align: right; }
+.flabel.cur { color: var(--gold); } .flabel.done { color: #8a7a4a; }
+
+/* v0.5 강타 · 보스 격파 · 운 굴림 */
+.slash.rev { transform: translate(-50%, -50%) rotate(28deg) scaleX(0); animation-name: slashrev; }
+@keyframes slashrev { 40% { transform: translate(-50%, -50%) rotate(28deg) scaleX(1); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(28deg) scaleX(1.1); opacity: 0; } }
+.slash.flat { transform: translate(-50%, -50%) rotate(0deg) scaleX(0); animation-name: slashflat; height: 12px; }
+@keyframes slashflat { 40% { transform: translate(-50%, -50%) scaleX(1.3); opacity: 1; } 100% { transform: translate(-50%, -50%) scaleX(1.4); opacity: 0; } }
+.shockring { position: absolute; left: 50%; top: 45%; width: 30px; height: 30px; border: 4px solid #ffb347; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 6; animation: ring calc(.55s / var(--speed)) ease-out forwards; }
+@keyframes ring { to { width: 170px; height: 170px; opacity: 0; border-width: 1px; } }
+.screenflash { position: absolute; inset: 0; z-index: 86; pointer-events: none; animation: sflashk calc(.35s / var(--speed)) ease-out forwards; }
+.screenflash.white { background: #fff; } .screenflash.gold { background: radial-gradient(circle, #fff6c2, #f5c542 60%, transparent); }
+@keyframes sflashk { from { opacity: .85; } to { opacity: 0; } }
+#app.punch { animation: punch calc(.25s / var(--speed)) ease-out; }
+@keyframes punch { 30% { transform: scale(1.035); } }
+.enemy.bossdie .em { animation: bossshake calc(1.3s / var(--speed)) linear forwards; }
+@keyframes bossshake { 0%, 70% { filter: brightness(2) saturate(2); } 0% { transform: translate(0, 0); } 10% { transform: translate(-7px, 3px) rotate(-6deg); } 20% { transform: translate(7px, -3px) rotate(6deg); } 30% { transform: translate(-8px, 2px); } 40% { transform: translate(8px, -2px) rotate(-5deg); } 50% { transform: translate(-6px, 4px) rotate(5deg); } 60% { transform: translate(6px, -4px); } 75% { transform: scale(1.5); opacity: 1; filter: brightness(4) blur(1px); } 100% { transform: scale(2.4); opacity: 0; filter: brightness(6) blur(6px); } }
+.enemy.bossdie .name, .enemy.bossdie .intent { opacity: 0; transition: opacity .3s; }
+.hpfrag { position: absolute; z-index: 87; pointer-events: none; background: linear-gradient(180deg, #ff8a80, #c9303a); border: 1px solid #ffd0cc; border-radius: 2px; box-shadow: 0 0 8px #ff5a5f; animation: frag calc(1.2s / var(--speed)) cubic-bezier(.2,.7,.4,1) forwards; }
+@keyframes frag { to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+.bossdown { position: absolute; left: 0; right: 0; top: 30%; z-index: 92; text-align: center; pointer-events: none; animation: tban calc(1.5s / var(--speed)) ease-out forwards; background: linear-gradient(90deg, transparent, rgba(120,60,0,.85), transparent); padding: 12px 0; }
+.bossdown .bd1 { font-size: 44px; font-weight: 900; color: var(--gold); text-shadow: 0 0 20px #ffb300, 0 4px 0 #6a4300; }
+.bossdown .bd2 { font-size: 18px; font-weight: 800; color: #fff4c2; }
+.chanceroll { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 30; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 18px; border-radius: 18px; background: rgba(0,0,0,.72); border: 2px solid var(--gold); box-shadow: 0 0 30px rgba(0,0,0,.6); animation: bpop .3s; }
+.crlabel { font-size: 13px; font-weight: 800; color: #ffe9a8; white-space: nowrap; }
+.crdie { transition: transform .08s; }
+.crdie.crwin { box-shadow: 0 0 24px 6px #ffd34d; background: linear-gradient(145deg, #fff3a8, #f0b81e); }
+.crdie.crlose, .crball.crlose { filter: grayscale(.8) brightness(.8); }
+.crball { width: 84px; height: 84px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 900; border: 4px solid var(--gold); background: #111; }
+.crball.w { background: #c0262d; } .crball.l { background: #151515; } .crball.z { background: #0a7a3a; }
+.crball.crwin { box-shadow: 0 0 24px 6px #ffd34d; }
+.crres { min-height: 24px; font-size: 20px; font-weight: 900; }
+.crres.win { color: var(--gold); } .crres.lose { color: #aaa; }

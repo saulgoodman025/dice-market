@@ -126,3 +126,22 @@ describe('가드레일 (§5)', () => {
     }
   });
 });
+
+describe('막 전체 지도 (갈림길)', () => {
+  it('막다른 길 없음 · 모든 노드 도달 가능 · 보스 직전 안전 노드 · 카지노만 있는 길 없음', () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const { run } = mk(seed);
+      const m = run.map;
+      expect(m.length).toBe(5);
+      expect(m[4].map((n) => n.type)).toEqual(['boss']);
+      for (let f = 0; f < 4; f++) {
+        for (const n of m[f]) {
+          expect(n.next.length).toBeGreaterThan(0);
+          expect(n.next.some((j) => m[f + 1][j].type !== 'casino')).toBe(true);
+        }
+        for (let j = 0; j < m[f + 1].length; j++) expect(m[f].some((n) => n.next.includes(j))).toBe(true);
+      }
+      for (const n of m[2]) expect(n.next.some((j) => ['shop', 'rest'].includes(m[3][j].type))).toBe(true);
+    }
+  });
+});

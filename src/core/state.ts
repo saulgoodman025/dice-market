@@ -126,6 +126,8 @@ export type NodeType = 'combat' | 'elite' | 'shop' | 'casino' | 'event' | 'rest'
 
 export interface MapNode {
   type: NodeType;
+  x: number; // 가로 위치 0~1
+  next: number[]; // 다음 층에서 갈 수 있는 노드 인덱스
 }
 
 export type RewardOption =
@@ -225,7 +227,8 @@ export interface RunState {
   consumables: string[];
   act: number; // 1..3
   floor: number; // 0..4 (4 = 보스)
-  map: MapNode[][]; // 현재 막의 층별 선택지
+  map: MapNode[][]; // 현재 막의 전체 지도 (층별 노드)
+  path: number[]; // 이번 막에서 고른 노드 인덱스 (층별)
   nodesReached: number;
   bossesKilled: number;
   heat: number;
@@ -262,4 +265,5 @@ export type GameEvent =
   | { t: 'toast'; text: string; tone?: 'good' | 'bad' | 'info' | 'gold' }
   | { t: 'sfx'; name: string }
   | { t: 'megaJackpot' }
-  | { t: 'enemyAct'; uid: number };
+  | { t: 'enemyAct'; uid: number }
+  | { t: 'chanceRoll'; kind: 'die' | 'roulette'; result: number; win: boolean; label: string };

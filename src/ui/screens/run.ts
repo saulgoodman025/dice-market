@@ -7,7 +7,7 @@ import { MATERIAL_BY_ID } from '../../data/materials';
 import { condText, SKILL_BY_ID } from '../../data/skills';
 import { RELIC_BY_ID } from '../../data/relics';
 import { CONSUMABLE_BY_ID } from '../../data/consumables';
-import { currentOptions } from '../../rules/run';
+import { currentChoices } from '../../rules/run';
 import { NODE_INFO } from '../../rules/map';
 import { donChance, donEV, donMaxStreak, donMin, evText, haggleOdds, pct } from '../../rules/casino';
 import { getMods } from '../../rules/ctx';
@@ -20,20 +20,53 @@ const ACT_NAME = ['', '로비', 'VIP 라운지', '하우스 금고'];
 
 export function mapScreen(app: App): string {
   const run = app.run!;
-  const opts = currentOptions(run);
-  const floors = Array.from({ length: BALANCE.floorsPerAct }, (_, i) => `<i class="${i < run.floor ? 'done' : i === run.floor ? 'cur' : ''}"></i>`).join('');
-  const nodes = opts.map((n, i) => {
+  const F = BALANCE.floorsPerAct;
+  const choices = run.screen === 'map' ? currentChoices(run) : [];
+  // 지금 위치에서 앞으로 갈 수 있는 노드
+  const reach: Set<number>[] = run.map.map(() => new Set<number>());
+  if (run.floor < F) {
+    for (const c of run.screen === 'map' ? choices : [run.path[run.floor]]) reach[run.floor]?.add(c);
+    for (let f = run.floor; f < F - 1; f++) for (const i of reach[f]) for (const j of run.map[f][i].next) reach[f + 1].add(j);
+  }
+  const state = (f: number, i: number): string => {
+    if (f < run.floor || (f === run.floor && run.screen !== 'map')) return run.path[f] === i ? 'visited' : 'skipped';
+    if (f === run.floor) return choices.includes(i) ? 'choice' : 'skipped';
+    return reach[f].has(i) ? 'future' : 'unreach';
+  };
+  // 좌표: 아래가 1층, 위가 보스 (퍼센트)
+  const ROW = 100 / F;
+  const pos = (f: number, n: { x: number }) => ({ x: 8 + n.x * 84, y: 100 - (f + 0.5) * ROW });
+  let lines = '';
+  run.map.forEach((floor, f) => floor.forEach((n, i) => n.next.forEach((j) => {
+    const a = pos(f, n);
+    const b = pos(f + 1, run.map[f + 1][j]);
+    const sa = state(f, i);
+    const sb = state(f + 1, j);
+    const cls = sa === 'visited' && (sb === 'visited' || sb === 'choice') ? 'taken' : (sa === 'skipped' || sa === 'unreach' || sb === 'skipped' || sb === 'unreach') ? 'dead' : 'open';
+    lines += `<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`;
+  })));
+  const nodes = run.map.map((floor, f) => floor.map((n, i) => {
+    const st = state(f, i);
+    const p = pos(f, n);
     const info = NODE_INFO[n.type];
-    return `<button class="node ${n.type}" data-act="node" data-arg="${i}"><span class="ne">${info.emoji}</span><span class="grow"><div class="nn">${info.name}</div><div class="muted small">${info.desc}</div></span><span class="muted">▶</span></button>`;
-  }).join('');
-  return `${topbar(app)}<div class="screen">
-    <h2 class="center">${run.act}막 · ${ACT_NAME[run.act]}</h2>
-    <div class="floors">${floors}</div>
-    <div class="muted small center">${run.floor + 1}층 — 길을 고르자. 이동하면 이자 +${interestFor(run)}G</div>
-    <div class="mapnodes">${nodes}</div>
-    <div class="grow"></div>
+    const ci = choices.indexOf(i);
+    const act = st === 'choice' ? `data-act="node" data-arg="${ci}"` : '';
+    return `<button class="mnode ${st} t-${n.type}" style="left:${p.x}%;top:${p.y}%" ${act} data-tip="${esc(info.name + ': ' + info.desc)}" ${st === 'choice' ? '' : 'tabindex="-1"'}>
+      <span class="me">${info.emoji}</span>${st === 'visited' ? '<span class="mbadge">✓</span>' : ''}<span class="ml">${info.name}</span></button>`;
+  }).join('')).join('');
+  const floorLabels = Array.from({ length: F }, (_, f) => `<span class="flabel ${f === run.floor ? 'cur' : f < run.floor ? 'done' : ''}" style="top:${100 - (f + 0.5) * ROW}%">${f === F - 1 ? '보스' : `${f + 1}층`}</span>`).join('');
+  const done = (run.act - 1) * F + run.floor;
+  const acts = [1, 2, 3].map((a) => `<div class="actseg ${a < run.act ? 'done' : a === run.act ? 'cur' : ''}"><b>${a}막</b><span>${ACT_NAME[a]}</span><div class="actdots">${Array.from({ length: F }, (_, f) => `<i class="${a < run.act || (a === run.act && f < run.floor) ? 'on' : a === run.act && f === run.floor ? 'now' : ''}"></i>`).join('')}</div></div>`).join('');
+  return `${topbar(app)}<div class="screen mapscreen">
+    <div class="acts">${acts}</div>
+    <div class="muted small center">전체 진행 ${done}/${F * 3} · <b class="gold">빛나는 칸</b>을 눌러 이동 · 이동하면 이자 +${interestFor(run)}G</div>
+    <div class="mapwrap">
+      ${floorLabels}
+      <svg class="maplines" viewBox="0 0 100 100" preserveAspectRatio="none">${lines}</svg>
+      ${nodes}
+    </div>
     ${relicStrip(app)}
-    <div class="row">${consumablesRow(app)}<div class="grow"></div><button class="btn ghost" data-act="quit">🏳️</button></div>
+    <div class="row">${consumablesRow(app)}<div class="grow"></div><button class="btn ghost" data-act="quit" aria-label="포기">🏳️</button></div>
   </div>`;
 }
 

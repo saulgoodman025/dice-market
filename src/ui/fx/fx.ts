@@ -93,7 +93,9 @@ export function floatAt(el: Element | null, text: string, color = '#fff', size =
   const d = document.createElement('div');
   d.className = 'float';
   d.textContent = text;
-  d.style.left = `${r.left - h.left + r.width / 2 + (fxRandom() - 0.5) * 20}px`;
+  const est = Math.min(h.width * 0.45, text.length * size * 0.32); // 화면 밖으로 잘리지 않게
+  const cx = r.left - h.left + r.width / 2 + (fxRandom() - 0.5) * 20;
+  d.style.left = `${Math.max(est + 6, Math.min(h.width - est - 6, cx))}px`;
   d.style.top = `${r.top - h.top + r.height * 0.3}px`;
   d.style.color = color;
   d.style.fontSize = `${size}px`;

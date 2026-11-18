@@ -102,5 +102,8 @@ export const sfx = {
     noise(0.22, 0.45, 0.03, 1500);
     tone(300, 0.25, 'sawtooth', 0.2, 0.05, 120);
   },
+  heavy: () => { tone(90, 0.35, 'sine', 0.6, 0, 40); tone(180, 0.2, 'square', 0.3, 0, 60); noise(0.25, 0.5, 0, 200); },
+  explosion: () => { noise(0.9, 0.7, 0, 80); tone(70, 0.8, 'sine', 0.6, 0, 30); tone(140, 0.5, 'sawtooth', 0.25, 0.05, 50); },
+  fanfare: () => { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i === 6 ? 0.9 : 0.18, 'triangle', 0.3, i * 0.12)); },
   bad: () => tone(200, 0.25, 'sawtooth', 0.3, 0, 100),
 };

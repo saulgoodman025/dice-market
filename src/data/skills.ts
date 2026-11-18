@@ -69,7 +69,7 @@ export const SKILLS: SkillDef[] = [
     id: 'gamble', name: '도박사', rarity: 'rare', chance: true, cond: { k: 'range', lo: 1, hi: 2 }, desc: '다시 굴려 6이면 {d} 공격 (1/6)', v: { d: 30 }, role: 'atk',
     run: (u) => {
       const r = rng(u.ctx, 'combat').die();
-      u.ctx.emit({ t: 'toast', text: `🎲 도박사 재굴림: ${r}${r === 6 ? ' — 명중!' : ''}`, tone: r === 6 ? 'gold' : 'info' });
+      u.ctx.emit({ t: 'chanceRoll', kind: 'die', result: r, win: r === 6, label: '6이 나오면 30 피해!' });
       if (r === 6) u.dmg(30);
     },
   },
@@ -109,9 +109,9 @@ export const SKILLS: SkillDef[] = [
     id: 'roulette', name: '룰렛 베팅', rarity: 'epic', chance: true, cond: { k: 'any' }, desc: '반반 확률로 눈×{m} 공격', v: { m: 5 }, role: 'atk',
     run: (u) => {
       const n = rng(u.ctx, 'combat').int(0, 36);
-      if (n === 0) { addJackpot(u.ctx, 100); u.ctx.emit({ t: 'toast', text: '룰렛 0! 잭팟 100%', tone: 'gold' }); }
-      else if (n <= 18) { u.ctx.emit({ t: 'toast', text: `룰렛 ${n} — 적중!`, tone: 'gold' }); u.dmg(u.v * 5); }
-      else u.ctx.emit({ t: 'toast', text: `룰렛 ${n} — 빗나감`, tone: 'bad' });
+      u.ctx.emit({ t: 'chanceRoll', kind: 'roulette', result: n, win: n <= 18, label: n === 0 ? '0! 잭팟 100%' : '1~18이면 적중' });
+      if (n === 0) addJackpot(u.ctx, 100);
+      else if (n <= 18) u.dmg(u.v * 5);
     },
   },
   {

@@ -19,7 +19,7 @@ export function topbar(app: App): string {
     <span class="stat" data-tip="🔥 열기 ${r.heat}/10: 족보를 낼수록 오르고 피해가 세진다 (단계당 +5%). 족보를 못 내면 0">🔥<span class="heat">${heat}</span></span>
     <span class="stat" data-tip="💰 잭팟 ${Math.round(jp)}%: 100%가 되면 다음 턴 모든 주사위 효과 2배 + 무료 슬롯">💰<span class="jp ${jp >= 100 ? 'full' : ''}"><i style="width:${jp}%"></i></span></span>
     <span class="grow"></span>
-    <span class="stat muted">${r.act}-${r.floor + 1}${r.stake ? ` · S${r.stake}` : ''}</span>
+    <span class="stat muted" style="white-space:nowrap">${r.act}막 ${r.floor >= 4 ? '보스' : `${r.floor + 1}층`}${r.stake ? ` S${r.stake}` : ''}</span>
     ${cb ? '<button class="iconbtn" data-act="tutOpen" data-always="1" aria-label="도움말">?</button>' : ''}
     <button class="iconbtn" data-act="modal" data-arg="bag" data-always="1" aria-label="가방">☰</button>
   </div>`;
