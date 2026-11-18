@@ -169,7 +169,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
       if (res) { animateSlot(app, res); return; }
       break;
     }
-    case 'pick': pickReward(ctx, n); break;
+    case 'pick': pickReward(ctx, n); if (!run.pending && !run.offer) leaveReward(ctx); break;
     case 'leaveReward': leaveReward(ctx); break;
     // ── 상점 ──
     case 'haggle': {

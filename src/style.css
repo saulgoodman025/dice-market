@@ -490,3 +490,35 @@ h1, h2, h3 { margin: 0; }
 .crball.crwin { box-shadow: 0 0 24px 6px #ffd34d; }
 .crres { min-height: 24px; font-size: 20px; font-weight: 900; }
 .crres.win { color: var(--gold); } .crres.lose { color: #aaa; }
+
+/* v0.6 가독성: 어두운 배경 위 글자 대비 */
+:root { --ink: #f7f4ec; --ink-dim: #cdd8d2; --red: #ff6b70; --green: #4ee89a; }
+#app {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0) 30%, rgba(0,0,0,.6) 100%),
+    repeating-linear-gradient(45deg, rgba(255,200,90,.035) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, rgba(255,200,90,.035) 0 2px, transparent 2px 22px),
+    linear-gradient(#250a12, #14060a);
+}
+.muted { color: var(--ink-dim); }
+.screen > .muted, .screen > .center.small, .screen > .small { text-shadow: 0 1px 2px #000; }
+.card, .item { background: #102a21; border-color: rgba(255,255,255,.16); }
+.item .ds, .skill .sd { color: #d4ded8; }
+.item .tt { color: #fff; }
+.odds { color: #c8f5dc; background: rgba(0,0,0,.5); }
+.dieinfo { background: rgba(0,0,0,.45); border-radius: 10px; padding: 3px 8px; color: #e6eee9; }
+.tag { background: #000; border: 1px solid rgba(255,255,255,.2); }
+.item.lockedchar { background: #0c1a15; }
+.item.lockedchar .tt, .item.lockedchar .ds { color: #9fb0a7; }
+.item.lockedchar .ds.red, .item.lockedchar .red { color: #ff8a8e; }
+.tablestats { color: #e6f3ec; text-shadow: 0 1px 2px #000; }
+.enemy .name { color: #fff; text-shadow: 0 1px 2px #000; }
+.handbar { background: rgba(0,0,0,.5); }
+.steps { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 800; }
+.steps span { padding: 3px 10px; border-radius: 12px; background: rgba(0,0,0,.45); color: #9fb0a7; border: 1px solid rgba(255,255,255,.12); }
+.steps span.on { color: #2a1a00; background: var(--gold); border-color: var(--gold); }
+.steps span.done { color: var(--gold); }
+.steps i { width: 18px; height: 2px; background: rgba(255,255,255,.3); }
+.card .row.total { border-top: 1px solid rgba(255,255,255,.15); padding-top: 6px; font-size: 16px; }
+.actseg span, .flabel, .mnode .ml { color: #e6eee9; }
+.mnode .ml { text-shadow: 0 1px 2px #000, 0 0 4px #000; }

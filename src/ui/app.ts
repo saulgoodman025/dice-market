@@ -240,6 +240,10 @@ export class App {
         this.after();
       }, wait + (close ? 500 : 0));
     }
+    if (run && run.screen !== 'reward' && (this.ui.don.text || this.ui.slot.res)) {
+      this.ui.don = { rolling: false, face: 6, text: '' };
+      this.ui.slot = { res: null, spinning: false };
+    }
     if (run?.screen === 'reward' && run.reward && this.piggyAnimated !== run.reward) {
       this.piggyAnimated = run.reward;
       this.piggyCountUp(run.reward.piggy);
@@ -571,10 +575,10 @@ export class App {
     const face = box.querySelector<HTMLElement>(die ? '.crdie' : '.crball')!;
     const res = box.querySelector<HTMLElement>('.crres')!;
     // 감속하며 굴러가다 결과에서 멈춤
-    const steps = die ? 14 : 18;
+    const steps = die ? 9 : 11;
     let t = 0;
     for (let i = 0; i < steps; i++) {
-      t += 45 * Math.pow(1.17, i);
+      t += 38 * Math.pow(1.15, i);
       const last = i === steps - 1;
       setTimeout(() => {
         const v = last ? ev.result : die ? 1 + Math.floor(fxRandom() * 6) : Math.floor(fxRandom() * 37);
@@ -589,7 +593,7 @@ export class App {
       res.className = `crres ${ev.win || (!die && ev.result === 0) ? 'win' : 'lose'}`;
       if (ev.win) { sfx.jackpot(); burstAt(face, '#ffd34d', 30); vibrate(60); } else sfx.bad();
     }, (t + 80) / sp);
-    const total = t + 900;
+    const total = t + 550;
     setTimeout(() => box.remove(), total / sp);
     return total;
   }

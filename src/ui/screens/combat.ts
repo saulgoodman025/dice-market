@@ -138,7 +138,6 @@ export function combatScreen(app: App): string {
   return `${topbar(app)}
   <div class="screen noscroll combat ${app.veil ? 'enemyphase' : ''}">
     <div class="table">
-      <div class="felt-print">THE HOUSE · DICE PAYS ×7</div>
       <div class="enemies">${enemies}</div>
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}

@@ -73,27 +73,44 @@ export function mapScreen(app: App): string {
 export function rewardScreen(app: App): string {
   const run = app.run!;
   const rw = run.reward!;
-  const collected = rw.base === -1;
+  const collected = rw.base === -1; // 1단계(골드) 끝 → 2단계(보상 선택)
   const ui = app.ui;
-  const canDon = !collected && !rw.donDone && rw.gold > 0 && rw.donStreak < donMaxStreak(run);
-  const don = `<div class="card col center">
-    <b>🎲 더블 오어 낫싱</b>
-    <div class="die bigdie" id="dondie">${pipsHtml(ui.don.face)}</div>
-    <div class="muted small">주사위 ${donMin(run)}~6이 나오면 2배, 아니면 0 (${rw.donStreak}/${donMaxStreak(run)}연속)</div>
-    <div class="odds">성공 ${pct(donChance(run))} · ${evText(donEV(run))}</div>
-    <div style="min-height:18px;font-weight:800" class="${ui.don.text.includes('성공') ? 'gold' : 'red'}">${esc(ui.don.text)}</div>
-    ${run.consumables.includes('insurance') ? '<div class="small green">📄 보험증서: 실패 시 원금 반환</div>' : ''}
-    <div class="row center"><button class="btn danger" data-act="don" ${canDon ? '' : 'disabled'}>${rw.gold}G 걸고 굴리기</button><button class="btn primary" data-act="collect" ${collected ? 'disabled' : ''}>${collected ? '수령 완료' : `${rw.gold}G 받기`}</button></div>
-  </div>`;
-  const opts = rw.options.map((o, i) => itemHtml(o, rw.picked ? 'sold' : '', rw.picked ? '' : `<button class="btn" data-act="pick" data-arg="${i}">선택</button>`)).join('');
+  const steps = `<div class="steps"><span class="${collected ? 'done' : 'on'}">① 골드 정산</span><i></i><span class="${collected ? 'on' : ''}">② 보상 선택</span></div>`;
+  if (!collected) {
+    const canDon = !rw.donDone && rw.gold > 0 && rw.donStreak < donMaxStreak(run);
+    const spins = run.pendingFreeSpins > 0 || ui.slot.res || ui.slot.spinning;
+    return `${topbar(app)}<div class="screen">
+      <h2 class="center gold">승리!</h2>
+      ${steps}
+      <div class="card col">
+        <div class="row"><span class="grow">기본 보상</span><b>${rw.base}G</b></div>
+        <div class="row"><span class="grow">🐷 저금통 <span class="muted small">(열기·유물 보정 ×${rw.heatMult.toFixed(2)})</span></span><b id="piggyamt">${rw.piggy}G</b></div>
+        ${rw.heal ? `<div class="green">보스 처치: 체력 ${rw.heal} 회복</div>` : ''}
+        <div class="row total"><span class="grow">받을 골드</span><b class="gold">${rw.gold}G</b></div>
+      </div>
+      <div class="card col center">
+        <b>🎲 더블 오어 낫싱 <span class="muted small">(선택)</span></b>
+        <div class="die bigdie" id="dondie">${pipsHtml(ui.don.face)}</div>
+        <div class="small">주사위 ${donMin(run)}~6 → <b class="gold">2배</b> · 그 외 → <b class="red">0G</b> <span class="muted">(${rw.donStreak}/${donMaxStreak(run)}연속)</span></div>
+        <div class="odds">성공 ${pct(donChance(run))} · ${evText(donEV(run))}</div>
+        <div style="min-height:22px;font-weight:900;font-size:17px" class="${ui.don.text.includes('성공') ? 'gold' : 'red'}">${esc(ui.don.text)}</div>
+        ${run.consumables.includes('insurance') ? '<div class="small green">📄 보험증서: 실패 시 원금 반환</div>' : ''}
+        <button class="btn danger" data-act="don" ${canDon ? '' : 'disabled'}>${rw.gold}G 걸고 굴리기</button>
+      </div>
+      ${spins ? `<div class="card col"><b>💰 잭팟 무료 스핀 ×${run.pendingFreeSpins}</b>${slotMachine(app)}<button class="btn primary" data-act="freespin" ${run.pendingFreeSpins > 0 && !ui.slot.spinning ? '' : 'disabled'}>무료 스핀!</button></div>` : ''}
+      <div class="grow"></div>
+      <button class="btn primary big" data-act="collect">${rw.gold > 0 ? `💰 ${rw.gold}G 받고 다음 ▶` : '다음 ▶'}</button>
+    </div>`;
+  }
+  const kind = rw.options[0]?.kind === 'relic' ? '유물' : '보상';
+  const opts = rw.options.map((o, i) => itemHtml(o, rw.picked ? 'sold' : '', rw.picked ? '' : `<button class="btn primary" data-act="pick" data-arg="${i}">가져가기</button>`)).join('');
   return `${topbar(app)}<div class="screen">
-    <h2 class="center gold">승리!</h2>
-    <div class="card"><div>기본 보상 <b>${collected ? '' : rw.base + 'G'}</b></div><div>🐷 저금통 <b id="piggyamt">${rw.piggy}G</b> <span class="muted small">(열기·유물 보정 ×${rw.heatMult.toFixed(2)})</span></div>${rw.heal ? `<div class="green">보스 처치: 체력 ${rw.heal} 회복</div>` : ''}</div>
-    ${don}
-    ${run.pendingFreeSpins > 0 || ui.slot.res || ui.slot.spinning ? `<div class="card col"><b>💰 잭팟 무료 스핀 ×${run.pendingFreeSpins}</b>${slotMachine(app)}<button class="btn primary" data-act="freespin" ${run.pendingFreeSpins > 0 && !ui.slot.spinning ? '' : 'disabled'}>무료 스핀!</button></div>` : ''}
-    <h3>보상 선택 <span class="muted small">(1개)</span></h3>
+    <h2 class="center">${kind} 선택</h2>
+    ${steps}
+    <div class="center small">하나를 가져가거나, 필요 없으면 건너뛰자.</div>
     <div class="col">${opts}</div>
-    <button class="btn ${collected || rw.gold === 0 ? 'primary' : ''} big" data-act="leaveReward">${collected ? '계속 ▶' : '골드 받고 계속 ▶'}</button>
+    <div class="grow"></div>
+    <button class="btn ${rw.picked ? 'primary' : ''} big" data-act="leaveReward">${rw.picked ? '계속 ▶' : '건너뛰기 ▶'}</button>
   </div>`;
 }
 
