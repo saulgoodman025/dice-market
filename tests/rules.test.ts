@@ -1,0 +1,128 @@
+import { describe, expect, it } from 'vitest';
+import { newRun, openShop } from '../src/rules/run';
+import { confirmHand, endTurn, reroll, startCombat, toggleLock, useSkill } from '../src/rules/combat';
+import { donChance, donEV, rouletteOdds, slotOdds, haggleOdds } from '../src/rules/casino';
+import { MANIP_SKILLS } from '../src/data/meta';
+import { SKILLS } from '../src/data/skills';
+import { RELICS } from '../src/data/relics';
+import { FACES } from '../src/data/faces';
+import { MATERIALS } from '../src/data/materials';
+import { CONSUMABLES } from '../src/data/consumables';
+import { ENEMIES } from '../src/data/enemies';
+import { EVENTS } from '../src/data/events';
+import { HANDS } from '../src/data/hands';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+const mk = (seed = 1, char = 'gambler') => {
+  const run = newRun(seed, char);
+  return { run, ctx: { run, emit: () => {} } };
+};
+
+describe('콘텐츠 수량', () => {
+  it('사양서 수량과 일치', () => {
+    expect(SKILLS.length).toBe(32);
+    expect(FACES.length).toBe(20);
+    expect(MATERIALS.length).toBe(9);
+    expect(RELICS.length).toBe(50);
+    expect(CONSUMABLES.length).toBe(16);
+    expect(EVENTS.length).toBe(12);
+    expect(HANDS.length).toBe(10);
+    expect(ENEMIES.filter((e) => e.tier === 'boss').length).toBe(3);
+    for (const act of [1, 2, 3]) {
+      expect(ENEMIES.filter((e) => e.act === act && e.tier === 'normal').length).toBe(6);
+      expect(ENEMIES.filter((e) => e.act === act && e.tier === 'elite').length).toBe(2);
+    }
+  });
+});
+
+describe('전투 코어', () => {
+  it('잠근 주사위는 리롤되지 않는다', () => {
+    const { run, ctx } = mk(3);
+    startCombat(ctx, 'normal', ['bouncer']);
+    const cb = run.combat!;
+    const keep = cb.hand[0];
+    toggleLock(ctx, keep.key);
+    const before = keep.pip;
+    for (let i = 0; i < 2; i++) reroll(ctx);
+    expect(keep.pip).toBe(before);
+    expect(cb.rerollsLeft).toBe(0);
+  });
+
+  it('베기: 피해 = 눈 × 족보 배율 (나무 주사위)', () => {
+    const { run, ctx } = mk(5, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    const e = cb.enemies[0];
+    const d = cb.hand.find((h) => h.material === 'wood')!;
+    confirmHand(ctx);
+    const mult = cb.handResult!.mult;
+    const hp = e.hp;
+    useSkill(ctx, 0, [d.key]);
+    expect(hp - e.hp).toBe(Math.round(d.pip * mult));
+  });
+
+  it('쓰지 않은 주사위는 저금통으로', () => {
+    const { run, ctx } = mk(9, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    const sum = cb.hand.reduce((s, h) => s + h.pip, 0);
+    endTurn(ctx);
+    expect(cb.piggy).toBe(sum);
+  });
+
+  it('노 핸드는 열기를 0으로', () => {
+    const { run, ctx } = mk(11);
+    run.heat = 4;
+    startCombat(ctx, 'normal', ['bouncer']);
+    const cb = run.combat!;
+    cb.hand.forEach((h, i) => { h.pip = [1, 2, 4, 5, 6][i] ?? 1; h.sticker = undefined; h.material = 'wood'; });
+    confirmHand(ctx);
+    expect(cb.handResult!.id).toBe('none');
+    expect(run.heat).toBe(0);
+  });
+});
+
+describe('카지노 기대값 (R2/R4)', () => {
+  it('기본 EV ≤ 1.0 (도박사 고유 능력 제외)', () => {
+    const { run } = mk(1, 'knight');
+    expect(donEV(run)).toBeLessThanOrEqual(1.0);
+    expect(donChance(run)).toBeCloseTo(0.5);
+    expect(slotOdds(run).ev).toBeLessThanOrEqual(1.0);
+    for (const r of rouletteOdds(run).rows) expect(r.ev).toBeLessThanOrEqual(1.0);
+    expect(haggleOdds(run).ev).toBeCloseTo(0.8);
+  });
+  it('빌드로 EV > 1.0 가능 (하우스의 열쇠)', () => {
+    const { run } = mk(1, 'knight');
+    run.relics.push('housekey');
+    expect(donEV(run)).toBeGreaterThan(1.0);
+  });
+});
+
+describe('가드레일 (§5)', () => {
+  it('1막 상점에 눈 조작 스킬 등장 확률 ≥ 60%', () => {
+    let hit = 0;
+    const N = 600;
+    for (let i = 0; i < N; i++) {
+      const { run, ctx } = mk(1000 + i);
+      openShop(ctx);
+      if (run.shop!.items.some((it) => it.opt.kind === 'skill' && MANIP_SKILLS.includes(it.opt.id))) hit++;
+    }
+    expect(hit / N).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('규칙 코드에 Math.random 사용 금지', () => {
+    const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((f) => (f.isDirectory() ? walk(join(d, f.name)) : [join(d, f.name)]));
+    for (const f of walk('src').filter((x) => x.endsWith('.ts'))) {
+      expect(readFileSync(f, 'utf8').includes('Math.random'), f).toBe(false);
+    }
+  });
+
+  it('규칙 코드에서 특정 아이템 id를 if로 검사하지 않는다', () => {
+    const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((f) => (f.isDirectory() ? walk(join(d, f.name)) : [join(d, f.name)]));
+    for (const f of walk('src/rules')) {
+      const src = readFileSync(f, 'utf8');
+      expect(/def\.id\s*===|\.id\s*===\s*'(?:[a-z]+)'/.test(src), f).toBe(false);
+    }
+  });
+});

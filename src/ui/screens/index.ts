@@ -1,0 +1,28 @@
+import type { App } from '../app';
+import { combatScreen } from './combat';
+import { casinoScreen, mysteryModal, paytableModal, scratchModal } from './casino';
+import { charScreen, codexScreen, endScreen, settingsScreen, titleScreen } from './menus';
+import { eventScreen, mapScreen, restScreen, rewardScreen, runModals, shopScreen } from './run';
+
+export function renderScreen(app: App): string {
+  const ui = app.ui;
+  if (ui.page === 'title') return titleScreen(app);
+  if (ui.page === 'charselect') return charScreen(app);
+  if (ui.page === 'codex') return codexScreen(app);
+  if (ui.page === 'settings') return settingsScreen(app);
+  const run = app.run;
+  if (!run) return titleScreen(app);
+  let body = '';
+  switch (run.screen) {
+    case 'combat': body = run.combat ? combatScreen(app) : mapScreen(app); break;
+    case 'map': body = mapScreen(app); break;
+    case 'reward': body = rewardScreen(app); break;
+    case 'shop': body = shopScreen(app); break;
+    case 'casino': body = casinoScreen(app); break;
+    case 'event': body = eventScreen(app); break;
+    case 'rest': body = restScreen(app); break;
+    case 'gameover': case 'victory': return endScreen(app);
+    default: body = mapScreen(app);
+  }
+  return body + runModals(app, { paytable: () => paytableModal(app), scratch: () => scratchModal(app), mystery: () => mysteryModal(app) });
+}
