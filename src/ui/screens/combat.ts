@@ -87,34 +87,33 @@ export function combatScreen(app: App): string {
   const infoDie = cb.hand.find((h) => h.key === ui.infoKey && (!h.used || h.gone));
   const info = infoDie ? dieInfo(infoDie, cb.brokenDice.includes(infoDie.dieIdx)) : '';
 
-  // ── 스킬 카드 (예상 효과 숫자) ──
-  const skills = Array.from({ length: run.maxSlots }, (_, i) => {
-    const s = run.skills[i];
-    if (!s) return `<div class="skill empty">빈 칸</div>`;
+  // ── 스킬 카드 손패 (예상 효과 숫자) ──
+  const n = run.skills.length;
+  const cards = run.skills.map((s, i) => {
     const def = SKILL_BY_ID[s.id];
     const usable = !cb.usedSlots[i] && skillUsable(ctx, i);
     const pv = usable ? previewSkill(ctx, i, selKeys) : null;
     const ready = !!pv?.keys;
-    let big = '';
-    let small = '';
+    let badge = '';
     if (pv?.keys) {
-      if (pv.chance) big = '<span class="pv">🎲?</span>';
-      else {
-        const parts: string[] = [];
-        if (pv.dmg) parts.push(`<span class="pv dmg">⚔${pv.dmg}</span>`);
-        if (pv.block) parts.push(`<span class="pv blk">🛡${pv.block}</span>`);
-        if (pv.heal) parts.push(`<span class="pv heal">❤${pv.heal}</span>`);
-        if (pv.gold) parts.push(`<span class="pv gold">🪙${pv.gold}</span>`);
-        if (pv.piggy) parts.push(`<span class="pv gold">🐷${pv.piggy}</span>`);
-        big = parts[0] ?? '<span class="pv">✨</span>';
-        small = parts[1] ?? '';
-      }
+      if (pv.chance) badge = '<span class="pvb">🎲?</span>';
+      else if (pv.dmg) badge = `<span class="pvb dmg">⚔${pv.dmg}</span>`;
+      else if (pv.block) badge = `<span class="pvb blk">🛡${pv.block}</span>`;
+      else if (pv.heal) badge = `<span class="pvb heal">❤${pv.heal}</span>`;
+      else if (pv.gold) badge = `<span class="pvb gold">🪙${pv.gold}</span>`;
+      else if (pv.piggy) badge = `<span class="pvb gold">🐷${pv.piggy}</span>`;
     }
     const state = cb.usedSlots[i] ? 'used' : ready ? 'ready' : 'off';
-    return `<button class="skill r-${def.rarity} ${state}" data-act="slot" data-arg="${i}" data-tip="${esc(def.name + ' — ' + condText(def.cond) + ' 주사위: ' + fmt(def.desc, def.v))}">
-      <span class="srow"><span class="sn">${ROLE_ICON[def.role]} ${esc(def.name)}${s.up ? `<span class="green small">+${Math.round(s.up * 100)}%</span>` : ''}</span>${big}</span>
-      <span class="srow"><span class="cond">${esc(condText(def.cond))}</span>${small ? small.replace('class="pv', 'class="pv small2') : `<span class="sd">${cb.usedSlots[i] ? '사용함' : esc(fmt(def.desc, def.v))}</span>`}</span>
-    </button>`;
+    const mid = (n - 1) / 2;
+    const rot = (i - mid) * (n > 4 ? 4 : 3);
+    const lift = Math.abs(i - mid) * (n > 4 ? 3 : 2.5);
+    return `<div class="scard r-${def.rarity} ${state} ${ui.selCard === i ? 'chosen' : ''}" data-card="${i}" data-act="cardTap" data-arg="${i}" style="--rot:${rot}deg;--lift:${lift}px;z-index:${10 + i}" data-tip="${esc(def.name + ' — ' + condText(def.cond) + ' 주사위: ' + fmt(def.desc, def.v) + (def.target === 'enemy' ? ' (적에게 끌어다 놓기)' : ' (테이블에 끌어다 놓기)'))}">
+      <span class="ccond">${esc(condText(def.cond))}</span>${badge}
+      <div class="cart">${def.icon}</div>
+      <div class="cname">${esc(def.name)}${s.up ? `<span class="green">+</span>` : ''}</div>
+      <div class="cdesc">${cb.usedSlots[i] ? '사용함' : esc(fmt(def.desc, def.v))}</div>
+      <span class="ctgt">${def.target === 'enemy' ? '🎯' : '✋'}</span>
+    </div>`;
   }).join('');
 
   // ── 플레이어 패널 ──
@@ -137,7 +136,7 @@ export function combatScreen(app: App): string {
   const moves = hasMoves(ctx);
   return `${topbar(app)}
   <div class="screen noscroll combat ${app.veil ? 'enemyphase' : ''}">
-    <div class="table">
+    <div class="table" data-act="field">
       <div class="enemies">${enemies}</div>
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}
@@ -150,8 +149,8 @@ export function combatScreen(app: App): string {
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>
-    <div class="dieinfo">${info || (roll ? '주사위를 탭해 <b>🔒잠그고</b> 리롤 · 스킬을 탭해 사용' : '주사위를 고르고 <b>스킬</b>을 탭 · 남은 주사위는 🐷')}</div>
-    <div class="skills ${run.maxSlots > 4 ? 'many' : ''}">${skills}</div>
+    <div class="dieinfo">${info || (ui.selCard !== null ? (SKILL_BY_ID[run.skills[ui.selCard].id].target === 'enemy' ? '🎯 공격할 <b>적</b>을 탭하세요' : '✋ <b>테이블</b>을 탭하면 사용') : roll ? '주사위를 탭해 <b>🔒잠그고</b> 리롤 · 카드를 <b>끌어다 놓아</b> 사용' : '카드를 <b>적</b>(🎯) 또는 <b>테이블</b>(✋)에 끌어다 놓기')}</div>
+    <div class="hand n${n}">${cards}</div>
     <div class="actions">
       <button class="btn" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}>🎲 리롤 ${roll ? cb.rerollsLeft : 0}</button>
       <button class="btn" data-act="modal" data-arg="hands">📖 도움말</button>
@@ -192,7 +191,7 @@ const TUT = [
   { e: '🎲', t: '주사위로 싸운다', d: '매 턴 주사위 5개가 굴러간다. 위쪽은 적(딜러), 아래쪽이 나다.' },
   { e: '🔒', t: '잠그고 다시 굴리기', d: '마음에 드는 주사위를 탭하면 잠긴다.\n🎲 리롤을 누르면 나머지만 다시 굴린다 (턴당 2번).' },
   { e: '🃏', t: '족보 = 배율', d: '같은 눈, 이어지는 눈을 모으면 족보!\n배율만큼 모든 효과가 세진다. 📖 족보 버튼으로 언제든 확인.' },
-  { e: '⚔️', t: '스킬 누르기', d: '스킬 카드를 탭하면 알맞은 주사위로 바로 발동!\n카드 오른쪽 큰 숫자가 예상 결과다.\n⚔ 빨강 = 적에게 줄 피해, 🛡 파랑 = 내 방어' },
+  { e: '🃏', t: '카드를 끌어다 쓰기', d: '아래 스킬 카드를 끌어서 놓으면 알맞은 주사위로 발동!\n🎯 공격 카드는 적 위에, ✋ 방어·회복 카드는 테이블 아무 곳에.\n카드 위 숫자가 예상 결과 (⚔ 피해, 🛡 방어)' },
   { e: '👀', t: '적의 다음 행동', d: '적 머리 위 ⚔️ 숫자만큼 이번 턴 끝에 공격해 온다.\n🛡 방어로 막고, 남은 주사위는 🐷 저금통 → 골드.\n할 게 없으면 턴 종료 버튼이 반짝인다.' },
 ];
 

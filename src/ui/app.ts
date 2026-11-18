@@ -12,6 +12,7 @@ import { fxRandom } from '../core/rng';
 import { pipsHtml } from './components/parts';
 import { renderScreen } from './screens/index';
 import { handleAction } from './actions';
+import { initCardDrag } from './drag';
 import { ENEMY_BY_ID } from '../data/enemies';
 
 /** 강한 공격 연출 기준 피해량 */
@@ -45,6 +46,7 @@ export interface Ui {
   helpTab: 'hands' | 'dice';
   pickSlot: number | null;
   pickFace: number | null;
+  selCard: number | null; // 탭으로 고른 스킬 카드
   pickMat: number | null;
   /** 연출 중에는 결과가 반영되기 전 숫자를 보여준다 (결과 미리 노출 방지) */
   freeze: { gold: number; chips: number; hp: number } | null;
@@ -65,7 +67,7 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, freeze: null,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, freeze: null,
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
@@ -88,6 +90,7 @@ export class App {
     const saved = loadRun(SAVE_VERSION);
     if (saved) this.run = saved;
     this.bindInput();
+    initCardDrag(this);
     this.render();
   }
 
@@ -147,6 +150,18 @@ export class App {
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  /** 드래그가 시작되면 길게 누르기 툴팁을 취소 */
+  cancelTip() {
+    clearTimeout(this.tipTimer);
+    this.hideTip();
+  }
+
+  /** 드래그 직후 따라오는 클릭 한 번을 무시 */
+  swallowClick() {
+    this.suppressClick = true;
+    setTimeout(() => { this.suppressClick = false; }, 0);
   }
 
   private showTip(text: string, x: number, y: number) {

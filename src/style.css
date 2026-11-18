@@ -540,3 +540,54 @@ h1, h2, h3 { margin: 0; }
 
 .net .face.pickedFace { outline: 4px solid var(--gold); box-shadow: 0 0 16px rgba(245,197,66,.8); transform: scale(1.08); }
 .die.pickedDie { outline: 3px solid var(--gold); box-shadow: 0 0 14px rgba(245,197,66,.8); transform: translateY(-4px); }
+
+/* v0.9 스킬 카드 손패 */
+.hand { position: relative; display: flex; justify-content: center; align-items: flex-end; height: 128px; padding-top: 6px; }
+.scard {
+  position: relative; flex-shrink: 0; width: 80px; height: 116px; margin: 0 -3px; border-radius: 10px; padding: 18px 5px 5px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: grab; touch-action: none; user-select: none;
+  background: linear-gradient(180deg, #2c4a3d, #16281f); border: 2px solid #8a7a4a;
+  box-shadow: 0 4px 10px rgba(0,0,0,.55), inset 0 0 0 2px rgba(0,0,0,.35);
+  transform: translateY(var(--lift)) rotate(var(--rot)); transform-origin: 50% 120%;
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+}
+.hand.n5 .scard { width: 74px; margin: 0 -7px; }
+.hand.n6 .scard { width: 70px; margin: 0 -9px; }
+.scard.r-common { border-color: #a99a6a; }
+.scard.r-rare { border-color: #4aa3ff; }
+.scard.r-epic { border-color: #b57cff; }
+.scard.r-legendary { border-color: #f5c542; box-shadow: 0 4px 10px rgba(0,0,0,.55), 0 0 12px rgba(245,197,66,.5); }
+.scard .cart { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px;
+  background: radial-gradient(circle at 40% 35%, #2f6e55, #0d3326); box-shadow: inset 0 0 0 2px rgba(245,197,66,.4); }
+.scard .cname { font-size: 12px; font-weight: 900; color: #fff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.scard .cdesc { font-size: 9.5px; line-height: 1.2; color: #dfe9e3; text-align: center; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.scard .ccond { position: absolute; left: 3px; top: 3px; font-size: 9.5px; font-weight: 900; color: #1b1208; background: #e9d3a8; border-radius: 5px; padding: 0 4px; white-space: nowrap; max-width: 62%; overflow: hidden; text-overflow: ellipsis; }
+.scard .pvb { position: absolute; right: -6px; top: -8px; font-size: 13px; font-weight: 900; padding: 1px 5px; border-radius: 10px; background: #111; border: 2px solid #fff3; white-space: nowrap; }
+.scard .pvb.dmg { color: #ff9a90; border-color: #ff6b6b; } .scard .pvb.blk { color: #9fd0ff; border-color: #5aa9ff; }
+.scard .pvb.heal { color: #5be39a; border-color: #3ddc84; } .scard .pvb.gold { color: var(--gold); border-color: var(--gold-dim); }
+.scard .ctgt { position: absolute; right: 3px; bottom: 2px; font-size: 11px; opacity: .85; }
+.scard.ready { box-shadow: 0 4px 10px rgba(0,0,0,.55), 0 0 0 2px rgba(61,220,132,.7), 0 0 12px rgba(61,220,132,.35); }
+.scard.off { filter: grayscale(.75) brightness(.7); cursor: not-allowed; }
+.scard.used { opacity: .22; filter: grayscale(1); }
+.scard.ready:active, .scard.chosen { transform: translateY(-22px) rotate(0deg) scale(1.08); z-index: 60 !important; }
+.scard.chosen { box-shadow: 0 0 0 3px var(--gold), 0 0 22px rgba(245,197,66,.8); }
+.scard.lifted { opacity: .25; }
+.scard.ghost { position: absolute; z-index: 95; pointer-events: none; margin: 0; transform: translate(-50%, -70%) scale(1.12) rotate(-4deg); transition: none; opacity: .95; }
+.scard.ghost.armed { box-shadow: 0 0 0 3px var(--gold), 0 0 26px 6px rgba(245,197,66,.9); transform: translate(-50%, -70%) scale(1.18) rotate(0deg); }
+.scard.ghost.played { transition: transform .2s, opacity .2s; transform: translate(-50%, -70%) scale(1.5); opacity: 0; }
+.scard.ghost.returning { transition: left .18s, top .18s, opacity .18s; opacity: .3; }
+.drag-field .table { box-shadow: inset 0 0 0 3px rgba(245,197,66,.55), inset 0 8px 30px rgba(0,0,0,.45), 0 0 0 2px #2a1408, 0 8px 18px rgba(0,0,0,.6); }
+.drag-enemy .enemy:not(.dead) { outline: 2px dashed rgba(255,107,107,.8); outline-offset: 2px; }
+.enemy.aim { background: rgba(255,60,60,.18) !important; box-shadow: inset 0 0 0 3px #ff4d4d !important; }
+.enemy.aim .em { transform: scale(1.12); }
+.enemy.aim::after { content: '🎯'; position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; opacity: .85; pointer-events: none; animation: aimpulse .6s ease-in-out infinite; }
+@keyframes aimpulse { 50% { transform: translate(-50%, -50%) scale(1.2); } }
+.fullscreen, .blackout, .bossdown, .turnbanner { pointer-events: none; }
+
+/* 손패가 아래 버튼을 가리지 않게 */
+.hand { height: 136px; align-items: flex-start; padding-top: 8px; overflow: visible; }
+.hand .scard { transform-origin: 50% 100%; }
+/* 적 조준 중엔 카드를 작게, 손가락 위쪽으로 띄워 대상이 보이게 */
+.scard.ghost.aimmode { transform: translate(-50%, -135%) scale(.72) rotate(0deg); opacity: .9; }
+.scard.ghost.aimmode.armed { transform: translate(-50%, -135%) scale(.78) rotate(0deg); }
+.hand.n5 .scard, .hand.n6 .scard { height: 106px; padding-top: 16px; } .hand.n5 .scard .cart, .hand.n6 .scard .cart { width: 40px; height: 40px; font-size: 24px; } .hand.n5, .hand.n6 { height: 126px; }

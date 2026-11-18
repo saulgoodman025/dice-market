@@ -101,30 +101,39 @@ function runAction(app: App, act: string, arg: string, n: number) {
       app.render();
       return;
     }
-    case 'target': if (cb) setTarget(ctx, n); break;
+    case 'target': {
+      if (!cb) break;
+      if (ui.selCard !== null) {
+        const slot = ui.selCard;
+        const def = SKILL_BY_ID[run.skills[slot]?.id];
+        ui.selCard = null;
+        playSkill(app, slot, def?.target === 'enemy' ? n : null);
+        return;
+      }
+      setTarget(ctx, n);
+      break;
+    }
     case 'reroll': if (cb) { reroll(ctx); } break;
     case 'confirm': if (cb) { confirmHand(ctx); ui.sel = []; } break;
-    case 'slot': {
-      if (!cb || cb.phase === 'over') break;
-      const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : ui.sel;
-      let keys: number[] | null = canUse(ctx, n, sel) ? sel : null;
-      if (!keys) keys = autoPick(ctx, n, sel);
-      const def = SKILL_BY_ID[run.skills[n]?.id];
-      if (!def) break;
-      if (!keys) {
-        app.toast(cb.usedSlots[n] ? '이번 턴에 이미 사용한 칸' : `조건: ${condText(def.cond)}`, 'bad');
-        sfx.bad();
-        vibrate(20);
-        return;
-      }
-      if (def.needsChoice) {
-        ui.picker = { mode: 'fate', slot: n, keys };
-        app.render();
-        return;
-      }
-      useSkill(ctx, n, keys);
-      ui.sel = [];
-      app.after();
+    case 'slot': playSkill(app, n, null); return;
+    case 'cardTap': {
+      // 카드 탭: 선택/해제 (드래그가 어려울 때 보조 수단)
+      if (!cb) return;
+      if (ui.selCard === n) { ui.selCard = null; app.render(); return; }
+      if (!cardPlayable(app, n, true)) return;
+      ui.selCard = n;
+      app.render();
+      return;
+    }
+    case 'field': {
+      // 선택한 카드를 테이블에 놓기 (대상 없는 스킬 / 적이 하나뿐일 때)
+      if (!cb || ui.selCard === null) return;
+      const def = SKILL_BY_ID[run.skills[ui.selCard]?.id];
+      const alive = cb.enemies.filter((e) => e.hp > 0);
+      if (def?.target === 'enemy' && alive.length > 1) { app.toast('공격할 적을 탭하세요', 'info'); return; }
+      const slot = ui.selCard;
+      ui.selCard = null;
+      playSkill(app, slot, null);
       return;
     }
     case 'endTurn': {
@@ -268,4 +277,44 @@ function pickerDie(app: App, key: number) {
 function finishTutorial(app: App) {
   app.meta.tutorialDone = true;
   saveMeta(app.meta);
+}
+
+/** 이 카드를 지금 쓸 수 있는가 (안 되면 이유를 알려준다) */
+export function cardPlayable(app: App, slot: number, explain: boolean): boolean {
+  const run = app.run!;
+  const cb = run.combat;
+  if (!cb || cb.phase === 'over' || app.ui.busy) return false;
+  const def = SKILL_BY_ID[run.skills[slot]?.id];
+  if (!def) return false;
+  const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : app.ui.sel;
+  const ok = canUse(app.ctx, slot, sel) || !!autoPick(app.ctx, slot, sel);
+  if (!ok && explain) {
+    app.toast(cb.usedSlots[slot] ? '이번 턴에 이미 쓴 카드' : `이 카드는 ${condText(def.cond)} 주사위가 필요하다`, 'bad');
+    sfx.bad();
+    vibrate(20);
+  }
+  return ok;
+}
+
+/** 스킬 카드 사용. targetUid가 있으면 그 적을 대상으로 */
+export function playSkill(app: App, slot: number, targetUid: number | null) {
+  const run = app.run!;
+  const cb = run.combat;
+  const ui = app.ui;
+  const ctx = app.ctx;
+  if (!cb || cb.phase === 'over') return;
+  if (!cardPlayable(app, slot, true)) return;
+  if (targetUid !== null) setTarget(ctx, targetUid);
+  const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : ui.sel;
+  const keys = canUse(ctx, slot, sel) ? sel : autoPick(ctx, slot, sel)!;
+  const def = SKILL_BY_ID[run.skills[slot].id];
+  ui.selCard = null;
+  if (def.needsChoice) {
+    ui.picker = { mode: 'fate', slot, keys };
+    app.render();
+    return;
+  }
+  useSkill(ctx, slot, keys);
+  ui.sel = [];
+  app.after();
 }
