@@ -5,7 +5,7 @@ export const META_LOCKED_START: { kind: 'skill' | 'relic' | 'face'; id: string }
   { kind: 'skill', id: 'split' }, { kind: 'skill', id: 'triple' }, { kind: 'skill', id: 'roulette' },
   { kind: 'skill', id: 'chain' }, { kind: 'skill', id: 'echo' }, { kind: 'skill', id: 'reload' },
   { kind: 'skill', id: 'allin' }, { kind: 'skill', id: 'yahtzeehammer' }, { kind: 'skill', id: 'midas' },
-  { kind: 'skill', id: 'doubledown' },
+  { kind: 'skill', id: 'doubledown' }, { kind: 'skill', id: 'warcry' },
   // 면 8개 (20 중 40%)
   { kind: 'face', id: 'chip' }, { kind: 'face', id: 'clone' }, { kind: 'face', id: 'magnet' },
   { kind: 'face', id: 'ice' }, { kind: 'face', id: 'mirror' }, { kind: 'face', id: 'skull' },

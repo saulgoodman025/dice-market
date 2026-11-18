@@ -53,6 +53,9 @@ export function combatScreen(app: App): string {
     const st = [
       e.block ? `<span class="blk">🛡${e.block}</span>` : '',
       e.weak ? `<span>❄-${e.weak}</span>` : '',
+      e.str ? `<span class="st str" data-tip="💪 힘 ${e.str}: 공격 피해 +${e.str}">💪${e.str}</span>` : '',
+      e.vuln ? `<span class="st vuln" data-tip="💔 취약 ${e.vuln}턴: 받는 피해 +50%">💔${e.vuln}</span>` : '',
+      e.frail ? `<span class="st frail" data-tip="🥀 약화 ${e.frail}턴: 주는 피해 -25%">🥀${e.frail}</span>` : '',
       e.stacks ? `<span class="red">📈+${e.stacks}</span>` : '',
       e.nextMult > 1 ? `<span class="red">💪×2</span>` : '',
       e.enraged ? `<span class="red">😡</span>` : '',
@@ -64,7 +67,7 @@ export function combatScreen(app: App): string {
       <div class="em">${e.emoji}</div>
       <div class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯약점 <b>${e.weakPip}</b></div>
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
-      <div class="ehp ${e.poison ? 'poisoned' : ''}" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>${e.hp}</b></div>
+      <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i>${e.poison && e.hp > 0 ? `<u class="psn" style="left:${(Math.max(0, e.hp - e.poison) / e.maxHp) * 100}%;width:${(Math.min(e.poison, e.hp) / e.maxHp) * 100}%"></u>` : ''}<b>${e.hp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
     </div>`;
   }).join('');
@@ -101,7 +104,7 @@ export function combatScreen(app: App): string {
     let badge = '';
     if (pv?.keys) {
       if (pv.chance) badge = '<span class="pvb">🎲?</span>';
-      else if (pv.dmg) badge = `<span class="pvb dmg">⚔${pv.dmg}</span>`;
+      else if (pv.dmg || pv.blocked) badge = `<span class="pvb dmg" title="">⚔${pv.dmg}${pv.blocked ? `<small>🛡${pv.blocked}</small>` : ''}</span>`;
       else if (pv.block) badge = `<span class="pvb blk">🛡${pv.block}</span>`;
       else if (pv.heal) badge = `<span class="pvb heal">❤${pv.heal}</span>`;
       else if (pv.gold) badge = `<span class="pvb gold">🪙${pv.gold}</span>`;
@@ -155,6 +158,9 @@ export function combatScreen(app: App): string {
       <div class="hpbar" data-hpk="p" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>❤ <span class="hpval">${run.hp}</span>/${run.maxHp}</b></div>
       <div class="chiporb chipstat ${chipsNow === 0 ? 'empty' : ''}" data-tip="🔶 족보 칩 = 카드 비용\n족보로 얻고, 남은 칩은 ${BALANCE.chipCarryMax}개까지 이월">
         <span class="onum">${chipsNow}</span><span class="olbl">🔶 칩</span>${chipGain ? `<span class="ogain">족보 +${chipGain}</span>` : ''}</div>
+      ${cb.pStr ? `<span class="st str" data-tip="💪 힘 ${cb.pStr}: 공격할 때마다 피해 +${cb.pStr}">💪${cb.pStr}</span>` : ''}
+      ${cb.pWeak ? `<span class="st frail" data-tip="🥀 약화 ${cb.pWeak}턴: 내가 주는 피해 -25%">🥀${cb.pWeak}</span>` : ''}
+      ${cb.pVuln ? `<span class="st vuln" data-tip="💔 취약 ${cb.pVuln}턴: 내가 받는 피해 +50%">💔${cb.pVuln}</span>` : ''}
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>

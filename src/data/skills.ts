@@ -69,6 +69,11 @@ export const SKILLS: SkillDef[] = [
   { id: 'evenstab', name: '짝수 찌르기', cost: 1, icon: '🔱', target: 'enemy', rarity: 'common', cond: { k: 'even' }, desc: '적에게 눈 + {a}만큼 피해를 줍니다.', v: { a: 4 }, role: 'atk', run: (u) => { u.dmg(u.v + 4); } },
   { id: 'oddcut', name: '홀수 베기', cost: 1, icon: '🌀', rarity: 'common', cond: { k: 'odd' }, desc: '무작위 적에게 눈 + {a}만큼 피해를 줍니다.', v: { a: 3 }, role: 'atk', run: (u) => { u.dmg(u.v + 3, { random: true }); } },
   { id: 'thorns', name: '가시방패', cost: 1, icon: '🌵', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 방어도를 얻습니다. 이번 턴에 공격받으면 {r} 피해를 되돌려줍니다.', v: { r: 3 }, role: 'def', run: (u) => { u.block(u.v); cbOf(u.ctx).thorns += 3; } },
+  {
+    id: 'intimidate', name: '위협', cost: 0, icon: '😠', target: 'enemy', rarity: 'common', cond: { k: 'range', lo: 1, hi: 3 },
+    desc: '적을 2턴간 약화시킵니다. 약화된 적은 피해를 25% 덜 줍니다.', role: 'util', noEcho: true,
+    run: (u) => { const t = tgtOf(u); if (t) t.frail += 2; },
+  },
   // ── R ──
   { id: 'execute', name: '처형', cost: 2, icon: '🪓', target: 'enemy', rarity: 'rare', cond: { k: 'exact', v: 6 }, desc: '적에게 {d}의 피해를 줍니다.', v: { d: 18 }, role: 'atk', run: (u) => { u.dmg(18 * (u.vals[0] / 6)); } },
   {
@@ -98,6 +103,16 @@ export const SKILLS: SkillDef[] = [
   },
   { id: 'bump', name: '올리기', cost: 0, icon: '⬆️', rarity: 'rare', cond: { k: 'range', lo: 1, hi: 5 }, desc: '눈을 1 올려서 돌려받습니다.', role: 'util', noEcho: true, run: (u) => { u.ret = [u.dice[0].pip + 1]; } },
   { id: 'flip', name: '뒤집기', cost: 0, icon: '🔄', rarity: 'rare', cond: { k: 'any' }, desc: '주사위를 뒤집어 돌려받습니다. (1↔6, 2↔5, 3↔4)', role: 'util', noEcho: true, run: (u) => { u.ret = [Math.max(1, Math.min(6, 7 - u.dice[0].pip))]; } },
+  {
+    id: 'rally', name: '기합', cost: 1, icon: '💪', rarity: 'rare', cond: { k: 'range', lo: 5, hi: 6 },
+    desc: '이번 전투 동안 힘이 2 오릅니다. 공격할 때마다 피해가 2 늘어납니다.', role: 'util', noEcho: true,
+    run: (u) => { cbOf(u.ctx).pStr += 2; },
+  },
+  {
+    id: 'expose', name: '약점 노출', cost: 1, icon: '🔍', target: 'enemy', rarity: 'rare', cond: { k: 'any' },
+    desc: '적을 2턴간 취약하게 만듭니다. 취약한 적은 피해를 50% 더 받습니다.', role: 'util', noEcho: true,
+    run: (u) => { const t = tgtOf(u); if (t) t.vuln += 2; },
+  },
   // ── E ──
   {
     id: 'allin', name: '올인', cost: 2, icon: '💥', target: 'enemy', rarity: 'epic', cond: { k: 'all' }, desc: '남은 주사위를 모두 써서 합 × {m}의 피해를 줍니다. 합이 {t} 미만이면 저금통 절반을 잃습니다.', v: { m: 3, t: 15 }, role: 'atk',
@@ -132,6 +147,11 @@ export const SKILLS: SkillDef[] = [
   {
     id: 'reload', name: '재장전', cost: 0, icon: '🔃', rarity: 'epic', cond: { k: 'any' }, desc: '리롤을 1번 더 얻고, 주사위를 돌려받습니다. (턴당 1번)', perTurn: 1, role: 'util', noEcho: true,
     run: (u) => { const cb = cbOf(u.ctx); cb.rerollsLeft++; cb.phase = 'roll'; u.ret = [u.dice[0].pip]; },
+  },
+  {
+    id: 'warcry', name: '전투 함성', cost: 1, icon: '📣', rarity: 'epic', cond: { k: 'same', n: 2 },
+    desc: '모든 적을 1턴간 취약·약화시키고, 내 약화와 취약을 모두 없앱니다.', role: 'util', noEcho: true,
+    run: (u) => { const cb = cbOf(u.ctx); for (const e of cb.enemies) if (e.hp > 0) { e.vuln += 1; e.frail += 1; } cb.pWeak = 0; cb.pVuln = 0; },
   },
   // ── L ──
   {
@@ -196,3 +216,8 @@ export function checkCond(c: Cond, pips: number[], freeDice: number): boolean {
 }
 
 export { damagePlayer };
+
+function tgtOf(u: SkillUse) {
+  const cb = cbOf(u.ctx);
+  return cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? cb.enemies.find((e) => e.hp > 0);
+}

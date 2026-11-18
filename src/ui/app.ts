@@ -3,6 +3,7 @@ import { clearRun, loadMeta, loadRun, loadSettings, saveMeta, saveRun, saveSetti
 import type { GameEvent, RunState } from '../core/state';
 import type { Ctx } from '../rules/ctx';
 import { finishCombat, newRun, SAVE_VERSION, updateFlow } from '../rules/run';
+import { previewSkill } from '../rules/combat';
 import { settleRun, type SettleResult } from '../rules/meta';
 import { dailySetup, todayKey } from '../rules/daily';
 import { sfx, setSound, setTempo } from '../audio/sfx';
@@ -164,7 +165,7 @@ export class App {
       if (!t) return;
       const x = ev.clientX;
       const y = ev.clientY;
-      this.tipTimer = window.setTimeout(() => { this.showTip(t.dataset.tip!, x, y, t); this.suppressClick = true; }, 420);
+      this.tipTimer = window.setTimeout(() => { this.showTip(t.dataset.tip!, x, y, t); this.tipPinned = true; this.suppressClick = true; }, 420);
     });
     const cancel = () => { clearTimeout(this.tipTimer); setTimeout(() => { if (!this.tipPinned) this.hideTip(); }, 1400); };
     // 마우스: 올리면 바로 설명
@@ -184,6 +185,44 @@ export class App {
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  /** 카드를 적 위(또는 테이블)에 올렸을 때 체력바에 예상 피해 표시 */
+  showHitPreview(slot: number, targetUid: number | null) {
+    this.clearHitPreview();
+    const cb = this.run?.combat;
+    if (!cb) return;
+    const sel = cb.phase === 'roll' ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : this.ui.sel;
+    const pv = previewSkill(this.ctx, slot, sel, targetUid);
+    if (pv.chance) {
+      if (targetUid !== null) this.hitLabel(this.el(`[data-uid="${targetUid}"] .ehp`), '🎲 운에 달림', '');
+      return;
+    }
+    for (const h of pv.hits) {
+      const e = cb.enemies.find((x) => x.uid === h.uid);
+      const bar = this.view.querySelector<HTMLElement>(`[data-hpk="e${h.uid}"]`);
+      if (!e || !bar) continue;
+      if (h.hpLoss > 0) {
+        const seg = document.createElement('em');
+        seg.className = 'hpprev';
+        seg.style.left = `${(Math.max(0, e.hp - h.hpLoss) / e.maxHp) * 100}%`;
+        seg.style.width = `${(Math.min(h.hpLoss, e.hp) / e.maxHp) * 100}%`;
+        bar.appendChild(seg);
+      }
+      this.hitLabel(bar, h.kill ? `처치! -${h.hpLoss}` : `-${h.hpLoss}`, h.blockLoss ? `🛡${h.blockLoss} 막힘` : '');
+    }
+  }
+
+  private hitLabel(bar: Element | null, text: string, sub: string) {
+    if (!bar) return;
+    const l = document.createElement('div');
+    l.className = 'hplabel';
+    l.innerHTML = `<b>${text}</b>${sub ? `<span>${sub}</span>` : ''}`;
+    bar.appendChild(l);
+  }
+
+  clearHitPreview() {
+    this.view.querySelectorAll('.hpprev, .hplabel').forEach((x) => x.remove());
   }
 
   /** 드래그가 시작되면 길게 누르기 툴팁을 취소 */

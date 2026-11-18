@@ -15,6 +15,7 @@ interface DragState {
   ghost: HTMLElement | null;
   enemyTarget: boolean;
   hoverUid: number | null;
+  lastUid: number | null;
   armed: boolean;
 }
 
@@ -49,6 +50,7 @@ export function initCardDrag(app: App) {
   let st: DragState | null = null;
 
   const cleanup = (s: DragState) => {
+    app.clearHitPreview();
     root.classList.remove('dragging', 'drag-enemy', 'drag-field');
     root.querySelectorAll('.enemy.aim').forEach((e) => e.classList.remove('aim'));
     s.card.classList.remove('aiming', 'lifted');
@@ -62,7 +64,7 @@ export function initCardDrag(app: App) {
     const slot = Number(card.dataset.card);
     const def = SKILL_BY_ID[app.run?.skills[slot]?.id ?? ''];
     if (!def) return;
-    st = { slot, x0: e.clientX, y0: e.clientY, card, arrow: null, ghost: null, enemyTarget: def.target === 'enemy', hoverUid: null, armed: false };
+    st = { slot, x0: e.clientX, y0: e.clientY, card, arrow: null, ghost: null, lastUid: null, enemyTarget: def.target === 'enemy', hoverUid: null, armed: false };
   });
 
   window.addEventListener('pointermove', (e) => {
@@ -104,8 +106,14 @@ export function initCardDrag(app: App) {
       const tgt = enemyEl ?? (alive.length === 1 && inField ? alive[0] : null);
       st.hoverUid = tgt ? Number(tgt.dataset.uid) : null;
       tgt?.classList.add('aim');
+      const prev = st.armed ? st.lastUid : null;
       st.armed = st.hoverUid !== null;
+      if (st.hoverUid !== prev) {
+        st.lastUid = st.hoverUid;
+        if (st.hoverUid !== null) app.showHitPreview(st.slot, st.hoverUid); else app.clearHitPreview();
+      }
     } else {
+      if (inField !== st.armed) { if (inField) app.showHitPreview(st.slot, null); else app.clearHitPreview(); }
       st.armed = inField;
     }
     st.arrow?.classList.toggle('armed', st.armed);

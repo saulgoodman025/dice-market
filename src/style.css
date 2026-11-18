@@ -852,3 +852,23 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 #app.felt-red .table, #app.felt-red .mapwrap { background: radial-gradient(ellipse at 50% 35%, #6a2530, #4a1820 60%, #2a0c12); }
 #app.felt-purple .table, #app.felt-purple .mapwrap { background: radial-gradient(ellipse at 50% 35%, #4b3070, #33204a 60%, #1d122b); }
 #app.felt-black .table, #app.felt-black .mapwrap { background: radial-gradient(ellipse at 50% 35%, #2c2f33, #1b1d20 60%, #0f1012); }
+
+/* v1.8 독(다음 턴 피해만 초록) · 예상 피해 · 상태 */
+.ehp > u.psn { position: absolute; top: 0; bottom: 0; z-index: 1; background: repeating-linear-gradient(135deg, #8fdc4a 0 5px, #b6f06a 5px 10px); box-shadow: 0 0 6px rgba(155,225,93,.8); text-decoration: none; }
+.ehp > em.hpprev { position: absolute; top: 0; bottom: 0; z-index: 2; background: #fff; animation: hpblink .6s ease-in-out infinite; }
+@keyframes hpblink { 50% { background: #ffd1cc; opacity: .55; } }
+.ehp { overflow: visible !important; }
+.ehp > s.trail, .ehp > i { border-radius: 6px; }
+.hplabel { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, -2px); z-index: 5; white-space: nowrap; pointer-events: none; display: flex; gap: 4px; align-items: center; }
+.hplabel b { font-size: 16px; font-weight: 900; color: #fff; background: #c9303a; border-radius: 8px; padding: 0 6px; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.hplabel span { font-size: 11px; font-weight: 800; color: #dcecff; background: #1f4a78; border-radius: 6px; padding: 0 4px; }
+.scard .pvb small { font-size: 9px; margin-left: 2px; color: var(--blk); }
+.st { font-size: 11px; font-weight: 900; border-radius: 6px; padding: 0 4px; }
+.st.str { background: rgba(255,131,120,.18); color: #ffb3a8; }
+.st.vuln { background: rgba(255,90,120,.2); color: #ff9db0; }
+.st.frail { background: rgba(170,140,90,.25); color: #e6cf9c; }
+.player .st { font-size: 13px; flex-shrink: 0; }
+.ehp > u.psn { top: -2px; bottom: -2px; border-radius: 3px; background: repeating-linear-gradient(135deg, #7fe03a 0 4px, #c6ff7a 4px 8px); box-shadow: 0 0 8px #9be15d; }
+.enemy.aim::after { font-size: 30px; opacity: .3; top: 30%; }
+.hplabel { bottom: calc(100% + 4px); z-index: 8; }
+.hplabel b { font-size: 18px; padding: 1px 8px; border: 2px solid #fff; }

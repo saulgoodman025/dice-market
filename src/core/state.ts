@@ -43,7 +43,8 @@ export interface HandDie {
 export type IntentKind =
   | 'attack' | 'attackRange' | 'multi' | 'block' | 'buff' | 'debuff'
   | 'steal' | 'stealDie' | 'tax' | 'flip' | 'interest' | 'copy' | 'charge'
-  | 'rig' | 'seize' | 'bet' | 'random' | 'houseCopy' | 'queen';
+  | 'rig' | 'seize' | 'bet' | 'random' | 'houseCopy' | 'queen'
+  | 'enrage' | 'curseWeak' | 'curseVuln';
 
 export interface IntentSpec {
   k: IntentKind;
@@ -76,6 +77,9 @@ export interface Enemy {
   splitDone: boolean;
   enraged: boolean;
   weakPip: number; // 공개된 약점 눈 (이 눈으로 공격하면 피해 1.5배)
+  str: number; // 💪 힘: 공격 피해 +N (전투 동안)
+  vuln: number; // 💔 취약: 받는 피해 +50% (남은 턴)
+  frail: number; // 🥀 약화: 주는 피해 -25% (남은 턴)
 }
 
 export interface HandResult {
@@ -107,6 +111,9 @@ export interface CombatState {
   counters: Record<string, number>; // 전투 단위 카운터
   turnCounters: Record<string, number>; // 턴 단위 카운터
   handChips: number; // 🔶 족보 칩 (카드 비용)
+  pStr: number; // 내 💪 힘
+  pVuln: number; // 내 💔 취약
+  pWeak: number; // 내 🥀 약화
   next: { six: number; one: number; rerollPenalty: number; flip: boolean; stealDie: boolean; preview: number[] };
   jackpotTurn: boolean;
   houseRule: string | null;

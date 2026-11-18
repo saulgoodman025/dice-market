@@ -6,6 +6,8 @@ export const BALANCE = {
   lockLimit: 2, // 동시에 잠글 수 있는 주사위
   chipCarryMax: 3, // 다음 턴으로 넘길 수 있는 족보 칩
   weakMult: 1.75,
+  vulnMult: 1.5, // 취약: 받는 피해 ×1.5
+  frailMult: 0.75, // 약화: 주는 피해 ×0.75
   weakJackpot: 4, // 약점 눈 적중 시 잭팟 게이지 +% // 약점 눈 피해 배율
   startSlots: 4,
   maxSlots: 6,

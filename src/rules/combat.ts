@@ -21,7 +21,7 @@ export function makeEnemy(ctx: Ctx, id: string, hpMult: number, patternOffset = 
   const e: Enemy = {
     uid: ctx.run.nextUid++, id, name: def.name, emoji: def.emoji, hp, maxHp: hp, block: 0,
     patternIdx: patternOffset % def.pattern.length, intent: { k: 'attack', label: '', icon: '' },
-    poison: 0, weak: 0, nextMult: 1, stacks: 0, charge: 0, phase: 1, splitDone: false, enraged: false, weakPip: 1,
+    poison: 0, weak: 0, nextMult: 1, stacks: 0, charge: 0, phase: 1, splitDone: false, enraged: false, weakPip: 1, str: 0, vuln: 0, frail: 0,
   };
   return e;
 }
@@ -43,7 +43,7 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
   }
   const cb: CombatState = {
     kind, enemies, hand: [], phase: 'roll', turn: 0, rerollsLeft: 0, block: 0, keepBlock: 0, thorns: 0,
-    piggy: 0, piggyMult: 1, handChips: 0, handResult: null, usedSlots: [], target: enemies[0].uid, diceUsedThisTurn: 0,
+    piggy: 0, piggyMult: 1, handChips: 0, pStr: 0, pVuln: 0, pWeak: 0, handResult: null, usedSlots: [], target: enemies[0].uid, diceUsedThisTurn: 0,
     lastSkill: null, doubledown: 0, counters: {}, turnCounters: {},
     next: { six: 0, one: 0, rerollPenalty: 0, flip: false, stealDie: false, preview: [] },
     jackpotTurn: false, houseRule: null, queenParity: null, lastSkillDamage: 0, dmgTaken: 0, result: null,
@@ -59,9 +59,12 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
 // ───────────── 인텐트 ─────────────
 function attackValue(ctx: Ctx, e: Enemy, base: number): number {
   const m = getMods(ctx.run);
-  let v = (base + e.stacks) * e.nextMult;
+  const cb = ctx.run.combat;
+  let v = (base + e.stacks + e.str) * e.nextMult;
   if (e.enraged) v *= 1.5;
   if (e.phase >= 2 && m.bossPhase2 > 0 && ENEMY_BY_ID[e.id].tier === 'boss') v *= 1.25;
+  if (e.frail > 0) v *= BALANCE.frailMult; // 적 약화
+  if (cb && cb.pVuln > 0) v *= BALANCE.vulnMult; // 내 취약
   v -= e.weak;
   return Math.max(0, Math.round(v));
 }
@@ -93,6 +96,9 @@ export function describeIntent(ctx: Ctx, e: Enemy, spec: IntentSpec): Intent {
     case 'rig': return { ...spec, icon: '🎯', label: '주사위 1 강제' };
     case 'seize': return { ...spec, icon: '📜', label: '소모품 압류' };
     case 'bet': return { ...spec, icon: '🎲', label: `${attackValue(ctx, e, n)}~${attackValue(ctx, e, n * 6)}` };
+    case 'enrage': return { ...spec, icon: '💪', label: `힘 +${n}` };
+    case 'curseWeak': return { ...spec, icon: '🥀', label: `약화 ${n}` };
+    case 'curseVuln': return { ...spec, icon: '💔', label: `취약 ${n}` };
     case 'houseCopy': {
       const mult = cb?.handResult?.mult ?? 1;
       return { ...spec, icon: '🏛️', label: `${n}×족보(${attackValue(ctx, e, Math.round(n * mult))})` };
@@ -532,7 +538,9 @@ export function useSkill(ctx: Ctx, slot: number, keys: number[], choice?: { key:
   const u: SkillUse = {
     ctx, slot, dice, vals, v: vals[0], sum: vals.reduce((a, b) => a + b, 0), power, ret: null, choice,
     dmg: (base, opts = {}) => {
-      const amount = opts.flat ? base : base * handMult * heatMult * power * extraMult;
+      // 💪 힘은 한 대마다 더해지고, 🥀 약화는 피해를 25% 줄인다
+      const weakM = cb.pWeak > 0 ? BALANCE.frailMult : 1;
+      const amount = opts.flat ? base : (base + cb.pStr) * handMult * heatMult * power * extraMult * weakM;
       const hits = opts.hits ?? 1;
       let total = 0;
       for (let i = 0; i < hits; i++) {
@@ -652,6 +660,8 @@ export function endTurn(ctx: Ctx) {
     cb.piggy = Math.round((cb.piggy + add) * mult);
   }
   cb.handChips = Math.min(BALANCE.chipCarryMax, cb.handChips);
+  if (cb.pWeak > 0) cb.pWeak--;
+  if (cb.pVuln > 0) cb.pVuln--;
   if (cb.doubledown) {
     damagePlayer(ctx, cb.doubledown, '더블다운', { ignoreBlock: true });
     cb.doubledown = 0;
@@ -745,10 +755,15 @@ export function enemyTurn(ctx: Ctx) {
         enemyAttack(ctx, e, attackValue(ctx, e, r * n));
         break;
       }
+      case 'enrage': e.str += n; toast(ctx, `💪 ${e.name}의 힘 +${n}`, 'bad'); break;
+      case 'curseWeak': cb.pWeak += n; toast(ctx, `🥀 약화 ${n}턴: 내가 주는 피해 -25%`, 'bad'); break;
+      case 'curseVuln': cb.pVuln += n; toast(ctx, `💔 취약 ${n}턴: 내가 받는 피해 +50%`, 'bad'); break;
       case 'houseCopy': enemyAttack(ctx, e, attackValue(ctx, e, Math.round(n * (cb.handResult?.mult ?? 1)))); break;
       default: break;
     }
     if (it.k !== 'charge') e.charge = 0;
+    if (e.vuln > 0) e.vuln--;
+    if (e.frail > 0) e.frail--;
     const def = ENEMY_BY_ID[e.id];
     e.patternIdx = (e.patternIdx + 1) % def.pattern.length;
     e.intent = makeIntent(ctx, e);
@@ -767,19 +782,32 @@ export function useConsumable(ctx: Ctx, idx: number, def: { use?: (c: Ctx) => bo
   return ok;
 }
 
+export interface EnemyHit {
+  uid: number;
+  hpLoss: number; // 실제로 깎이는 체력
+  blockLoss: number; // 방어도에 막히는 양
+  kill: boolean;
+}
+
 export interface SkillPreview {
   keys: number[] | null;
-  dmg: number;
+  dmg: number; // 실제로 깎이는 체력 합 (방어도에 막힌 부분 제외)
+  blocked: number;
   block: number;
   heal: number;
   gold: number;
   piggy: number;
   chance: boolean;
+  hits: EnemyHit[];
 }
 
-/** 스킬을 실제 규칙으로 복제 상태에서 미리 실행해 예상 효과를 구한다 (실제 상태·RNG는 건드리지 않음) */
-export function previewSkill(ctx: Ctx, slot: number, prefer: number[]): SkillPreview {
-  const empty: SkillPreview = { keys: null, dmg: 0, block: 0, heal: 0, gold: 0, piggy: 0, chance: false };
+/**
+ * 스킬을 실제 규칙으로 복제 상태에서 미리 실행해 예상 효과를 구한다 (실제 상태·RNG는 건드리지 않음).
+ * 족보·열기·약점·힘·약화·취약·적 특수 능력·방어도·유물이 모두 반영된다.
+ * targetUid를 주면 그 적을 대상으로 계산한다.
+ */
+export function previewSkill(ctx: Ctx, slot: number, prefer: number[], targetUid: number | null = null): SkillPreview {
+  const empty: SkillPreview = { keys: null, dmg: 0, blocked: 0, block: 0, heal: 0, gold: 0, piggy: 0, chance: false, hits: [] };
   const cb = ctx.run.combat;
   if (!cb || cb.phase === 'over' || !skillUsable(ctx, slot)) return empty;
   const keys = canUse(ctx, slot, prefer) ? prefer : autoPick(ctx, slot, prefer);
@@ -788,23 +816,33 @@ export function previewSkill(ctx: Ctx, slot: number, prefer: number[]): SkillPre
   const run2 = structuredClone(ctx.run);
   const c2: Ctx = { run: run2, emit: () => {} };
   const cb2 = run2.combat!;
+  if (targetUid !== null && cb2.enemies.some((e) => e.uid === targetUid && e.hp > 0)) cb2.target = targetUid;
   if (cb2.phase === 'roll') confirmHand(c2);
   if (cb2.result) return { ...empty, keys };
-  const hp0 = cb2.enemies.reduce((s, e) => s + e.hp + e.block, 0);
+  const before = new Map(cb2.enemies.map((e) => [e.uid, { hp: e.hp, block: e.block }]));
   const b0 = cb2.block + cb2.keepBlock;
   const h0 = run2.hp;
   const g0 = run2.gold;
   const p0 = cb2.piggy;
-  useSkill(c2, slot, keys, def.needsChoice ? undefined : undefined);
-  const hp1 = cb2.enemies.reduce((s, e) => s + e.hp + e.block, 0);
+  useSkill(c2, slot, keys);
+  const hits: EnemyHit[] = [];
+  for (const e of cb2.enemies) {
+    const o = before.get(e.uid);
+    if (!o) continue; // 분열로 새로 생긴 적
+    const hpLoss = Math.max(0, o.hp - e.hp);
+    const blockLoss = Math.max(0, o.block - e.block);
+    if (hpLoss || blockLoss) hits.push({ uid: e.uid, hpLoss, blockLoss, kill: o.hp > 0 && e.hp <= 0 });
+  }
   return {
     keys,
-    dmg: Math.max(0, hp0 - hp1),
+    dmg: hits.reduce((s2, h) => s2 + h.hpLoss, 0),
+    blocked: hits.reduce((s2, h) => s2 + h.blockLoss, 0),
     block: Math.max(0, cb2.block + cb2.keepBlock - b0),
     heal: Math.max(0, run2.hp - h0),
     gold: Math.max(0, run2.gold - g0),
     piggy: Math.max(0, cb2.piggy - p0),
     chance: !!def.chance,
+    hits,
   };
 }
 

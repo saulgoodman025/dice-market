@@ -30,6 +30,7 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   const def = ENEMY_BY_ID[e.id];
   let amt = Math.max(0, Math.round(amount));
   const weakHit = info.pip !== undefined && info.pip === e.weakPip && amt > 0;
+  if (e.vuln > 0 && info.source !== '독' && amt > 0) amt = Math.round(amt * BALANCE.vulnMult);
   if (weakHit) { amt = Math.round(amt * BALANCE.weakMult); addJackpot(ctx, BALANCE.weakJackpot); }
   if (def.modIncoming) amt = Math.max(0, Math.round(def.modIncoming(ctx, e, amt, info)));
   if (e.enraged) amt = Math.round(amt * 1.0);

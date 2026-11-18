@@ -32,7 +32,7 @@ export const HOUSE_RULES: Record<string, string> = {
 
 export const ENEMIES: EnemyDef[] = [
   // ── 1막 로비 ──
-  { id: 'bouncer', name: '문지기', emoji: '🕴️', hp: 26, act: 1, tier: 'normal', pattern: [{ k: 'attack', n: 7 }, { k: 'block', n: 6 }], desc: '' },
+  { id: 'bouncer', name: '문지기', emoji: '🕴️', hp: 26, act: 1, tier: 'normal', pattern: [{ k: 'attack', n: 7 }, { k: 'block', n: 6 }, { k: 'enrage', n: 2 }], desc: '가끔 힘을 길러 공격이 세집니다.' },
   { id: 'pickpocket', name: '소매치기', emoji: '🥷', hp: 18, act: 1, tier: 'normal', pattern: [{ k: 'steal', n: 5 }, { k: 'attack', n: 5 }], desc: '저금통에서 5를 훔쳐 갑니다.' },
   {
     id: 'chiprat', name: '칩 쥐', emoji: '🐀', hp: 12, act: 1, tier: 'normal', count: 2, pattern: [{ k: 'attack', n: 4 }], desc: '쓰러뜨리면 카지노 칩을 1 줍니다.',
@@ -42,7 +42,7 @@ export const ENEMIES: EnemyDef[] = [
   { id: 'valet', name: '주차요원', emoji: '🅿️', hp: 22, act: 1, tier: 'normal', pattern: [{ k: 'attack', n: 6 }, { k: 'debuff' }], desc: '다음 턴 내 리롤을 1 줄입니다.' },
   { id: 'cardshark', name: '카드 샤크', emoji: '🦈', hp: 24, act: 1, tier: 'normal', pattern: [{ k: 'attack', n: 5 }, { k: 'buff' }], desc: '힘을 모아 다음 공격이 2배가 됩니다.' },
   {
-    id: 'pitguard', name: '경비대장', emoji: '💂', hp: 60, act: 1, tier: 'elite', pattern: [{ k: 'block', n: 10 }, { k: 'attack', n: 14 }, { k: 'multi', n: 6, hits: 2 }],
+    id: 'pitguard', name: '경비대장', emoji: '💂', hp: 60, act: 1, tier: 'elite', pattern: [{ k: 'block', n: 10 }, { k: 'curseVuln', n: 2 }, { k: 'attack', n: 14 }, { k: 'multi', n: 6, hits: 2 }],
     desc: '방어도가 있으면 홀수 눈 피해를 절반만 받습니다.',
     modIncoming: (_c, e, a, info) => (e.block > 0 && info.pip !== undefined && info.pip % 2 === 1 ? a / 2 : a),
   },
@@ -67,7 +67,7 @@ export const ENEMIES: EnemyDef[] = [
     modIncoming: (_c, _e, a, info) => (info.pip !== undefined && info.pip % 2 === 1 ? 0 : a),
   },
   {
-    id: 'evenhater', name: '홀수 광신도', emoji: '⚫', hp: 42, act: 2, tier: 'normal', pattern: [{ k: 'attack', n: 9 }], desc: '짝수 눈으로 준 피해를 받지 않습니다.',
+    id: 'evenhater', name: '홀수 광신도', emoji: '⚫', hp: 42, act: 2, tier: 'normal', pattern: [{ k: 'attack', n: 9 }, { k: 'curseWeak', n: 2 }, { k: 'attack', n: 9 }], desc: '짝수 눈으로 준 피해를 받지 않습니다.',
     modIncoming: (_c, _e, a, info) => (info.pip !== undefined && info.pip % 2 === 0 ? 0 : a),
   },
   { id: 'loanshark', name: '사채업자', emoji: '💸', hp: 50, act: 2, tier: 'normal', pattern: [{ k: 'attack', n: 6 }, { k: 'attack', n: 6 }, { k: 'interest', n: 4 }], desc: '이자가 붙어 공격이 점점 4씩 세집니다.' },
@@ -79,7 +79,7 @@ export const ENEMIES: EnemyDef[] = [
     },
   },
   {
-    id: 'auditor', name: '감사관', emoji: '🕵️', hp: 80, act: 2, tier: 'elite', pattern: [{ k: 'block', n: 15 }, { k: 'attack', n: 18 }], desc: '투 페어 이하의 족보로 준 피해는 절반만 받습니다.',
+    id: 'auditor', name: '감사관', emoji: '🕵️', hp: 80, act: 2, tier: 'elite', pattern: [{ k: 'block', n: 15 }, { k: 'curseWeak', n: 2 }, { k: 'attack', n: 18 }], desc: '투 페어 이하의 족보로 준 피해는 절반만 받습니다.',
     modIncoming: (ctx, _e, a) => { const h = ctx.run.combat?.handResult; return h && HAND_BY_ID[h.id].rank <= 2 ? a / 2 : a; },
   },
   {
@@ -104,7 +104,7 @@ export const ENEMIES: EnemyDef[] = [
     },
   },
   // ── 3막 하우스 금고 ──
-  { id: 'golem', name: '칩 골렘', emoji: '🗿', hp: 70, act: 3, tier: 'normal', pattern: [{ k: 'block', n: 12 }, { k: 'attack', n: 16 }], desc: '' },
+  { id: 'golem', name: '칩 골렘', emoji: '🗿', hp: 70, act: 3, tier: 'normal', pattern: [{ k: 'block', n: 12 }, { k: 'attack', n: 16 }, { k: 'enrage', n: 3 }], desc: '단단하고, 점점 힘이 세집니다.' },
   { id: 'oddsmaker', name: '확률 설계자', emoji: '🧮', hp: 55, act: 3, tier: 'normal', pattern: [{ k: 'attack', n: 12 }, { k: 'rig' }], desc: '다음 굴림에서 내 주사위 하나를 1로 만듭니다.' },
   {
     id: 'goldslime', name: '황금 슬라임', emoji: '🟡', hp: 60, act: 3, tier: 'normal', pattern: [{ k: 'attack', n: 10 }], desc: '맞을 때마다 골드를 2 흘립니다. 체력이 절반이 되면 둘로 갈라집니다.',
@@ -133,10 +133,10 @@ export const ENEMIES: EnemyDef[] = [
     onDeath: (ctx) => addConsumable(ctx, rng(ctx, 'loot').pick(CONSUMABLES.filter((c) => c.rarity !== 'legendary')).id),
   },
   { id: 'debtcollector', name: '추심원', emoji: '📜', hp: 65, act: 3, tier: 'normal', pattern: [{ k: 'attack', n: 14 }, { k: 'seize' }], desc: '내 소모품 하나를 압류해 갑니다.' },
-  { id: 'highroller', name: '하이롤러', emoji: '🤵', hp: 110, act: 3, tier: 'elite', pattern: [{ k: 'bet', n: 4 }, { k: 'attack', n: 16 }], desc: '주사위를 굴려 그 눈의 4배로 공격합니다.' },
+  { id: 'highroller', name: '하이롤러', emoji: '🤵', hp: 110, act: 3, tier: 'elite', pattern: [{ k: 'bet', n: 4 }, { k: 'curseVuln', n: 2 }, { k: 'attack', n: 16 }], desc: '내게 취약을 건 뒤 주사위를 굴려 그 눈의 4배로 공격합니다.' },
   { id: 'vaultkeeper', name: '금고지기', emoji: '🔐', hp: 120, act: 3, tier: 'elite', frozePiggy: true, pattern: [{ k: 'block', n: 20 }, { k: 'attack', n: 15 }], desc: '방어도가 있는 동안 내 저금통이 쌓이지 않습니다.' },
   {
-    id: 'thehouse', name: '더 하우스', emoji: '🏛️', hp: 320, act: 3, tier: 'boss', pattern: [{ k: 'houseCopy', n: 10 }, { k: 'block', n: 20 }, { k: 'houseCopy', n: 14 }],
+    id: 'thehouse', name: '더 하우스', emoji: '🏛️', hp: 320, act: 3, tier: 'boss', pattern: [{ k: 'houseCopy', n: 10 }, { k: 'curseWeak', n: 2 }, { k: 'block', n: 20 }, { k: 'houseCopy', n: 14 }],
     desc: '내 족보 배율만큼 세게 반격합니다. 체력이 절반 이하면, 내가 노 핸드일 때마다 30 회복합니다.',
     onTurnStart: (ctx, e) => { if (e.phase === 1 && e.hp <= e.maxHp / 2) { e.phase = 2; toast(ctx, '더 하우스 2페이즈: 노 핸드를 노린다!', 'bad'); } },
     onHandScored: (ctx, e, hand) => {

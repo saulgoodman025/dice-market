@@ -21,7 +21,7 @@ const mk = (seed = 1, char = 'gambler') => {
 
 describe('콘텐츠 수량', () => {
   it('사양서 수량과 일치', () => {
-    expect(SKILLS.length).toBe(32);
+    expect(SKILLS.length).toBe(36);
     expect(FACES.length).toBe(20);
     expect(MATERIALS.length).toBe(9);
     expect(RELICS.length).toBe(50);
@@ -228,5 +228,43 @@ describe('족보 재판정', () => {
     expect(cb.hand.filter((h) => !h.gone).map((h) => h.pip).filter((p) => p === 6).length).toBe(4);
     expect(cb.handResult!.id).toBe('four');
     expect(cb.handChips).toBe(chips0 + 3); // 트리플 4 → 포카드 7 (올리기 비용 0)
+  });
+});
+
+describe('버프·디버프', () => {
+  const setup = (seed: number) => {
+    const { run, ctx } = mk(seed, 'knight');
+    startCombat(ctx, 'normal', ['golem']);
+    const cb = run.combat!;
+    const e = cb.enemies[0];
+    e.hp = e.maxHp = 999; e.block = 0; e.weakPip = 99;
+    run.heat = 0;
+    cb.hand.forEach((h, i) => { h.pip = [1, 2, 4, 5, 6][i]; h.sticker = undefined; h.material = 'wood'; });
+    confirmHand(ctx); // 노 핸드 ×1
+    cb.handChips = 9;
+    return { run, ctx, cb, e };
+  };
+  it('힘: 공격 피해 +N', () => {
+    const { ctx, cb, e } = setup(51);
+    cb.pStr = 3;
+    useSkill(ctx, 0, [cb.hand[2].key]); // 베기 4
+    expect(999 - e.hp).toBe(7);
+  });
+  it('약화: 내 피해 ×0.75, 취약한 적: 받는 피해 ×1.5', () => {
+    const a = setup(52);
+    a.cb.pWeak = 1;
+    useSkill(a.ctx, 0, [a.cb.hand[2].key]);
+    expect(999 - a.e.hp).toBe(3);
+    const b = setup(53);
+    b.e.vuln = 1;
+    useSkill(b.ctx, 0, [b.cb.hand[2].key]);
+    expect(999 - b.e.hp).toBe(6);
+  });
+  it('상태는 턴이 지나면 줄어든다', () => {
+    const { ctx, cb, e } = setup(54);
+    cb.pWeak = 1; e.vuln = 1;
+    endTurn(ctx);
+    expect(cb.pWeak).toBe(0);
+    expect(e.vuln).toBe(0);
   });
 });
