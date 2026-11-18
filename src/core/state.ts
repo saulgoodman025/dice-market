@@ -218,6 +218,9 @@ export interface RunState {
   rng: Record<Stream, number>;
   charId: string;
   stake: number;
+  table: string; // 시작 테이블
+  dailyKey?: string; // 일일 도전 날짜
+  dailyRule?: string; // 일일 도전 규칙 id
   hp: number;
   maxHp: number;
   gold: number;

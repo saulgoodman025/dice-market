@@ -29,12 +29,15 @@ export function makeEnemy(ctx: Ctx, id: string, hpMult: number, patternOffset = 
 export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: string[], rewardMult = 1) {
   const run = ctx.run;
   const m = getMods(run);
-  const hpMult = BALANCE.enemyHpMult * (1 + m.enemyHpPct) * ddaEnemyHpMult(run);
+  const endless = Math.max(0, run.act - 3);
+  const hpMult = BALANCE.enemyHpMult * (1 + m.enemyHpPct) * ddaEnemyHpMult(run) * (1 + 0.4 * endless);
   const enemies: Enemy[] = [];
   const seen: Record<string, number> = {};
   for (const id of enemyIds) {
     seen[id] = (seen[id] ?? 0);
-    enemies.push(makeEnemy(ctx, id, hpMult, seen[id]));
+    const en = makeEnemy(ctx, id, hpMult, seen[id]);
+    en.stacks += 2 * endless; // 엔드리스: 공격력 +2/막
+    enemies.push(en);
     seen[id]++;
     run.flags['seen_enemy_' + id] = 1;
   }
@@ -395,6 +398,7 @@ export function confirmHand(ctx: Ctx) {
   }
   cb.turnCounters.confirmed = 1;
   cb.handChips += handChipsFor(ctx, hand.id);
+  run.flags.ach_max_chips = Math.max(run.flags.ach_max_chips ?? 0, cb.handChips);
   if (hand.heat < 0) resetHeat(ctx);
   else addHeat(ctx, hand.heat);
   if (hand.jackpot) addJackpot(ctx, hand.jackpot);

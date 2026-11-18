@@ -39,6 +39,9 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   // 튜토리얼 동안 적은 체력 1 아래로 내려가지 않는다 (끝까지 배울 수 있게)
   if (ctx.run.flags.tutorial && e.hp - dealt < 1) dealt = Math.max(0, e.hp - 1);
   e.hp = Math.max(0, e.hp - dealt);
+  ctx.run.flags.ach_max_hit = Math.max(ctx.run.flags.ach_max_hit ?? 0, dealt);
+  if (weakHit) ctx.run.flags.ach_weak_hits = (ctx.run.flags.ach_weak_hits ?? 0) + 1;
+  if (e.hp <= 0 && info.source === '독') ctx.run.flags.ach_poison_kill = 1;
   ctx.emit({ t: 'dmgEnemy', uid: e.uid, amount: dealt, crit: info.crit, blocked, src: info.source, weakHit });
   if (dealt > 0) def.onDamaged?.(ctx, e, dealt);
   if (e.hp <= 0) killEnemy(ctx, e);
@@ -51,6 +54,7 @@ export function killEnemy(ctx: Ctx, e: Enemy) {
   e.hp = 0;
   ctx.run.stats.kills++;
   ctx.emit({ t: 'enemyDie', uid: e.uid });
+  if (ENEMY_BY_ID[e.id].tier === 'boss' && cb.turnCounters.yahtzee) ctx.run.flags.ach_yahtzee_boss = 1;
   ENEMY_BY_ID[e.id].onDeath?.(ctx, e);
   fire(ctx, 'onKill', { enemy: e });
   if (alive(cb).length === 0) {
@@ -115,6 +119,7 @@ export function healPlayer(ctx: Ctx, amount: number) {
 export function gainGold(ctx: Ctx, amount: number) {
   const a = Math.round(amount);
   ctx.run.gold = Math.max(0, ctx.run.gold + a);
+  ctx.run.flags.ach_max_gold = Math.max(ctx.run.flags.ach_max_gold ?? 0, ctx.run.gold);
   if (a > 0) ctx.run.stats.goldEarned += a;
   if (a !== 0) ctx.emit({ t: 'gold', amount: a });
 }

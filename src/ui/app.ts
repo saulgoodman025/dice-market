@@ -3,7 +3,8 @@ import { clearRun, loadMeta, loadRun, loadSettings, saveMeta, saveRun, saveSetti
 import type { GameEvent, RunState } from '../core/state';
 import type { Ctx } from '../rules/ctx';
 import { finishCombat, newRun, SAVE_VERSION, updateFlow } from '../rules/run';
-import { settleRun } from '../rules/meta';
+import { settleRun, type SettleResult } from '../rules/meta';
+import { dailySetup, todayKey } from '../rules/daily';
 import { sfx, setSound, setTempo } from '../audio/sfx';
 import { burstAt, coinRain, dmgSize, floatAt, hitstop, initFx, setFx, shake, vibrate } from './fx/fx';
 import { BALANCE } from '../data/balance';
@@ -21,7 +22,7 @@ const HIT_STRONG = 15;
 const HIT_MASSIVE = 30;
 import type { SlotResult } from '../rules/casino';
 
-export type Page = 'title' | 'charselect' | 'codex' | 'settings' | 'run';
+export type Page = 'title' | 'charselect' | 'codex' | 'settings' | 'run' | 'achievements';
 
 export interface Ui {
   page: Page;
@@ -34,13 +35,15 @@ export interface Ui {
   busy: boolean;
   charSel: string;
   stakeSel: number;
+  tableSel: string;
+  achTab: 'ach' | 'mastery';
   scratch: { grid: string[]; wins: string[]; rev: boolean[] } | null;
   mystery: { rarity: string; relic: string | null; opened: boolean } | null;
   slot: { res: SlotResult | null; spinning: boolean } ;
   roulette: { n: number | null; won: number; spinning: boolean };
   high: { d: [number, number] | null; win: boolean; text: string };
   don: { rolling: boolean; face: number; text: string; before?: { gold: number; streak: number } };
-  end: { points: number; unlocked: string[] } | null;
+  end: SettleResult | null;
   codexTab: 'relic' | 'face' | 'enemy' | 'hand';
   shopEdit: boolean;
   infoKey: number;
@@ -68,7 +71,7 @@ export class App {
   debug = new URLSearchParams(location.search).has('debug');
   ui: Ui = {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
-    charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
+    charSel: 'gambler', stakeSel: 0, tableSel: 'classic', achTab: 'ach', scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
     don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands', pickSlot: null, pickFace: null, pickMat: null, selCard: null, restPick: null, rewardSel: null, freeze: null,
   };
@@ -106,12 +109,23 @@ export class App {
     setSound(this.settings.sound);
     setTempo(this.settings.speed);
     setFx({ shake: this.settings.shake, vibrate: this.settings.vibrate, speed: this.settings.speed });
+    // 꾸미기: 주사위 스킨·테이블 색
+    this.root.className = this.root.className.replace(/\b(skin|felt)-\S+/g, '').trim();
+    this.root.classList.add(`skin-${this.settings.skin ?? 'ivory'}`, `felt-${this.settings.felt ?? 'green'}`);
     saveSettings(this.settings);
   }
 
-  startRun(charId: string, stake: number) {
+  startRun(charId: string, stake: number, table = 'classic') {
     const seed = (Date.now() ^ Math.floor(fxRandom() * 1e9)) >>> 0;
-    this.run = newRun(seed, charId, stake, { unlocked: this.meta.unlocked });
+    this.run = newRun(seed, charId, stake, { unlocked: this.meta.unlocked }, { table });
+    this.ui.page = 'run';
+    this.save();
+  }
+
+  /** 오늘의 도전: 날짜로 정해진 시드·캐릭터·테이블·규칙 */
+  startDaily() {
+    const d = dailySetup(todayKey());
+    this.run = newRun(d.seed, d.charId, 0, { unlocked: this.meta.unlocked }, { table: d.tableId, dailyKey: d.key, dailyRule: d.rule.id });
     this.ui.page = 'run';
     this.save();
   }
@@ -250,6 +264,8 @@ export class App {
   /** 규칙 실행 후 호출: 저장 → 렌더 → 연출 */
   after(opts: { noRender?: boolean; enemyPhase?: { hp0: number; blk0: number } } = {}) {
     const run = this.run;
+    // 판이 끝났으면 결과 화면을 그리기 전에 정산 (업적·숙련도·일일 점수 표시)
+    if (run && (run.screen === 'victory' || run.screen === 'gameover') && !this.ui.end) this.endRun();
     const events = this.queue.splice(0);
     const ci = events.findIndex((e) => e.t === 'chanceRoll');
     if (ci >= 0 && !opts.enemyPhase) {
@@ -305,7 +321,6 @@ export class App {
       this.piggyAnimated = run.reward;
       this.piggyCountUp(run.reward.piggy);
     }
-    if (run && (run.screen === 'victory' || run.screen === 'gameover') && !this.ui.end) this.endRun();
     this.save();
   }
 

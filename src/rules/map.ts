@@ -89,9 +89,10 @@ export function genActMap(ctx: Ctx): MapNode[][] {
 }
 
 export function pickEncounter(ctx: Ctx, tier: 'normal' | 'elite' | 'boss'): string[] {
-  const act = ctx.run.act;
+  const act = Math.min(3, ctx.run.act);
   const r = rng(ctx, 'map');
-  const pool = ENEMIES.filter((e) => e.act === act && e.tier === tier);
+  // 엔드리스(4막~): 3막 적, 보스는 셋 중 무작위
+  const pool = ENEMIES.filter((e) => (ctx.run.act > 3 && tier === 'boss' ? true : e.act === act) && e.tier === tier);
   const def = r.pick(pool);
   const ids = Array(def.count ?? 1).fill(def.id);
   // 3막 후반 일반 전투는 가끔 2마리

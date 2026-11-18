@@ -13,6 +13,11 @@ export interface Meta {
   codex: { relics: string[]; faces: string[]; enemies: string[]; hands: string[] };
   stats: { runs: number; wins: number; yahtzees: number; megaJackpots: number; bestNodes: number };
   tutorialDone: boolean;
+  achievements: string[];
+  mastery: Record<string, number>; // 캐릭터별 숙련도 경험치
+  owned: string[]; // 'table:id' | 'skin:id' | 'felt:id'
+  daily: Record<string, number>; // 날짜별 최고 점수
+  bestEndless: number;
 }
 
 export interface Settings {
@@ -20,6 +25,8 @@ export interface Settings {
   shake: boolean;
   vibrate: boolean;
   speed: 1 | 2;
+  skin: string;
+  felt: string;
 }
 
 export const defaultMeta = (): Meta => ({
@@ -27,9 +34,10 @@ export const defaultMeta = (): Meta => ({
   codex: { relics: [], faces: [], enemies: [], hands: [] },
   stats: { runs: 0, wins: 0, yahtzees: 0, megaJackpots: 0, bestNodes: 0 },
   tutorialDone: false,
+  achievements: [], mastery: {}, owned: [], daily: {}, bestEndless: 0,
 });
 
-export const defaultSettings = (): Settings => ({ sound: true, shake: true, vibrate: true, speed: 1 });
+export const defaultSettings = (): Settings => ({ sound: true, shake: true, vibrate: true, speed: 1, skin: 'ivory', felt: 'green' });
 
 function read<T>(k: string): T | null {
   try {

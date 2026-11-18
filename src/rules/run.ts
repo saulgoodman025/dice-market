@@ -12,6 +12,8 @@ import { RELIC_BY_ID } from '../data/relics';
 import { SKILL_BY_ID } from '../data/skills';
 import { STAKES } from '../data/stakes';
 import { HIGHROLLER } from '../data/casino';
+import { TABLE_BY_ID } from '../data/tables';
+import { dailyRuleById } from './daily';
 import { fire, getMods, registerSources, rng, toast, type Ctx, type EffectSource } from './ctx';
 import { startCombat } from './combat';
 import {
@@ -32,19 +34,25 @@ registerSources((run) => {
   const ch = CHAR_BY_ID[run.charId];
   if (ch) out.push(ch);
   for (const s of STAKES) if (s.level <= run.stake) out.push({ id: 'stake' + s.level, name: s.name, mods: s.mods });
+  const tb = TABLE_BY_ID[run.table];
+  if (tb?.mods) out.push({ id: 'table', name: tb.name, mods: tb.mods });
+  const dr = run.dailyRule ? dailyRuleById(run.dailyRule) : undefined;
+  if (dr) out.push({ id: 'daily', name: dr.name, mods: dr.mods });
   return out;
 });
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export interface MetaPool {
   unlocked: string[]; // "kind:id"
 }
 
-export function newRun(seed: number, charId: string, stake = 0, meta: MetaPool = { unlocked: [] }): RunState {
+export interface RunOptions { table?: string; dailyKey?: string; dailyRule?: string }
+
+export function newRun(seed: number, charId: string, stake = 0, meta: MetaPool = { unlocked: [] }, opts: RunOptions = {}): RunState {
   const ch = CHAR_BY_ID[charId];
   const run: RunState = {
-    version: SAVE_VERSION, seed, rng: makeRngState(seed), charId, stake,
+    version: SAVE_VERSION, seed, rng: makeRngState(seed), charId, stake, table: opts.table ?? 'classic', dailyKey: opts.dailyKey, dailyRule: opts.dailyRule,
     hp: ch.hp, maxHp: ch.hp, gold: BALANCE.startGold, chips: 0,
     dice: [], skills: ch.skills.map((id) => ({ id, up: 0 })), maxSlots: BALANCE.startSlots,
     relics: [], consumables: [], act: 1, floor: 0, map: [], path: [], nodesReached: 0, bossesKilled: 0,
@@ -55,6 +63,8 @@ export function newRun(seed: number, charId: string, stake = 0, meta: MetaPool =
     nextUid: 1, pendingFreeSpins: 0, pendingEliteFromSlot: false, log: [],
   };
   run.dice = ch.dice.map((m) => newDie(run.nextUid++, m));
+  TABLE_BY_ID[run.table]?.setup?.(run, newDie);
+  if (opts.dailyKey) run.flags.daily = 1;
   for (const l of META_LOCKED_START) {
     if (!meta.unlocked.includes(`${l.kind}:${l.id}`)) run.flags[`pool_${l.kind}_${l.id}`] = 0;
   }
@@ -129,6 +139,8 @@ export function finishCombat(ctx: Ctx) {
     return;
   }
   run.stats.combatsWon++;
+  if (cb.kind === 'boss' && run.hp <= run.maxHp * 0.1) run.flags.ach_close_boss = 1;
+  if (cb.kind === 'elite' && cb.dmgTaken === 0) run.flags.ach_perfect_elite = 1;
   const m = getMods(run);
   const base = BALANCE.rewardGold[cb.kind] * cb.rewardMult;
   let piggyPct = 1 + run.heat * BALANCE.heatPiggyPerStep + m.piggyPct;
@@ -203,7 +215,7 @@ export function advance(ctx: Ctx) {
   }
   const wasBoss = run.floor >= BALANCE.floorsPerAct - 1;
   if (wasBoss) {
-    if (run.act >= 3) {
+    if (run.act >= 3 && !run.flags.endless) {
       run.screen = 'victory';
       run.flags.meta_clear = 1;
       return;
@@ -243,7 +255,7 @@ function nextAct(ctx: Ctx) {
   updateFlow(run);
   run.map = genActMap(ctx);
   run.screen = 'map';
-  toast(ctx, `${run.act}막 시작: ${run.act === 2 ? 'VIP 라운지' : '하우스 금고'}`, 'info');
+  toast(ctx, run.act > 3 ? `♾️ 엔드리스 ${run.act}막: 적이 더 강해집니다` : `${run.act}막 시작: ${run.act === 2 ? 'VIP 라운지' : '하우스 금고'}`, 'info');
 }
 
 // ───────────── 휴식 ─────────────
@@ -512,3 +524,11 @@ export function flowBand(run: RunState) {
 }
 
 export { HIGHROLLER };
+
+/** 클리어 후 엔드리스로 계속: 4막부터 점점 세지는 막 */
+export function continueEndless(ctx: Ctx) {
+  const run = ctx.run;
+  if (run.screen !== 'victory') return;
+  run.flags.endless = 1;
+  nextAct(ctx);
+}

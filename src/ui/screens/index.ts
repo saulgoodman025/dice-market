@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { combatScreen, handsModal, tutorialModal } from './combat';
 import { casinoScreen, mysteryModal, paytableModal, scratchModal } from './casino';
-import { charScreen, codexScreen, endScreen, settingsScreen, titleScreen } from './menus';
+import { achievementsScreen, charScreen, codexScreen, endScreen, settingsScreen, titleScreen } from './menus';
 import { eventScreen, mapScreen, restScreen, rewardScreen, runModals, shopScreen } from './run';
 
 export function renderScreen(app: App): string {
@@ -9,6 +9,7 @@ export function renderScreen(app: App): string {
   if (ui.page === 'title') return titleScreen(app);
   if (ui.page === 'charselect') return charScreen(app);
   if (ui.page === 'codex') return codexScreen(app);
+  if (ui.page === 'achievements') return achievementsScreen(app);
   if (ui.page === 'settings') return settingsScreen(app);
   const run = app.run;
   if (!run) return titleScreen(app);

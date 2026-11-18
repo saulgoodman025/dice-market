@@ -9,7 +9,7 @@ import {
 import {
   applyFace, applyMaterial, buyChip, cancelPending, casinoHighroller, collectRewardGold, enterNode, eventChoose, leaveCasino,
   leaveReward, leaveShop, offerFaces, pickOffer, pickReward, replaceSkill, restHeal, restUpgrade, shopApplyPricetag, shopBuy,
-  shopReroll, upgradeSkill, useConsumableOutside, advance,
+  shopReroll, upgradeSkill, useConsumableOutside, advance, continueEndless,
 } from '../rules/run';
 import { doubleOrNothing, haggle, openMystery, rouletteSpin, scratchCard, slotSpin } from '../rules/casino';
 import type { RouletteBet } from '../data/casino';
@@ -34,7 +34,21 @@ export function handleAction(app: App, act: string, arg: string) {
     case 'codexTab': ui.codexTab = arg as typeof ui.codexTab; break;
     case 'char': ui.charSel = arg; break;
     case 'stake': ui.stakeSel = Math.max(0, Math.min(app.meta.maxStake, n)); break;
-    case 'start': app.startRun(ui.charSel, ui.stakeSel); ui.end = null; break;
+    case 'start': app.startRun(ui.charSel, ui.stakeSel, ui.tableSel); ui.end = null; break;
+    case 'daily': app.startDaily(); ui.end = null; break;
+    case 'achievements': ui.page = 'achievements'; break;
+    case 'achTab': ui.achTab = arg as typeof ui.achTab; break;
+    case 'table': ui.tableSel = arg; break;
+    case 'cosmetic': {
+      const [k, id] = arg.split(':');
+      if (k === 'skin') app.settings.skin = id;
+      if (k === 'felt') app.settings.felt = id;
+      app.applySettings();
+      break;
+    }
+    case 'endless':
+      if (run && run.screen === 'victory') { continueEndless(app.ctx); ui.end = null; app.save(); }
+      break;
     case 'set': {
       const k = arg as 'sound' | 'shake' | 'vibrate';
       app.settings[k] = !app.settings[k];
