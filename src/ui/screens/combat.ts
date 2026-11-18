@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { condText, SKILL_BY_ID } from '../../data/skills';
 import { FACE_BY_ID } from '../../data/faces';
-import { MATERIAL_BY_ID } from '../../data/materials';
+import { MATERIAL_BY_ID, MATERIALS } from '../../data/materials';
 import { ENEMY_BY_ID, HOUSE_RULES } from '../../data/enemies';
 import { HAND_BY_ID, HANDS } from '../../data/hands';
 import { CHAR_BY_ID } from '../../data/characters';
@@ -23,11 +23,12 @@ function intentText(e: Enemy): { cls: string; text: string } {
   return { cls: 'util', text: `${it.icon} ${esc(it.label)}` };
 }
 
-export function dieInfo(h: HandDie): string {
+export function dieInfo(h: HandDie, broken = false): string {
   const parts: string[] = [];
+  if (h.gone) parts.push(broken ? '<b class="red">💥 깨짐</b> 1이 나와서 깨졌다 · 이번 전투만 못 씀' : '<b class="red">🦝 빼앗김</b> 이번 턴만 못 씀');
   if (h.material !== 'wood') {
     const m = MATERIAL_BY_ID[h.material];
-    parts.push(`<b>${m.name} 주사위</b> ${esc(fmt(m.desc, m.v))}`);
+    parts.push(`<b>${m.icon} ${m.name}</b> ${esc(fmt(m.desc, m.v))}`);
   }
   if (h.sticker) {
     const f = FACE_BY_ID[h.sticker];
@@ -79,12 +80,12 @@ export function combatScreen(app: App): string {
   const selKeys = roll ? cb.hand.filter((h) => h.locked && !h.used).map((h) => h.key) : ui.sel;
   const tray = cb.hand.map((h) => {
     const sel = roll ? h.locked : ui.sel.includes(h.key);
-    const cls = `${h.used ? 'used' : ''} ${roll && h.locked ? 'locked' : ''} ${!roll && sel ? 'sel' : ''} ${h.material !== 'wood' || h.sticker ? 'special' : ''}`;
-    const lock = roll && h.locked ? '<span class="lock">🔒</span>' : '';
+    const cls = `${h.used ? 'used' : ''} ${h.gone ? 'broken' : ''} ${roll && h.locked ? 'locked' : ''} ${!roll && sel ? 'sel' : ''} ${ui.infoKey === h.key ? 'info' : ''}`;
+    const lock = h.gone ? '<span class="crack">💥</span>' : roll && h.locked ? '<span class="lock">🔒</span>' : '';
     return handDieHtml(h, cls, `data-key="${h.key}" data-act="die" data-arg="${h.key}"`).replace(/<\/div>$/, `${lock}</div>`);
   }).join('');
-  const infoDie = cb.hand.find((h) => h.key === ui.infoKey && !h.used);
-  const info = infoDie ? dieInfo(infoDie) : '';
+  const infoDie = cb.hand.find((h) => h.key === ui.infoKey && (!h.used || h.gone));
+  const info = infoDie ? dieInfo(infoDie, cb.brokenDice.includes(infoDie.dieIdx)) : '';
 
   // ── 스킬 카드 (예상 효과 숫자) ──
   const skills = Array.from({ length: run.maxSlots }, (_, i) => {
@@ -141,7 +142,7 @@ export function combatScreen(app: App): string {
       <div class="enemies">${enemies}</div>
       ${rules ? `<div class="rulechip">${rules}</div>` : ''}
       ${handbar}
-      <div class="tray ${app.veil ? 'veiled' : ''} ${cb.hand.length > 5 ? 'many' : ''}">${tray}</div>
+      <div class="tray ${app.veil ? 'veiled' : ''} ${cb.hand.length > 5 ? 'many' : ''} ${cb.hand.length > 6 ? 'lots' : ''}">${tray}</div>
       <div class="tablestats"><span data-tip="리롤: 잠그지 않은 주사위를 다시 굴림">🎲 리롤 <b>${roll ? cb.rerollsLeft : 0}</b></span><span data-tip="안 쓴 주사위 눈이 모여 전투 후 골드가 된다">🐷 <b>${cb.piggy}</b></span>${tools}</div>
     </div>
     <div class="player">
@@ -154,7 +155,7 @@ export function combatScreen(app: App): string {
     <div class="skills ${run.maxSlots > 4 ? 'many' : ''}">${skills}</div>
     <div class="actions">
       <button class="btn" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}>🎲 리롤 ${roll ? cb.rerollsLeft : 0}</button>
-      <button class="btn" data-act="modal" data-arg="hands">📖 족보</button>
+      <button class="btn" data-act="modal" data-arg="hands">📖 도움말</button>
       <button class="btn primary ${moves ? '' : 'glow'}" data-act="endTurn">턴 종료 ▶</button>
     </div>
   </div>
@@ -163,16 +164,28 @@ export function combatScreen(app: App): string {
 
 export function handsModal(app: App): string {
   const cb = app.run?.combat;
-  const cur = cb ? (cb.handResult ?? (cb.phase === 'roll' ? previewHand(app.ctx) : null)) : null;
-  const rows = [...HANDS].reverse().map((h) => `<div class="hrow ${cur?.id === h.id ? 'cur' : ''}">
+  const tab = app.ui.helpTab;
+  const tabs = `<div class="tabs"><button class="${tab === 'hands' ? 'on' : ''}" data-act="helpTab" data-arg="hands">🃏 족보</button><button class="${tab === 'dice' ? 'on' : ''}" data-act="helpTab" data-arg="dice">🎲 주사위 재질</button></div>`;
+  let body = '';
+  if (tab === 'hands') {
+    const cur = cb ? (cb.handResult ?? (cb.phase === 'roll' ? previewHand(app.ctx) : null)) : null;
+    body = `<div class="small muted">주사위 5개로 만든 족보 하나가 이번 턴 <b>모든 공격·방어·골드</b>에 배율로 곱해진다. 높은 족보가 나오면 🔥열기도 오른다.</div>
+    <div class="col" style="gap:4px">${[...HANDS].reverse().map((h) => `<div class="hrow ${cur?.id === h.id ? 'cur' : ''}">
       <div class="hdice">${h.example.map((p) => `<div class="die tiny">${pipsHtml(p)}</div>`).join('')}</div>
       <div class="grow"><b>${h.name}</b><div class="muted small">${h.how}</div></div>
       <b class="gold">×${h.mult}</b>
-    </div>`).join('');
+    </div>`).join('')}</div>`;
+  } else {
+    const owned = new Set(app.run?.dice.map((d) => d.material) ?? []);
+    body = `<div class="small muted">주사위 왼쪽 아래 작은 아이콘이 재질이다. 전투 중 주사위를 탭하면 아래에 설명이 나온다. <b>내 것</b> 표시는 지금 가진 재질.</div>
+    <div class="col" style="gap:4px">${MATERIALS.map((m) => `<div class="hrow ${owned.has(m.id) ? 'cur' : ''}">
+      <div class="die small mat-${m.id}" style="flex-shrink:0">${pipsHtml(5)}${m.id !== 'wood' ? `<span class="matb">${m.icon}</span>` : ''}</div>
+      <div class="grow"><b>${m.icon} ${m.name}</b>${owned.has(m.id) ? ' <span class="tag rare">내 것</span>' : ''}<div class="small">${esc(m.long)}</div></div>
+    </div>`).join('')}</div>`;
+  }
   return `<div class="modal"><div class="box">
-    <div class="row"><h3 class="grow">📖 족보표</h3><button class="btn ghost" data-act="closeModal">✕</button></div>
-    <div class="small muted">주사위 5개로 만든 족보 하나가 이번 턴 <b>모든 공격·방어·골드</b>에 배율로 곱해진다. 높은 족보가 나오면 🔥열기도 오른다.</div>
-    <div class="col" style="gap:4px">${rows}</div>
+    <div class="row"><h3 class="grow">📖 도움말</h3><button class="btn ghost" data-act="closeModal">✕</button></div>
+    ${tabs}${body}
   </div></div>`;
 }
 

@@ -38,6 +38,7 @@ export interface Ui {
   codexTab: 'relic' | 'face' | 'enemy' | 'hand';
   shopEdit: boolean;
   infoKey: number;
+  helpTab: 'hands' | 'dice';
   tut: number;
 }
 
@@ -55,12 +56,13 @@ export class App {
     page: 'title', sel: [], picker: null, casinoTab: 'slot', bets: {}, modal: null, editDie: 0, busy: false,
     charSel: 'gambler', stakeSel: 0, scratch: null, mystery: null, slot: { res: null, spinning: false },
     roulette: { n: null, won: 0, spinning: false }, high: { d: null, win: false, text: '' },
-    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0,
+    don: { rolling: false, face: 6, text: '' }, end: null, codexTab: 'relic', shopEdit: false, infoKey: -1, tut: 0, helpTab: 'hands',
   };
   private tipEl: HTMLElement | null = null;
   private piggyAnimated: unknown = null;
   private resultPending = false;
   veil = false;
+  private lastRenderKey = '';
   private tipTimer = 0;
   private suppressClick = false;
 
@@ -169,7 +171,13 @@ export class App {
   render() {
     const run = this.run;
     this.root.classList.toggle('fever', !!run && run.screen === 'combat' && run.heat >= BALANCE.feverAt);
+    // 다시 그려도 스크롤 위치 유지 (같은 화면일 때)
+    const key = `${this.ui.page}:${run?.screen ?? ''}:${this.ui.modal ?? ''}:${run?.pending?.kind ?? ''}:${run?.offer ? 1 : 0}`;
+    const keep = key === this.lastRenderKey;
+    const saved = keep ? [...this.view.querySelectorAll<HTMLElement>('.screen, .modal .box')].map((el) => el.scrollTop) : [];
+    this.lastRenderKey = key;
     this.view.innerHTML = renderScreen(this);
+    if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
     if (this.debug && run) {
       updateFlow(run);
       const d = document.createElement('div');

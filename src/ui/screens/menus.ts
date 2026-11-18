@@ -8,6 +8,7 @@ import { HANDS } from '../../data/hands';
 import { META_LOCKED_START } from '../../data/meta';
 import { nextUnlockIn, runPoints } from '../../rules/meta';
 import { esc, fmt, rarityTag } from '../components/parts';
+import { MATERIAL_BY_ID } from '../../data/materials';
 import { SKILL_BY_ID } from '../../data/skills';
 import { RELIC_BY_ID } from '../../data/relics';
 import { FACE_BY_ID } from '../../data/faces';
@@ -39,6 +40,8 @@ export function charScreen(app: App): string {
       <div class="grow" style="text-align:left"><div class="tt">${c.name} <span class="muted small">❤${c.hp}</span></div>
       <div class="ds">${esc(c.desc)}</div>
       <div class="ds">스킬: ${c.skills.map((s) => SKILL_BY_ID[s].name).join('·')}</div>
+      <div class="ds">주사위: ${[...new Set(c.dice)].map((m) => `${MATERIAL_BY_ID[m].icon} ${MATERIAL_BY_ID[m].name}×${c.dice.filter((x) => x === m).length}`).join(' ')}</div>
+      ${[...new Set(c.dice)].filter((m) => m !== 'wood').map((m) => `<div class="ds">${MATERIAL_BY_ID[m].icon} ${esc(MATERIAL_BY_ID[m].long)}</div>`).join('')}
       ${unlocked ? '' : `<div class="ds red">해금: ${esc(c.unlockText)}</div>`}</div>
     </button>`;
   }).join('');

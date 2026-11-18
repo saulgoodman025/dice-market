@@ -136,7 +136,11 @@ export function diceViewer(app: App, applyFace: boolean): string {
     const [c, r] = NET_POS[i];
     return `<div class="face mat-${die.material} ${applyFace ? 'target' : ''}" style="grid-column:${c};grid-row:${r}" ${applyFace ? `data-act="applyFace" data-arg="${i}"` : ''} data-tip="${esc(sd ? `${sd.name}: ${fmt(sd.desc, sd.v)}` : `눈 ${f.pip}`)}">${label}${sd ? `<span class="stk">${sd.emoji}</span>` : ''}</div>`;
   }).join('');
-  return `<div class="card col"><div class="dicepick">${picks}</div><div class="center small muted">${MATERIAL_BY_ID[die.material].name} 주사위 #${sel + 1}</div><div class="net">${net}</div></div>`;
+  const m = MATERIAL_BY_ID[die.material];
+  const stickers = die.faces.filter((f) => f.sticker).map((f) => { const sd = FACE_BY_ID[f.sticker!]; return `<div class="small">${sd.emoji} <b>${sd.name}</b> (${f.pip} 면) — ${esc(fmt(sd.desc, sd.v))}</div>`; }).join('');
+  return `<div class="card col"><div class="dicepick">${picks}</div>
+    <div class="matcard"><div class="row"><span style="font-size:22px">${m.icon}</span><b>${m.name} 주사위</b><span class="muted small">#${sel + 1}</span></div><div class="small">${esc(m.long)}</div>${stickers ? `<div class="col" style="gap:2px;margin-top:4px">${stickers}</div>` : ''}</div>
+    <div class="net">${net}</div></div>`;
 }
 
 function pendingModal(app: App): string {
@@ -198,7 +202,7 @@ function bagModal(app: App): string {
     <b>유물 ${run.relics.length}</b><div class="col">${relics}</div>
     <b>소모품 ${run.consumables.length}/${BALANCE.maxConsumables}</b><div class="col">${cons}</div>
     <b>스킬 ${run.skills.length}/${run.maxSlots}</b><div class="col">${skills}</div>
-    <b>주사위 ${run.dice.length}</b>${diceViewer(app, false)}
+    <div class="row"><b class="grow">주사위 ${run.dice.length}</b><button class="btn ghost" style="min-height:36px" data-act="modal" data-arg="hands" data-always="1">📖 재질·족보 설명</button></div>${diceViewer(app, false)}
     <div class="row"><button class="btn ghost" data-act="settings" data-always="1">⚙️ 설정</button><button class="btn ghost" data-act="back" data-always="1">타이틀</button><button class="btn danger" data-act="quit" data-always="1">포기</button></div>
   </div></div>`;
 }

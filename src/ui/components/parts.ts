@@ -29,7 +29,8 @@ export function dieFace(pip: number, sticker?: string, material = 'wood', extra 
   const showNum = f?.kind === 'replace' && (f.pip === 7 || f.pip === 0 || f.wild || f.mirror);
   const inner = f?.wild ? '<span class="num">🃏</span>' : showNum ? `<span class="num">${pip}</span>` : pipsHtml(pip);
   const stk = f ? `<span class="stk">${f.emoji}</span>` : '';
-  return `<div class="die mat-${material} ${extra}" ${attrs}>${inner}${stk}</div>`;
+  const mat = material !== 'wood' ? `<span class="matb">${MATERIAL_BY_ID[material]?.icon ?? ''}</span>` : '';
+  return `<div class="die mat-${material} ${extra}" ${attrs}>${inner}${stk}${mat}</div>`;
 }
 
 export function handDieHtml(h: HandDie, cls: string, attrs: string) {

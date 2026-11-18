@@ -232,7 +232,7 @@ function postRoll(ctx: Ctx, rolled: HandDie[]) {
       hd.used = true;
       hd.gone = true;
       cb.brokenDice.push(hd.dieIdx);
-      toast(ctx, '💥 유리 주사위 깨짐 (이번 전투)', 'bad');
+      toast(ctx, '💥 유리 주사위가 1이 나와 깨졌다 (이번 전투만)', 'bad');
       continue;
     }
     const f = faceOf(hd);

@@ -27,6 +27,6 @@ export function renderScreen(app: App): string {
     case 'gameover': case 'victory': return endScreen(app);
     default: body = mapScreen(app);
   }
-  if (ui.modal === 'hands') return body + handsModal(app);
+  if (ui.modal === 'hands' && !run.offer && !run.pending) return body + handsModal(app);
   return body + runModals(app, { paytable: () => paytableModal(app), scratch: () => scratchModal(app), mystery: () => mysteryModal(app) });
 }

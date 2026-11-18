@@ -40,6 +40,7 @@ export function handleAction(app: App, act: string, arg: string) {
     }
     case 'speed': app.settings.speed = app.settings.speed === 1 ? 2 : 1; app.applySettings(); break;
     case 'modal': ui.modal = arg as typeof ui.modal; break;
+    case 'helpTab': ui.helpTab = arg as typeof ui.helpTab; break;
     case 'tutOpen': ui.tut = 1; ui.modal = null; break;
     case 'tutNext': ui.tut = ui.tut >= 5 ? 0 : ui.tut + 1; if (ui.tut === 0) finishTutorial(app); break;
     case 'tutSkip': ui.tut = 0; finishTutorial(app); break;
@@ -94,6 +95,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
       if (!cb) break;
       if (ui.picker) { pickerDie(app, n); return; }
       ui.infoKey = n;
+      if (cb.hand.find((h) => h.key === n)?.used) { app.render(); return; }
       if (cb.phase === 'roll') { toggleLock(ctx, n); sfx.lock(); }
       else ui.sel = ui.sel.includes(n) ? ui.sel.filter((k) => k !== n) : [...ui.sel, n];
       app.render();
