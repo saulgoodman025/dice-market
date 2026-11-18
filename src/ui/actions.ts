@@ -151,6 +151,7 @@ function runAction(app: App, act: string, arg: string, n: number) {
       endTurn(ctx);
       ui.sel = [];
       ui.picker = null;
+      ui.selCard = null;
       ui.infoKey = -1;
       app.after({ enemyPhase: { hp0, blk0 } });
       return;

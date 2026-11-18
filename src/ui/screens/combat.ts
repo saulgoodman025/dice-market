@@ -52,7 +52,6 @@ export function combatScreen(app: App): string {
     const hpPct = (e.hp / e.maxHp) * 100;
     const st = [
       e.block ? `<span class="blk">🛡${e.block}</span>` : '',
-      e.poison ? `<span class="green">☠${e.poison}</span>` : '',
       e.weak ? `<span>❄-${e.weak}</span>` : '',
       e.stacks ? `<span class="red">📈+${e.stacks}</span>` : '',
       e.nextMult > 1 ? `<span class="red">💪×2</span>` : '',
@@ -64,7 +63,8 @@ export function combatScreen(app: App): string {
       <div class="intent ${it.cls}">${it.text}</div>
       <div class="em">${e.emoji}</div>
       <div class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯약점 <b>${e.weakPip}</b></div>
-      <div class="ehp" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>${e.hp}</b></div>
+      ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
+      <div class="ehp ${e.poison ? 'poisoned' : ''}" data-hpk="e${e.uid}" data-pct="${hpPct}"><s class="trail"></s><i style="width:${hpPct}%"></i><b>${e.hp}</b></div>
       <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
     </div>`;
   }).join('');
@@ -158,7 +158,7 @@ export function combatScreen(app: App): string {
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>
-    <div class="dieinfo">${info || (ui.selCard !== null ? (SKILL_BY_ID[run.skills[ui.selCard].id].target === 'enemy' ? '🎯 공격할 <b>적</b>을 탭하세요' : '✋ <b>테이블</b>을 탭하면 사용') : roll ? '🔒 탭해서 잠금 · 카드는 <b>끌어다 놓기</b>' : '🎯 카드 → 적 · ✋ 카드 → 위로')}</div>
+    <div class="dieinfo">${info || (ui.selCard !== null ? (() => { const d = SKILL_BY_ID[run.skills[ui.selCard].id]; return `<b>${esc(d.name)}</b> ${esc(fmt(d.desc, d.v))} · ${d.target === 'enemy' ? '🎯 적을 탭' : '✋ 위쪽을 탭'}`; })() : roll ? '🔒 탭해서 잠금 · 카드는 <b>끌어다 놓기</b>' : '🎯 카드 → 적 · ✋ 카드 → 위로')}</div>
     <div class="hand n${n}">${cards}</div>
     <div class="actions">
       <button class="btn" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}>🎲 리롤 ${roll ? cb.rerollsLeft : 0}</button>

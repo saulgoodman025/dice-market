@@ -811,3 +811,13 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .rcard.rar-legendary::before { content: ''; position: absolute; left: 50%; top: 72px; width: 260px; height: 260px; transform: translate(-50%, -50%); background: repeating-conic-gradient(rgba(255,220,130,.22) 0 10deg, transparent 10deg 30deg); animation: rays 8s linear infinite; z-index: 0; }
 @keyframes rays { to { transform: translate(-50%, -50%) rotate(360deg); } }
 .rcard.rar-legendary .rname { color: #ffe39a; text-shadow: 0 0 8px rgba(255,200,90,.6); }
+
+/* v1.6 독: 연두색 체력바 + 표시 */
+.ehp.poisoned > i { background: linear-gradient(90deg, #6fcf3a, #b6f06a) !important; box-shadow: 0 0 8px rgba(155,225,93,.7); }
+.ehp.poisoned { border-color: rgba(155,225,93,.7); }
+.poisonbadge { display: inline-block; font-size: 11px; font-weight: 900; color: #10200a; background: #9be15d; border-radius: 8px; padding: 0 6px; margin: 1px auto; animation: pbub 1.4s ease-in-out infinite; }
+@keyframes pbub { 50% { box-shadow: 0 0 10px rgba(155,225,93,.9); } }
+.enemy.poisontick .em { animation: ptick .45s; }
+@keyframes ptick { 30% { filter: hue-rotate(70deg) saturate(2.5) brightness(1.2); transform: scale(.94); } }
+.scard .cdesc { -webkit-line-clamp: 4; font-size: 9px; }
+.hand.n5 .scard .cdesc, .hand.n6 .scard .cdesc { -webkit-line-clamp: 3; }

@@ -59,48 +59,48 @@ export interface SkillDef {
 
 export const SKILLS: SkillDef[] = [
   // ── C ──
-  { id: 'slash', name: '베기', cost: 1, icon: '🗡️', target: 'enemy', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 공격', role: 'atk', run: (u) => { u.dmg(u.v); } },
-  { id: 'guard', name: '방패', cost: 1, icon: '🛡️', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 방어', role: 'def', run: (u) => u.block(u.v) },
-  { id: 'jab', name: '잽', cost: 1, icon: '👊', target: 'enemy', rarity: 'common', cond: { k: 'range', lo: 1, hi: 3 }, desc: '눈×{m} 공격', v: { m: 2 }, role: 'atk', run: (u) => { u.dmg(u.v * 2); } },
-  { id: 'heavy', name: '강타', cost: 1, icon: '🔨', target: 'enemy', rarity: 'common', cond: { k: 'range', lo: 4, hi: 6 }, desc: '눈×{m} 공격', v: { m: 2 }, role: 'atk', run: (u) => { u.dmg(u.v * 2); } },
-  { id: 'firstaid', name: '응급처치', cost: 1, icon: '🩹', rarity: 'common', cond: { k: 'any' }, desc: '눈의 절반 회복 (전투당 {n}번)', v: { n: 2 }, perCombat: 2, role: 'def', run: (u) => u.heal(Math.ceil(u.v / 2)) },
-  { id: 'coinflip', name: '동전 던지기', cost: 0, icon: '🪙', target: 'enemy', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 골드 + 절반 공격', role: 'eco', run: (u) => { u.gold(u.v); u.dmg(Math.ceil(u.v / 2)); } },
-  { id: 'twin', name: '쌍검', cost: 1, icon: '⚔️', target: 'enemy', rarity: 'common', cond: { k: 'same', n: 2 }, desc: '두 눈 합×{m} 공격', v: { m: 2 }, role: 'atk', run: (u) => { u.dmg(u.sum * 2); } },
-  { id: 'evenstab', name: '짝수 찌르기', cost: 1, icon: '🔱', target: 'enemy', rarity: 'common', cond: { k: 'even' }, desc: '눈+{a} 공격', v: { a: 4 }, role: 'atk', run: (u) => { u.dmg(u.v + 4); } },
-  { id: 'oddcut', name: '홀수 베기', cost: 1, icon: '🌀', rarity: 'common', cond: { k: 'odd' }, desc: '눈+{a}, 무작위 적 공격', v: { a: 3 }, role: 'atk', run: (u) => { u.dmg(u.v + 3, { random: true }); } },
-  { id: 'thorns', name: '가시방패', cost: 1, icon: '🌵', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 방어, 맞으면 {r} 반격', v: { r: 3 }, role: 'def', run: (u) => { u.block(u.v); cbOf(u.ctx).thorns += 3; } },
+  { id: 'slash', name: '베기', cost: 1, icon: '🗡️', target: 'enemy', rarity: 'common', cond: { k: 'any' }, desc: '적에게 주사위 눈만큼 피해를 줍니다.', role: 'atk', run: (u) => { u.dmg(u.v); } },
+  { id: 'guard', name: '방패', cost: 1, icon: '🛡️', rarity: 'common', cond: { k: 'any' }, desc: '주사위 눈만큼 방어도를 얻습니다.', role: 'def', run: (u) => u.block(u.v) },
+  { id: 'jab', name: '잽', cost: 1, icon: '👊', target: 'enemy', rarity: 'common', cond: { k: 'range', lo: 1, hi: 3 }, desc: '적에게 눈의 {m}배만큼 피해를 줍니다.', v: { m: 2 }, role: 'atk', run: (u) => { u.dmg(u.v * 2); } },
+  { id: 'heavy', name: '강타', cost: 1, icon: '🔨', target: 'enemy', rarity: 'common', cond: { k: 'range', lo: 4, hi: 6 }, desc: '적에게 눈의 {m}배만큼 피해를 줍니다.', v: { m: 2 }, role: 'atk', run: (u) => { u.dmg(u.v * 2); } },
+  { id: 'firstaid', name: '응급처치', cost: 1, icon: '🩹', rarity: 'common', cond: { k: 'any' }, desc: '눈의 절반만큼 체력을 회복합니다. (전투당 {n}번)', v: { n: 2 }, perCombat: 2, role: 'def', run: (u) => u.heal(Math.ceil(u.v / 2)) },
+  { id: 'coinflip', name: '동전 던지기', cost: 0, icon: '🪙', target: 'enemy', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 골드를 얻고, 그 절반만큼 피해를 줍니다.', role: 'eco', run: (u) => { u.gold(u.v); u.dmg(Math.ceil(u.v / 2)); } },
+  { id: 'twin', name: '쌍검', cost: 1, icon: '⚔️', target: 'enemy', rarity: 'common', cond: { k: 'same', n: 2 }, desc: '두 눈의 합 × {m}만큼 피해를 줍니다.', v: { m: 2 }, role: 'atk', run: (u) => { u.dmg(u.sum * 2); } },
+  { id: 'evenstab', name: '짝수 찌르기', cost: 1, icon: '🔱', target: 'enemy', rarity: 'common', cond: { k: 'even' }, desc: '적에게 눈 + {a}만큼 피해를 줍니다.', v: { a: 4 }, role: 'atk', run: (u) => { u.dmg(u.v + 4); } },
+  { id: 'oddcut', name: '홀수 베기', cost: 1, icon: '🌀', rarity: 'common', cond: { k: 'odd' }, desc: '무작위 적에게 눈 + {a}만큼 피해를 줍니다.', v: { a: 3 }, role: 'atk', run: (u) => { u.dmg(u.v + 3, { random: true }); } },
+  { id: 'thorns', name: '가시방패', cost: 1, icon: '🌵', rarity: 'common', cond: { k: 'any' }, desc: '눈만큼 방어도를 얻습니다. 이번 턴에 공격받으면 {r} 피해를 되돌려줍니다.', v: { r: 3 }, role: 'def', run: (u) => { u.block(u.v); cbOf(u.ctx).thorns += 3; } },
   // ── R ──
-  { id: 'execute', name: '처형', cost: 2, icon: '🪓', target: 'enemy', rarity: 'rare', cond: { k: 'exact', v: 6 }, desc: '{d} 공격', v: { d: 18 }, role: 'atk', run: (u) => { u.dmg(18 * (u.vals[0] / 6)); } },
+  { id: 'execute', name: '처형', cost: 2, icon: '🪓', target: 'enemy', rarity: 'rare', cond: { k: 'exact', v: 6 }, desc: '적에게 {d}의 피해를 줍니다.', v: { d: 18 }, role: 'atk', run: (u) => { u.dmg(18 * (u.vals[0] / 6)); } },
   {
-    id: 'gamble', name: '도박사', cost: 0, icon: '🎲', target: 'enemy', rarity: 'rare', chance: true, chanceHit: () => 30, cond: { k: 'range', lo: 1, hi: 2 }, desc: '다시 굴려 6이면 {d} 공격 (1/6)', v: { d: 30 }, role: 'atk',
+    id: 'gamble', name: '도박사', cost: 0, icon: '🎲', target: 'enemy', rarity: 'rare', chance: true, chanceHit: () => 30, cond: { k: 'range', lo: 1, hi: 2 }, desc: '주사위를 다시 굴립니다. 6이 나오면 {d} 피해! 아니면 아무 일도 없습니다.', v: { d: 30 }, role: 'atk',
     run: (u) => {
       const r = rng(u.ctx, 'combat').die();
       u.ctx.emit({ t: 'chanceRoll', kind: 'die', result: r, win: r === 6, label: '6이 나오면 30 피해!' });
       if (r === 6) u.dmg(30);
     },
   },
-  { id: 'straight', name: '스트레이트', cost: 2, icon: '🎳', rarity: 'rare', cond: { k: 'seq', n: 4 }, desc: '모든 적 {d} 공격', v: { d: 25 }, role: 'atk', run: (u) => { u.dmg(25, { aoe: true }); } },
-  { id: 'triple', name: '삼연격', cost: 2, icon: '🐾', target: 'enemy', rarity: 'rare', cond: { k: 'same', n: 3 }, desc: '눈×3으로 3번 공격', role: 'atk', run: (u) => { u.dmg(u.v * 3, { hits: 3 }); } },
+  { id: 'straight', name: '스트레이트', cost: 2, icon: '🎳', rarity: 'rare', cond: { k: 'seq', n: 4 }, desc: '모든 적에게 {d}의 피해를 줍니다.', v: { d: 25 }, role: 'atk', run: (u) => { u.dmg(25, { aoe: true }); } },
+  { id: 'triple', name: '삼연격', cost: 2, icon: '🐾', target: 'enemy', rarity: 'rare', cond: { k: 'same', n: 3 }, desc: '눈 × 3의 피해를 3번 줍니다.', role: 'atk', run: (u) => { u.dmg(u.v * 3, { hits: 3 }); } },
   {
-    id: 'vampire', name: '흡혈', cost: 1, icon: '🧛', target: 'enemy', rarity: 'rare', cond: { k: 'any' }, desc: '눈만큼 공격, 절반 회복', v: { p: 50 }, role: 'atk',
+    id: 'vampire', name: '흡혈', cost: 1, icon: '🧛', target: 'enemy', rarity: 'rare', cond: { k: 'any' }, desc: '눈만큼 피해를 주고, 준 피해의 절반만큼 회복합니다.', v: { p: 50 }, role: 'atk',
     run: (u) => { const d = u.dmg(u.v); u.heal(d * 0.5); },
   },
   {
-    id: 'poison', name: '독침', cost: 1, icon: '🦂', target: 'enemy', rarity: 'rare', cond: { k: 'any' }, desc: '눈만큼 독 (매 턴 피해)', role: 'atk',
+    id: 'poison', name: '독침', cost: 1, icon: '🦂', target: 'enemy', rarity: 'rare', cond: { k: 'any' }, desc: '적을 눈만큼 중독시킵니다. 중독된 적은 매 턴 독만큼 피해를 받고, 독은 1씩 줄어듭니다.', role: 'atk',
     run: (u) => { const cb = cbOf(u.ctx); const t = cb.enemies.find((e) => e.uid === cb.target && e.hp > 0) ?? cb.enemies.find((e) => e.hp > 0); if (t) t.poison += Math.round(u.v * u.power); },
   },
-  { id: 'bash', name: '방패치기', cost: 1, icon: '🧱', target: 'enemy', rarity: 'rare', sampleBlock: 10, cond: { k: 'any' }, desc: '내 방어도만큼 공격', role: 'atk', run: (u) => { const cb = cbOf(u.ctx); u.dmg(cb.block + cb.keepBlock); } },
-  { id: 'invest', name: '투자', cost: 0, icon: '📈', rarity: 'rare', cond: { k: 'any' }, desc: '저금통에 눈×{m}', v: { m: 2 }, role: 'eco', run: (u) => u.piggy(u.v * 2) },
-  { id: 'lucky7', name: '럭키 세븐', cost: 1, icon: '🍀', target: 'enemy', rarity: 'rare', cond: { k: 'sumPair', v: 7 }, desc: '{d} 공격 + {g}골드', v: { d: 21, g: 7 }, role: 'atk', run: (u) => { u.dmg(21); u.gold(7); } },
+  { id: 'bash', name: '방패치기', cost: 1, icon: '🧱', target: 'enemy', rarity: 'rare', sampleBlock: 10, cond: { k: 'any' }, desc: '현재 방어도만큼 피해를 줍니다.', role: 'atk', run: (u) => { const cb = cbOf(u.ctx); u.dmg(cb.block + cb.keepBlock); } },
+  { id: 'invest', name: '투자', cost: 0, icon: '📈', rarity: 'rare', cond: { k: 'any' }, desc: '저금통에 눈의 {m}배를 넣습니다.', v: { m: 2 }, role: 'eco', run: (u) => u.piggy(u.v * 2) },
+  { id: 'lucky7', name: '럭키 세븐', cost: 1, icon: '🍀', target: 'enemy', rarity: 'rare', cond: { k: 'sumPair', v: 7 }, desc: '{d}의 피해를 주고 골드를 {g} 얻습니다.', v: { d: 21, g: 7 }, role: 'atk', run: (u) => { u.dmg(21); u.gold(7); } },
   {
-    id: 'split', name: '분할', cost: 0, icon: '✂️', rarity: 'rare', cond: { k: 'range', lo: 4, hi: 6 }, desc: '주사위를 둘로 쪼갬 (6→3+3)', role: 'util', noEcho: true,
+    id: 'split', name: '분할', cost: 0, icon: '✂️', rarity: 'rare', cond: { k: 'range', lo: 4, hi: 6 }, desc: '주사위를 둘로 쪼개 돌려받습니다. (6 → 3+3)', role: 'util', noEcho: true,
     run: (u) => { const p = u.dice[0].pip; const a = Math.ceil(p / 2); u.ret = [a, p - a]; },
   },
-  { id: 'bump', name: '올리기', cost: 0, icon: '⬆️', rarity: 'rare', cond: { k: 'range', lo: 1, hi: 5 }, desc: '눈 +1 해서 돌려받기', role: 'util', noEcho: true, run: (u) => { u.ret = [u.dice[0].pip + 1]; } },
-  { id: 'flip', name: '뒤집기', cost: 0, icon: '🔄', rarity: 'rare', cond: { k: 'any' }, desc: '뒤집기 (1↔6, 2↔5, 3↔4)', role: 'util', noEcho: true, run: (u) => { u.ret = [Math.max(1, Math.min(6, 7 - u.dice[0].pip))]; } },
+  { id: 'bump', name: '올리기', cost: 0, icon: '⬆️', rarity: 'rare', cond: { k: 'range', lo: 1, hi: 5 }, desc: '눈을 1 올려서 돌려받습니다.', role: 'util', noEcho: true, run: (u) => { u.ret = [u.dice[0].pip + 1]; } },
+  { id: 'flip', name: '뒤집기', cost: 0, icon: '🔄', rarity: 'rare', cond: { k: 'any' }, desc: '주사위를 뒤집어 돌려받습니다. (1↔6, 2↔5, 3↔4)', role: 'util', noEcho: true, run: (u) => { u.ret = [Math.max(1, Math.min(6, 7 - u.dice[0].pip))]; } },
   // ── E ──
   {
-    id: 'allin', name: '올인', cost: 2, icon: '💥', target: 'enemy', rarity: 'epic', cond: { k: 'all' }, desc: '남은 주사위 합×{m} 공격 (합 {t} 미만이면 저금통 절반 잃음)', v: { m: 3, t: 15 }, role: 'atk',
+    id: 'allin', name: '올인', cost: 2, icon: '💥', target: 'enemy', rarity: 'epic', cond: { k: 'all' }, desc: '남은 주사위를 모두 써서 합 × {m}의 피해를 줍니다. 합이 {t} 미만이면 저금통 절반을 잃습니다.', v: { m: 3, t: 15 }, role: 'atk',
     run: (u) => {
       u.dmg(u.sum * 3);
       const raw = u.dice.reduce((s, d) => s + d.pip, 0);
@@ -108,11 +108,11 @@ export const SKILLS: SkillDef[] = [
     },
   },
   {
-    id: 'doubledown', name: '더블다운', cost: 1, icon: '✖️', rarity: 'epic', cond: { k: 'any' }, desc: '다음 스킬 2배 (안 쓰면 자해)', role: 'util', noEcho: true, primesDouble: true,
+    id: 'doubledown', name: '더블다운', cost: 1, icon: '✖️', rarity: 'epic', cond: { k: 'any' }, desc: '이번 턴에 다음으로 쓰는 카드의 효과가 2배가 됩니다. 쓰지 않으면 눈만큼 피해를 입습니다.', role: 'util', noEcho: true, primesDouble: true,
     run: (u) => { cbOf(u.ctx).doubledown = u.dice[0].pip; },
   },
   {
-    id: 'roulette', name: '룰렛 베팅', cost: 1, icon: '🎡', target: 'enemy', rarity: 'epic', chance: true, chanceHit: (p) => p * 5, cond: { k: 'any' }, desc: '반반 확률로 눈×{m} 공격', v: { m: 5 }, role: 'atk',
+    id: 'roulette', name: '룰렛 베팅', cost: 1, icon: '🎡', target: 'enemy', rarity: 'epic', chance: true, chanceHit: (p) => p * 5, cond: { k: 'any' }, desc: '룰렛을 돌립니다. 적중하면 눈 × {m}의 피해! 0이 나오면 잭팟 게이지가 가득 찹니다.', v: { m: 5 }, role: 'atk',
     run: (u) => {
       const n = rng(u.ctx, 'combat').int(0, 36);
       u.ctx.emit({ t: 'chanceRoll', kind: 'roulette', result: n, win: n <= 18, label: n === 0 ? '0! 잭팟 100%' : '1~18이면 적중' });
@@ -121,29 +121,29 @@ export const SKILLS: SkillDef[] = [
     },
   },
   {
-    id: 'chain', name: '연쇄 번개', cost: 2, icon: '⚡', rarity: 'epic', cond: { k: 'any' }, desc: '모든 적에게 눈 + 쓴 주사위×2', role: 'atk',
+    id: 'chain', name: '연쇄 번개', cost: 2, icon: '⚡', rarity: 'epic', cond: { k: 'any' }, desc: '모든 적에게 눈 + (이번 턴에 쓴 주사위 수 × 2)의 피해를 줍니다.', role: 'atk',
     run: (u) => { u.dmg(u.v + cbOf(u.ctx).diceUsedThisTurn * 2, { aoe: true }); },
   },
   {
-    id: 'fortress', name: '요새', cost: 2, icon: '🏰', rarity: 'epic', cond: { k: 'sumMin', n: 3, min: 15 }, desc: '방어 {b}, 다음 턴까지 유지', v: { t: 15, b: 25 }, role: 'def',
+    id: 'fortress', name: '요새', cost: 2, icon: '🏰', rarity: 'epic', cond: { k: 'sumMin', n: 3, min: 15 }, desc: '방어도를 {b} 얻습니다. 이 방어도는 다음 턴까지 남습니다.', v: { t: 15, b: 25 }, role: 'def',
     run: (u) => { const cb = cbOf(u.ctx); const b = Math.round(25 * u.power * (cb.handResult?.mult ?? 1)); cb.keepBlock += b; u.ctx.emit({ t: 'block', amount: b }); },
   },
-  { id: 'echo', name: '메아리', cost: 1, icon: '🔁', rarity: 'epic', cond: { k: 'any' }, desc: '방금 쓴 스킬 한 번 더', role: 'util', noEcho: true, echo: true, run: () => { /* combat.ts에서 처리 */ } },
+  { id: 'echo', name: '메아리', cost: 1, icon: '🔁', rarity: 'epic', cond: { k: 'any' }, desc: '직전에 쓴 카드를 이 주사위로 한 번 더 씁니다.', role: 'util', noEcho: true, echo: true, run: () => { /* combat.ts에서 처리 */ } },
   {
-    id: 'reload', name: '재장전', cost: 0, icon: '🔃', rarity: 'epic', cond: { k: 'any' }, desc: '리롤 +1, 주사위 돌려받기', perTurn: 1, role: 'util', noEcho: true,
+    id: 'reload', name: '재장전', cost: 0, icon: '🔃', rarity: 'epic', cond: { k: 'any' }, desc: '리롤을 1번 더 얻고, 주사위를 돌려받습니다. (턴당 1번)', perTurn: 1, role: 'util', noEcho: true,
     run: (u) => { const cb = cbOf(u.ctx); cb.rerollsLeft++; cb.phase = 'roll'; u.ret = [u.dice[0].pip]; },
   },
   // ── L ──
   {
-    id: 'yahtzeehammer', name: '야찌 해머', cost: 1, icon: '🌟', target: 'enemy', rarity: 'legendary', cond: { k: 'same', n: 5 }, desc: '{d} 공격 + 잭팟 100%', v: { d: 100 }, role: 'atk',
+    id: 'yahtzeehammer', name: '야찌 해머', cost: 1, icon: '🌟', target: 'enemy', rarity: 'legendary', cond: { k: 'same', n: 5 }, desc: '{d}의 피해를 주고 잭팟 게이지를 가득 채웁니다.', v: { d: 100 }, role: 'atk',
     run: (u) => { u.dmg(100); addJackpot(u.ctx, 100); },
   },
   {
-    id: 'midas', name: '미다스의 손', cost: 1, icon: '👑', rarity: 'legendary', cond: { k: 'any' }, desc: '저금통 ×{m} (전투당 1번)', v: { m: 1.5 }, perCombat: 1, role: 'eco',
+    id: 'midas', name: '미다스의 손', cost: 1, icon: '👑', rarity: 'legendary', cond: { k: 'any' }, desc: '저금통을 {m}배로 불립니다. (전투당 1번)', v: { m: 1.5 }, perCombat: 1, role: 'eco',
     run: (u) => { const cb = cbOf(u.ctx); cb.piggy = Math.round(cb.piggy * 1.5 + u.v); },
   },
   {
-    id: 'fate', name: '운명 조작', cost: 1, icon: '🔮', rarity: 'legendary', cond: { k: 'any' }, desc: '다른 주사위 하나를 원하는 눈으로 (이 주사위는 돌려받음)', role: 'util', needsChoice: true, noEcho: true, keepDie: true,
+    id: 'fate', name: '운명 조작', cost: 1, icon: '🔮', rarity: 'legendary', cond: { k: 'any' }, desc: '다른 주사위 하나를 원하는 눈으로 바꿉니다. 이 주사위는 돌려받습니다.', role: 'util', needsChoice: true, noEcho: true, keepDie: true,
     run: () => { /* combat.ts에서 choice 처리 */ },
   },
 ];

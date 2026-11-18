@@ -38,22 +38,22 @@ export interface FaceDef {
 }
 
 export const FACES: FaceDef[] = [
-  { id: 'crit', name: '크리티컬', emoji: '★', rarity: 'common', kind: 'attr', desc: '이 주사위로 쓴 스킬 ×{m}', v: { m: 2 }, powerMult: 2, jackpotOnUse: 5 },
-  { id: 'gold', name: '금화', emoji: '🪙', rarity: 'common', kind: 'attr', desc: '나오면 +{g}골드', v: { g: 5 }, onFinal: (ctx) => gainGold(ctx, 5) },
-  { id: 'shield', name: '방패 문양', emoji: '🛡', rarity: 'common', kind: 'attr', desc: '나오면 방어 +{b}', v: { b: 5 }, onFinal: (ctx) => gainBlock(ctx, 5) },
-  { id: 'heart', name: '하트', emoji: '❤', rarity: 'common', kind: 'attr', desc: '나오면 체력 +{h}', v: { h: 3 }, onFinal: (ctx) => healPlayer(ctx, 3) },
+  { id: 'crit', name: '크리티컬', emoji: '★', rarity: 'common', kind: 'attr', desc: '이 면으로 쓴 카드의 효과가 {m}배가 됩니다.', v: { m: 2 }, powerMult: 2, jackpotOnUse: 5 },
+  { id: 'gold', name: '금화', emoji: '🪙', rarity: 'common', kind: 'attr', desc: '이 면이 나오면 골드를 {g} 얻습니다.', v: { g: 5 }, onFinal: (ctx) => gainGold(ctx, 5) },
+  { id: 'shield', name: '방패 문양', emoji: '🛡', rarity: 'common', kind: 'attr', desc: '이 면이 나오면 방어도를 {b} 얻습니다.', v: { b: 5 }, onFinal: (ctx) => gainBlock(ctx, 5) },
+  { id: 'heart', name: '하트', emoji: '❤', rarity: 'common', kind: 'attr', desc: '이 면이 나오면 체력을 {h} 회복합니다.', v: { h: 3 }, onFinal: (ctx) => healPlayer(ctx, 3) },
   {
-    id: 'bolt', name: '번개', emoji: '⚡', rarity: 'common', kind: 'attr', desc: '나오면 적에게 {d} 피해', v: { d: 5 },
+    id: 'bolt', name: '번개', emoji: '⚡', rarity: 'common', kind: 'attr', desc: '이 면이 나오면 무작위 적에게 {d} 피해를 줍니다.', v: { d: 5 },
     onFinal: (ctx) => { const e = randomEnemy(ctx); if (e) damageEnemy(ctx, e, 5, { source: '번개' }); },
   },
-  { id: 'reroll', name: '리롤', emoji: '🔄', rarity: 'common', kind: 'attr', desc: '나오면 리롤 +1', onRolled: (ctx) => { cbOf(ctx).rerollsLeft++; } },
-  { id: 'chip', name: '칩', emoji: '🎰', rarity: 'common', kind: 'attr', desc: '나오면 칩 +1', onFinal: (ctx) => gainChips(ctx, 1) },
-  { id: 'jackpot', name: '잭팟', emoji: '💰', rarity: 'rare', kind: 'attr', desc: '나오면 잭팟 +{j}%', v: { j: 15 }, onFinal: (ctx) => addJackpot(ctx, 15) },
-  { id: 'seven', name: '세븐', emoji: '7', rarity: 'rare', kind: 'replace', desc: '눈 7 (스트레이트엔 못 씀)', pip: 7 },
-  { id: 'zero', name: '제로', emoji: '0', rarity: 'rare', kind: 'replace', desc: '눈 0 · 저금통 ×{m}', v: { m: 1.3 }, pip: 0, piggyMult: 1.3 },
-  { id: 'wild', name: '와일드', emoji: '🃏', rarity: 'rare', kind: 'replace', desc: '족보에서 아무 눈 · 스킬엔 6', pip: 6, wild: true },
+  { id: 'reroll', name: '리롤', emoji: '🔄', rarity: 'common', kind: 'attr', desc: '이 면이 나오면 이번 턴 리롤을 1번 더 얻습니다.', onRolled: (ctx) => { cbOf(ctx).rerollsLeft++; } },
+  { id: 'chip', name: '칩', emoji: '🎰', rarity: 'common', kind: 'attr', desc: '이 면이 나오면 카지노 칩을 1 얻습니다.', onFinal: (ctx) => gainChips(ctx, 1) },
+  { id: 'jackpot', name: '잭팟', emoji: '💰', rarity: 'rare', kind: 'attr', desc: '이 면이 나오면 잭팟 게이지가 {j}% 찹니다.', v: { j: 15 }, onFinal: (ctx) => addJackpot(ctx, 15) },
+  { id: 'seven', name: '세븐', emoji: '7', rarity: 'rare', kind: 'replace', desc: '눈이 7이 됩니다. 스트레이트에는 쓸 수 없습니다.', pip: 7 },
+  { id: 'zero', name: '제로', emoji: '0', rarity: 'rare', kind: 'replace', desc: '눈이 0이 됩니다. 저금통에 넣으면 저금통이 {m}배가 됩니다.', v: { m: 1.3 }, pip: 0, piggyMult: 1.3 },
+  { id: 'wild', name: '와일드', emoji: '🃏', rarity: 'rare', kind: 'replace', desc: '족보에서는 가장 유리한 눈, 카드에 쓰면 6으로 칩니다.', pip: 6, wild: true },
   {
-    id: 'clone', name: '복제', emoji: '👥', rarity: 'rare', kind: 'attr', desc: '나오면 이번 턴 복사본 +1',
+    id: 'clone', name: '복제', emoji: '👥', rarity: 'rare', kind: 'attr', desc: '이 면이 나오면 이번 턴에만 이 주사위의 복사본을 하나 얻습니다.',
     onRolled: (ctx, hd) => {
       const cb = cbOf(ctx);
       if (cb.turnCounters['clone_' + hd.key]) return;
@@ -61,18 +61,18 @@ export const FACES: FaceDef[] = [
       cb.hand.push({ ...hd, key: cb.nextKey++, dieIdx: -1, temp: true, sticker: undefined, locked: false, used: false, rolledFx: true });
     },
   },
-  { id: 'magnet', name: '자석', emoji: '🧲', rarity: 'rare', kind: 'attr', desc: '족보에서 다른 주사위 눈으로', magnet: true },
+  { id: 'magnet', name: '자석', emoji: '🧲', rarity: 'rare', kind: 'attr', desc: '족보를 따질 때 다른 주사위 하나와 같은 눈으로 칩니다.', magnet: true },
   {
-    id: 'fire', name: '불꽃', emoji: '🔥', rarity: 'rare', kind: 'attr', desc: '공격 시 독 {n}', v: { n: 3 },
+    id: 'fire', name: '불꽃', emoji: '🔥', rarity: 'rare', kind: 'attr', desc: '이 면으로 공격하면 적을 {n}만큼 중독시킵니다.', v: { n: 3 },
     onUse: (u) => { const cb = cbOf(u.ctx); const t = alive(cb).find((e) => e.uid === cb.target) ?? alive(cb)[0]; if (t) t.poison += 3; },
   },
   {
-    id: 'ice', name: '얼음', emoji: '❄', rarity: 'rare', kind: 'attr', desc: '쓰면 적 다음 공격 -{n}', v: { n: 3 },
+    id: 'ice', name: '얼음', emoji: '❄', rarity: 'rare', kind: 'attr', desc: '이 면을 쓰면 적 전체의 다음 공격이 {n} 줄어듭니다.', v: { n: 3 },
     onUse: (u) => { for (const e of alive(cbOf(u.ctx))) e.weak += 3; },
   },
-  { id: 'mirror', name: '거울', emoji: '🪞', rarity: 'epic', kind: 'replace', desc: '가장 높은 다른 눈을 복사', pip: 1, mirror: true },
+  { id: 'mirror', name: '거울', emoji: '🪞', rarity: 'epic', kind: 'replace', desc: '손에서 가장 높은 다른 주사위의 눈을 따라 합니다.', pip: 1, mirror: true },
   {
-    id: 'bomb', name: '폭탄', emoji: '💣', rarity: 'epic', kind: 'attr', desc: '쓰면 모든 적 {d} 피해 (1회용)', v: { d: 8 },
+    id: 'bomb', name: '폭탄', emoji: '💣', rarity: 'epic', kind: 'attr', desc: '이 면을 쓰면 모든 적에게 {d} 피해를 주고, 주사위는 이번 전투 동안 사라집니다.', v: { d: 8 },
     onUse: (u) => {
       const cb = cbOf(u.ctx);
       for (const e of alive(cb)) damageEnemy(u.ctx, e, 8, { source: '폭탄 면' });
@@ -80,7 +80,7 @@ export const FACES: FaceDef[] = [
     },
   },
   {
-    id: 'skull', name: '해골', emoji: '💀', rarity: 'epic', kind: 'attr', desc: '나오면 체력 -{s} · 3개면 모든 적 {d}', v: { s: 3, d: 50 }, cursed: true,
+    id: 'skull', name: '해골', emoji: '💀', rarity: 'epic', kind: 'attr', desc: '이 면이 나오면 체력을 {s} 잃습니다. 한 턴에 3개 나오면 모든 적에게 {d} 피해!', v: { s: 3, d: 50 }, cursed: true,
     onFinal: (ctx) => {
       const cb = cbOf(ctx);
       damagePlayer(ctx, 3, '해골 면', { ignoreBlock: true });
@@ -89,7 +89,7 @@ export const FACES: FaceDef[] = [
     },
   },
   {
-    id: 'clover', name: '클로버', emoji: '🍀', rarity: 'epic', kind: 'attr', desc: '나오면 다른 주사위 1개 무료 리롤',
+    id: 'clover', name: '클로버', emoji: '🍀', rarity: 'epic', kind: 'attr', desc: '이 면이 나오면 가장 낮은 다른 주사위를 공짜로 다시 굴립니다.',
     onRolled: (ctx, hd) => {
       const cb = cbOf(ctx);
       const others = cb.hand.filter((h) => h.key !== hd.key && !h.used && !h.locked).sort((a, b) => a.pip - b.pip);
@@ -100,7 +100,7 @@ export const FACES: FaceDef[] = [
       }
     },
   },
-  { id: 'crown', name: '왕관', emoji: '👑', rarity: 'legendary', kind: 'replace', desc: '눈 6 · 족보 배율 +{m}', v: { m: 1.0 }, pip: 6, handMultAdd: 1.0 },
+  { id: 'crown', name: '왕관', emoji: '👑', rarity: 'legendary', kind: 'replace', desc: '눈이 6이 되고, 족보가 나오면 배율이 {m} 오릅니다.', v: { m: 1.0 }, pip: 6, handMultAdd: 1.0 },
 ];
 
 export const FACE_BY_ID = Object.fromEntries(FACES.map((f) => [f.id, f])) as Record<string, FaceDef>;

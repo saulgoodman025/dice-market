@@ -461,6 +461,13 @@ export class App {
         case 'dmgEnemy': {
           at(delay, () => {
             const el = this.el(`[data-uid="${e.uid}"]`);
+            if (e.amount > 0 && e.src === '독') {
+              floatAt(el, `🧪-${e.amount}`, '#9be15d', dmgSize(e.amount) * 1.1);
+              burstAt(el, '#9be15d', 18);
+              this.retrigger(el, 'poisontick');
+              sfx.hurt();
+              return;
+            }
             if (e.amount > 0) {
               if (e.blocked) { this.enemyShield(el); floatAt(el, `🛡${e.blocked}`, '#8cc6ff', 15); }
               const tier = e.amount >= HIT_MASSIVE ? 2 : e.amount >= HIT_STRONG ? 1 : 0;

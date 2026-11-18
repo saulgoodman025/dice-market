@@ -36,32 +36,32 @@ const usedKind = (app: App, kind: 'atk' | 'def') => {
 };
 
 export const COACH: Step[] = [
-  { focus: () => ['.enemy:not(.dead)'], title: '① 적과 다음 행동', text: '⚔ 숫자 = 다음 공격. 🎯약점 눈으로 때리면 피해 ×1.75' },
-  { focus: () => ['.tray'], title: '② 주사위', text: '매 턴 굴러가는 주사위로 카드를 쓴다.' },
+  { focus: () => ['.enemy:not(.dead)'], title: '① 적과 다음 행동', text: '위쪽이 적입니다. 머리 위 ⚔ 숫자만큼 내 턴이 끝나면 공격해 옵니다. 🎯약점 숫자와 같은 눈으로 때리면 피해가 1.75배!' },
+  { focus: () => ['.tray'], title: '② 주사위', text: '매 턴 주사위가 굴러갑니다. 이 주사위를 아래 카드에 써서 공격하고 방어합니다.' },
   {
-    focus: () => ['.tray'], title: '③ 잠그기', text: '탭하면 🔒 잠금. 잠근 건 리롤해도 그대로. (최대 2개)',
+    focus: () => ['.tray'], title: '③ 잠그기', text: '좋은 눈은 탭해서 🔒 잠그세요. 잠근 주사위는 다시 굴려도 그대로 남습니다. 한 번에 2개까지 잠글 수 있습니다.',
     doLabel: '주사위 하나를 탭하세요', done: (a) => !!cb(a)?.hand.some((h) => h.locked && !h.used) || (cb(a)?.phase ?? 'roll') !== 'roll',
   },
   {
-    focus: () => ['[data-act="reroll"]', '.tray'], title: '④ 다시 굴리기', text: '잠그지 않은 주사위만 다시 굴린다. (턴당 2번)',
+    focus: () => ['[data-act="reroll"]', '.tray'], title: '④ 다시 굴리기', text: '🎲 리롤을 누르면 잠그지 않은 주사위만 다시 굴립니다. 한 턴에 2번까지 할 수 있습니다.',
     doLabel: '리롤을 누르세요', done: (a) => { const c = cb(a); return !!c && (c.phase !== 'roll' || c.rerollsLeft < baseRerolls(a.ctx)); },
   },
-  { focus: () => ['.handbar'], title: '⑤ 족보 = 배율', text: '같은 눈·이어지는 눈 = 족보. ×배율만큼 이번 턴 효과 ↑' },
-  { focus: () => ['.chipstat', '.handbar'], title: '⑥ 족보 칩 🔶', text: '좋은 족보 = 🔶 칩 ↑. 카드 왼쪽 위 숫자가 비용. 남으면 3개까지 이월.' },
+  { focus: () => ['.handbar'], title: '⑤ 족보 = 배율', text: '같은 눈이나 이어지는 눈을 모으면 족보가 됩니다. 이번 턴 모든 공격과 방어에 ×배율이 곱해집니다. 누르면 족보표를 볼 수 있습니다.' },
+  { focus: () => ['.chipstat', '.handbar'], title: '⑥ 족보 칩 🔶', text: '카드를 쓰려면 🔶 칩이 필요합니다(카드 왼쪽 위 숫자). 족보가 좋을수록 칩을 많이 받고, 남은 칩은 3개까지 다음 턴으로 넘어갑니다.' },
   {
-    focus: (a) => [card(a, 'atk'), '.enemy:not(.dead)'], title: '⑦ 공격 카드', text: '🎯 카드를 적에게 끌어다 놓기. 오른쪽 위 숫자 = 예상 피해.',
+    focus: (a) => [card(a, 'atk'), '.enemy:not(.dead)'], title: '⑦ 공격 카드', text: '빛나는 🎯 카드를 적에게 끌어다 놓으세요. 카드 오른쪽 위 숫자가 예상 피해입니다. (카드를 탭한 뒤 적을 탭해도 됩니다)',
     doLabel: '카드를 적에게 끌어다 놓으세요', done: (a) => usedKind(a, 'atk'),
   },
   {
-    focus: (a) => [card(a, 'def')], title: '⑧ 방어 카드', text: '✋ 카드는 위로 끌어올리면 사용. 🛡 방어도가 공격을 먼저 막는다.',
+    focus: (a) => [card(a, 'def')], title: '⑧ 방어 카드', text: '✋ 카드는 대상이 없습니다. 위쪽으로 끌어올려 놓으면 씁니다. 얻은 🛡 방어도는 적의 공격을 먼저 막아줍니다.',
     doLabel: '방어 카드를 테이블로 끌어올리세요', done: (a) => usedKind(a, 'def'),
   },
-  { focus: () => ['.tablestats'], title: '⑨ 저금통', text: '안 쓴 주사위 눈 → 🐷 저금통 → 전투 후 골드.' },
+  { focus: () => ['.tablestats'], title: '⑨ 저금통', text: '쓰지 않고 남긴 주사위의 눈은 🐷 저금통에 쌓입니다. 전투에서 이기면 골드로 바뀝니다.' },
   {
-    focus: () => ['[data-act="endTurn"]'], title: '⑩ 턴 종료', text: '할 게 없으면 버튼이 반짝인다.',
+    focus: () => ['[data-act="endTurn"]'], title: '⑩ 턴 종료', text: '할 일을 마쳤으면 턴을 끝내세요. 더 할 수 있는 게 없으면 이 버튼이 반짝입니다.',
     doLabel: '턴 종료를 누르세요', done: (a) => (cb(a)?.turn ?? 1) >= 2,
   },
-  { focus: () => ['.player'], title: '⑪ 잘했다!', text: '이제 혼자 싸워 보자! (? 로 다시 보기)' },
+  { focus: () => ['.player'], title: '⑪ 잘했다!', text: '적의 공격은 🛡 방어도가 먼저 막고, 남은 만큼 ❤ 체력이 줄어듭니다. 이제 직접 싸워 보세요! 오른쪽 위 ? 로 다시 볼 수 있습니다.' },
 ];
 
 /** 지금 튜토리얼이 조작을 막고 있는가 */
