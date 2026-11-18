@@ -817,6 +817,8 @@ export interface EnemyHit {
   uid: number;
   hpLoss: number; // 실제로 깎이는 체력
   blockLoss: number; // 방어도에 막히는 양
+  poisonGain: number; // 새로 쌓이는 독
+  poisonNext: number; // 사용 후 적의 다음 턴에 독으로 깎일 체력
   kill: boolean;
 }
 
@@ -850,7 +852,7 @@ export function previewSkill(ctx: Ctx, slot: number, prefer: number[], targetUid
   if (targetUid !== null && cb2.enemies.some((e) => e.uid === targetUid && e.hp > 0)) cb2.target = targetUid;
   if (cb2.phase === 'roll') confirmHand(c2);
   if (cb2.result) return { ...empty, keys };
-  const before = new Map(cb2.enemies.map((e) => [e.uid, { hp: e.hp, block: e.block }]));
+  const before = new Map(cb2.enemies.map((e) => [e.uid, { hp: e.hp, block: e.block, poison: e.poison }]));
   const b0 = cb2.block + cb2.keepBlock;
   const h0 = run2.hp;
   const g0 = run2.gold;
@@ -862,7 +864,8 @@ export function previewSkill(ctx: Ctx, slot: number, prefer: number[], targetUid
     if (!o) continue; // 분열로 새로 생긴 적
     const hpLoss = Math.max(0, o.hp - e.hp);
     const blockLoss = Math.max(0, o.block - e.block);
-    if (hpLoss || blockLoss) hits.push({ uid: e.uid, hpLoss, blockLoss, kill: o.hp > 0 && e.hp <= 0 });
+    const poisonGain = e.hp > 0 ? Math.max(0, e.poison - o.poison) : 0;
+    if (hpLoss || blockLoss || poisonGain) hits.push({ uid: e.uid, hpLoss, blockLoss, poisonGain, poisonNext: e.hp > 0 ? Math.min(e.poison, e.hp) : 0, kill: o.hp > 0 && e.hp <= 0 });
   }
   return {
     keys,

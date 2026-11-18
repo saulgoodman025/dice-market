@@ -929,3 +929,8 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 @keyframes shardL { 0% { transform: none; } 100% { transform: translate(-22px, 18px) rotate(-55deg); opacity: 0; } }
 @keyframes shardR { 0% { transform: none; } 100% { transform: translate(20px, 22px) rotate(50deg); opacity: 0; } }
 @keyframes shtext { 0% { transform: translateY(6px) scale(.6); opacity: 0; } 25% { transform: none; opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }
+
+/* v2.2 독 예상 피해: 줄무늬 없이 체력바 안에 진한 녹색 단색 */
+.ehp > u.psn { top: 0 !important; bottom: 0 !important; border-radius: 0 !important; background: #3fae2a !important; box-shadow: none !important; }
+.ehp > em.psnprev { background: #3fae2a; animation: psnblink .6s ease-in-out infinite; }
+@keyframes psnblink { 50% { background: #7be05a; opacity: .6; } }

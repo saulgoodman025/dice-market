@@ -213,6 +213,15 @@ export class App {
         seg.style.width = `${(Math.min(h.hpLoss, e.hp) / e.maxHp) * 100}%`;
         bar.appendChild(seg);
       }
+      if (h.poisonGain > 0 && h.poisonNext > 0) {
+        // 독 카드: 다음 턴 독 피해(기존 독 포함)를 체력바 오른쪽 끝에 녹색으로 미리 보여준다
+        const hpAfter = Math.max(0, e.hp - h.hpLoss);
+        const seg = document.createElement('em');
+        seg.className = 'hpprev psnprev';
+        seg.style.left = `${(Math.max(0, hpAfter - h.poisonNext) / e.maxHp) * 100}%`;
+        seg.style.width = `${(Math.min(h.poisonNext, hpAfter) / e.maxHp) * 100}%`;
+        bar.appendChild(seg);
+      }
       if (h.kill) {
         // 처치되는 피해: 체력바 전체가 붉게 깜빡이고 적 위에 해골이 뜬다
         bar.classList.add('lethal');
