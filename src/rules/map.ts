@@ -37,7 +37,12 @@ export function genFloor(ctx: Ctx, floor: number): MapNode[] {
     if (seen.has(t[i])) t[i] = r.weighted(types.filter((k) => !seen.has(k)), (k) => w[k] + 1);
     seen.add(t[i]);
   }
-  // 4층(보스 직전)은 상점 또는 휴식 보장
+  // 전투 고정 층: 모든 칸이 전투 (1막 1층이 아니면 정예도 섞일 수 있다)
+  if (BALANCE.combatFloors.includes(floor)) {
+    for (let i = 0; i < t.length; i++) t[i] = i === t.length - 1 && t.length > 1 && !(run.act === 1 && floor === 0) && r.chance(w.elite / (w.elite + w.combat)) ? 'elite' : 'combat';
+    return t.map((type, i) => ({ type, x: XS[t.length][i], next: [] }));
+  }
+  // 보스 직전 층은 상점 또는 휴식 보장
   if (floor === BALANCE.floorsPerAct - 2 && !t.some((k) => k === 'shop' || k === 'rest')) t[t.length - 1] = r.chance(0.5) ? 'shop' : 'rest';
   // 카지노만 있는 층 금지
   if (!t.some((k) => k !== 'casino')) t[0] = 'combat';

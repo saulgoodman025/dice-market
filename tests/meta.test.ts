@@ -1,3 +1,4 @@
+import { BALANCE } from '../src/data/balance';
 import { describe, expect, it } from 'vitest';
 import { newRun, continueEndless, advance } from '../src/rules/run';
 import { settleRun } from '../src/rules/meta';
@@ -40,7 +41,7 @@ describe('업적 · 숙련도 · 엔드리스 · 일일 도전 · 테이블', ()
   it('클리어 후 엔드리스로 4막, 두 번째 정산은 늘어난 부분만', () => {
     const meta = defaultMeta();
     const { run, ctx } = mk(5);
-    run.act = 3; run.floor = 4; run.nodesReached = 15; run.bossesKilled = 3;
+    run.act = 3; run.floor = BALANCE.floorsPerAct - 1; run.nodesReached = 15; run.bossesKilled = 3;
     advance(ctx);
     expect(run.screen).toBe('victory');
     const r1 = settleRun(meta, run);

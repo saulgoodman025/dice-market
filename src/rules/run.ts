@@ -241,7 +241,7 @@ export function advance(ctx: Ctx) {
   updateFlow(run);
   run.screen = 'map';
   // 증강: 막마다 1번, 2층을 마친 뒤 (3층 지도로 넘어갈 때)
-  if (run.floor === 2 && run.act <= 3) offerAugment(ctx, 'map');
+  if (run.floor === BALANCE.augmentFloor && run.act <= 3) offerAugment(ctx, 'map');
 }
 
 function nextAct(ctx: Ctx) {

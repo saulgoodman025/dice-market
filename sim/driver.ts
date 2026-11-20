@@ -42,6 +42,8 @@ export interface RunResult {
   act: number;
   deckSize: number;
   removals: number;
+  relicCount: number;
+  combats: number;
   maxTier: number;
   combos: number;
   cards: string[];
@@ -82,7 +84,7 @@ export function playRun(bot: Bot, seed: number, charId = 'gambler', stake = 0): 
   return {
     won: run.screen === 'victory', nodes: run.nodesReached, deathBy: run.stats.deathBy, yahtzees: run.stats.yahtzees,
     jackpotTurns: run.stats.jackpotTurns, gambles: run.stats.gambles, relics: [...run.relics], bands, act: run.act,
-    deckSize: run.deck.length, removals: run.stats.removals,
+    deckSize: run.deck.length, removals: run.stats.removals, relicCount: run.relics.length, combats: run.stats.combatsWon,
     maxTier: Math.max(0, ...Object.keys(run.flags).filter((k) => k.startsWith('tierLive_')).map((k) => run.flags[k])),
     combos: Object.keys(run.flags).filter((k) => k.startsWith('comboSeen_')).length,
     cards: [...new Set(run.deck.map((c) => c.id))],

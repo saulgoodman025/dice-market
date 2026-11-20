@@ -37,7 +37,9 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
   snapshotTiers(run);
   const m = getMods(run);
   const endless = Math.max(0, run.act - 3);
-  const hpMult = BALANCE.enemyHpMult * (1 + m.enemyHpPct) * ddaEnemyHpMult(run) * (1 + 0.4 * endless);
+  // 막 안에서 깊이 들어갈수록 적이 단단해진다 (긴 막에서 후반 층이 쉬워지지 않게)
+  const depth = 1 + BALANCE.floorHpStep * run.floor;
+  const hpMult = BALANCE.enemyHpMult * depth * (1 + m.enemyHpPct) * ddaEnemyHpMult(run) * (1 + 0.4 * endless);
   const enemies: Enemy[] = [];
   const seen: Record<string, number> = {};
   for (const id of enemyIds) {

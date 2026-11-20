@@ -50,18 +50,22 @@ export const BALANCE = {
   shopSlotCount: 5,
   shopRerollStart: 2,
   shopRerollMax: 1, // 상점당 리롤 횟수 (유물 싹쓸이 방지)
+  relicPriceStep: 0.15, // 유물을 1개 가질 때마다 상점 유물 가격 +15%
   chipPrice: 8,
   prices: {
     card: { common: 5, rare: 8, epic: 12, legendary: 18 },
     face: { common: 3, rare: 6, epic: 10, legendary: 15 },
-    relic: { common: 6, rare: 10, epic: 15, legendary: 25 },
+    relic: { common: 8, rare: 13, epic: 20, legendary: 32 },
     material: { common: 8, rare: 10, epic: 12, legendary: 15 },
   } as Record<'card' | 'face' | 'relic' | 'material', Record<Rarity, number>>,
   rarityWeights: { common: 60, rare: 28, epic: 10, legendary: 2 } as Record<Rarity, number>,
   rarityShiftPerAct: 3,
 
   nodeWeights: { combat: 40, elite: 12, shop: 18, casino: 12, event: 13, rest: 5 } as Record<Exclude<NodeType, 'boss'>, number>,
-  floorsPerAct: 5,
+  floorsPerAct: 8, // 7층 + 보스
+  augmentFloor: 3, // 막마다 이 층에 오르면 증강 선택 (8층 지도의 앞쪽 절반)
+  combatFloors: [0, 4], // 이 층은 전투(정예 포함)만: 어느 길로 가도 전투를 최소 2번 거친다
+  floorHpStep: 0.04, // 층마다 적 체력 +4% (보스 층 +28%)
 
   restHealPct: 0.3,
 

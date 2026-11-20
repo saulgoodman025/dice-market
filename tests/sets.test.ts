@@ -204,11 +204,11 @@ describe('증강', () => {
     for (const a of AUGMENTS) expect(others.has(a.id), a.id).toBe(false);
   });
 
-  it('막마다 1번(2층을 마친 뒤) = 판당 3번, 엔드리스 진입 시 1번 더', () => {
+  it('막마다 1번(막 중간) = 판당 3번, 엔드리스 진입 시 1번 더', () => {
     const { run, ctx } = mk(31);
     let offers = 0;
     for (let act = 1; act <= 3; act++) {
-      for (let f = 0; f < 5; f++) {
+      for (let f = 0; f < BALANCE.floorsPerAct; f++) {
         run.screen = 'map';
         advance(ctx);
         if (run.augmentOffer) { offers++; pickAugment(ctx, 0); }

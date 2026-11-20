@@ -51,14 +51,14 @@ export function ddaEnemyHpMult(run: RunState): number {
 }
 
 export function ddaNodeWeights(run: RunState, w: Record<Exclude<NodeType, 'boss'>, number>): Record<Exclude<NodeType, 'boss'>, number> {
+  // 잘 풀리면 전투·정예가 늘고, 고전하면 휴식·이벤트가 늘어 숨 돌릴 틈이 생긴다
   const o = { ...w };
   const b = band(run.dda.flow);
-  if (b === 'despair' || b === 'struggle') {
-    const s = assistScale(run);
-    o.rest += 6 * s;
-    o.shop += 6 * s;
-  } else if (b === 'cruise') o.elite += 6;
-  else if (b === 'dominate') o.casino += 6;
+  const s = assistScale(run);
+  if (b === 'despair') { o.rest += 12 * s; o.event += 8 * s; o.shop += 4 * s; o.combat -= 12 * s; }
+  else if (b === 'struggle') { o.rest += 6 * s; o.event += 5 * s; o.combat -= 6 * s; }
+  else if (b === 'cruise') { o.combat += 8; o.elite += 4; o.rest = Math.max(1, o.rest - 2); }
+  else if (b === 'dominate') { o.combat += 14; o.elite += 8; o.rest = Math.max(1, o.rest - 3); o.event = Math.max(1, o.event - 4); }
   return o;
 }
 

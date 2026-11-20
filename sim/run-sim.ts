@@ -39,6 +39,8 @@ function summarize(name: string, rs: RunResult[]) {
   return {
     deck: avg(rs.map((r) => r.deckSize)),
     removals: avg(rs.map((r) => r.removals)),
+    relicCount: avg(rs.map((r) => r.relicCount)),
+    combats: avg(rs.map((r) => r.combats)),
     tier2: a3.filter((r) => r.maxTier >= 2).length / Math.max(1, a3.length),
     combo: a3.filter((r) => r.combos >= 1).length / Math.max(1, a3.length),
     card: [...card.entries()].filter(([, o]) => o.n >= Math.max(5, rs.length * 0.02)).map(([id, o]) => [id, o.n, o.w / o.n] as const).sort((a, b) => b[2] - a[2]),
@@ -73,6 +75,8 @@ lines.push(`| 판당 잭팟 턴 (숙련) | 2~4 | ${f2(grd.jackpot)} | ${target(g
 lines.push(`| 판당 도박 사용 (숙련) | ≥ 6 | ${f2(grd.gambles)} | ${target(grd.gambles >= 6)} |`);
 lines.push(`| 판 종료 시 평균 덱 크기 | 18~26 | ${f2(grd.deck)} | ${target(grd.deck >= 18 && grd.deck <= 26)} |`);
 lines.push(`| 판당 평균 카드 삭제 | ≥ 1.5 | ${f2(grd.removals)} | ${target(grd.removals >= 1.5)} |`);
+lines.push(`| 판 종료 시 평균 유물 | — | ${f2(grd.relicCount)} | |`);
+lines.push(`| 판당 평균 전투 | — | ${f2(grd.combats)} | |`);
 lines.push(`| 3막 도달 판 중 태그 2단계 이상 | ≥ 60% | ${p1(grd.tier2)} | ${target(grd.tier2 >= 0.6)} |`);
 lines.push(`| 3막 도달 판 중 숨은 콤보 1개 이상 | ≥ 50% | ${p1(grd.combo)} | ${target(grd.combo >= 0.5)} |`, '');
 for (const s of [grd, rnd]) {

@@ -1,3 +1,5 @@
+import { nodeWeights } from '../src/rules/map';
+import { BALANCE } from '../src/data/balance';
 import { describe, expect, it } from 'vitest';
 import { newRun, openShop, shopReroll } from '../src/rules/run';
 import { confirmHand, endTurn, playCard, reroll, startCombat, toggleLock } from '../src/rules/combat';
@@ -140,17 +142,35 @@ describe('막 전체 지도 (갈림길)', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const { run } = mk(seed);
       const m = run.map;
-      expect(m.length).toBe(5);
-      expect(m[4].map((n) => n.type)).toEqual(['boss']);
-      for (let f = 0; f < 4; f++) {
+      const F = BALANCE.floorsPerAct;
+      expect(m.length).toBe(F);
+      expect(m[F - 1].map((n) => n.type)).toEqual(['boss']);
+      for (let f = 0; f < F - 1; f++) {
         for (const n of m[f]) {
           expect(n.next.length).toBeGreaterThan(0);
           expect(n.next.some((j) => m[f + 1][j].type !== 'casino')).toBe(true);
         }
         for (let j = 0; j < m[f + 1].length; j++) expect(m[f].some((n) => n.next.includes(j))).toBe(true);
       }
-      for (const n of m[2]) expect(n.next.some((j) => ['shop', 'rest'].includes(m[3][j].type))).toBe(true);
+      for (const n of m[F - 3]) expect(n.next.some((j) => ['shop', 'rest'].includes(m[F - 2][j].type))).toBe(true);
+      // 전투 고정 층: 어느 길로 가도 전투를 거친다
+      for (const f of BALANCE.combatFloors) for (const n of m[f]) expect(['combat', 'elite']).toContain(n.type);
     }
+  });
+
+  it('DDA: 잘 풀리면 전투 비중↑, 고전하면 휴식·이벤트 비중↑', () => {
+    const { run, ctx } = mk(7);
+    run.act = 2;
+    const share = (flow: number) => {
+      run.dda.flow = flow;
+      const w = nodeWeights(ctx, 2);
+      const tot = Object.values(w).reduce((a, b) => a + b, 0);
+      return { fight: (w.combat + w.elite) / tot, calm: (w.rest + w.event) / tot };
+    };
+    const strong = share(95), mid = share(50), weak = share(10);
+    expect(strong.fight).toBeGreaterThan(mid.fight);
+    expect(weak.fight).toBeLessThan(mid.fight);
+    expect(weak.calm).toBeGreaterThan(mid.calm);
   });
 });
 

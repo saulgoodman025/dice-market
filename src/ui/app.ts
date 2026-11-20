@@ -162,11 +162,6 @@ export class App {
     this.root.addEventListener('click', (ev) => {
       if (this.suppressClick) { this.suppressClick = false; ev.preventDefault(); return; }
       const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
-      // 주사위 설명은 주사위가 아닌 곳을 누르면 닫힌다
-      if (this.ui.infoKey !== -1 && t?.dataset.act !== 'die') {
-        this.ui.infoKey = -1;
-        if (!t || (t as HTMLButtonElement).disabled) { this.render(); return; }
-      }
       if (!t) {
         // 상점 물건 줄은 탭해도 전체 설명이 뜬다 (잘린 설명 보기)
         const row = (ev.target as HTMLElement).closest<HTMLElement>('.shoplist .item[data-tip]');
@@ -178,6 +173,17 @@ export class App {
       const arg = t.dataset.arg ?? '';
       if (this.ui.busy && !t.dataset.always) return;
       handleAction(this, act, arg);
+    });
+    // 주사위 설명은 주사위가 아닌 곳에 손을 대면 닫힌다
+    // (iOS Safari는 빈 곳을 탭하면 click을 보내지 않아서 pointerdown에서 처리)
+    this.root.addEventListener('pointerdown', (ev) => {
+      if (this.ui.infoKey === -1) return;
+      const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
+      if (t?.dataset.act === 'die') return;
+      this.ui.infoKey = -1;
+      const info = this.view.querySelector('.dieinfo');
+      if (info) info.innerHTML = ''; // 다시 그리지 않고 지워서 누르는 중인 버튼이 사라지지 않게
+      this.view.querySelectorAll('.die.info').forEach((d) => d.classList.remove('info'));
     });
     // 롱프레스 툴팁
     this.root.addEventListener('pointerdown', (ev) => {
@@ -378,6 +384,8 @@ export class App {
     this.lastRenderKey = key;
     this.view.innerHTML = renderScreen(this);
     if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
+    // 지도에 처음 들어오면 지금 고를 수 있는 층이 화면 가운데 오게
+    if (!keep) this.view.querySelector('.mapscreen .mnode.choice')?.scrollIntoView({ block: 'center' });
     this.reapplyRecent();
     this.applyHpTrails();
     drawCoach(this);

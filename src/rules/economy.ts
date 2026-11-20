@@ -105,6 +105,8 @@ export function basePrice(run: RunState, o: RewardOption): number {
   let p: number;
   if (o.kind === 'consumable') p = CONSUMABLE_BY_ID[o.id].price;
   else p = BALANCE.prices[o.kind][r];
+  // 유물이 많을수록 다음 유물이 비싸진다 (후반 싹쓸이 방지)
+  if (o.kind === 'relic') p *= 1 + BALANCE.relicPriceStep * run.relics.length;
   const m = getMods(run);
   return Math.max(1, Math.round(p * (1 - m.shopDiscount) * (1 + m.shopPricePct)));
 }

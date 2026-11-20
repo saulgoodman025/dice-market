@@ -65,7 +65,7 @@ export function mapScreen(app: App): string {
   const acts = run.act > 3 ? `<div class="actseg cur" style="grid-column:1/-1"><b>♾️ 엔드리스 ${run.act}막</b><span>적 체력 +${40 * (run.act - 3)}% · 공격 +${2 * (run.act - 3)}</span><div class="actdots">${Array.from({ length: F }, (_, f) => `<i class="${f < run.floor ? 'on' : f === run.floor ? 'now' : ''}"></i>`).join('')}</div></div>` : [1, 2, 3].map((a) => `<div class="actseg ${a < run.act ? 'done' : a === run.act ? 'cur' : ''}"><b>${a}막</b><span>${ACT_NAME[a]}</span><div class="actdots">${Array.from({ length: F }, (_, f) => `<i class="${a < run.act || (a === run.act && f < run.floor) ? 'on' : a === run.act && f === run.floor ? 'now' : ''}"></i>`).join('')}</div></div>`).join('');
   return `${topbar(app)}<div class="screen mapscreen">
     <div class="acts">${acts}</div>
-    <div class="mapwrap">
+    <div class="mapwrap" style="--rows:${F}">
       ${floorLabels}
       <svg class="maplines" viewBox="0 0 100 100" preserveAspectRatio="none">${lines}</svg>
       ${nodes}

@@ -1295,3 +1295,10 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 /* 줄 높이가 2줄 설명에 모자라면 1줄로 줄이고 끝을 … 로 */
 .shopscreen .shoplist > .item { container-type: size; }
 @container (max-height: 46px) { .shopscreen .item .ds { -webkit-line-clamp: 1; } }
+
+/* 보유 유물: 항상 한 줄, 넘치면 좌우로 밀어서 본다 */
+.relicstrip { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; flex-shrink: 0; scrollbar-width: none; padding-bottom: 2px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.relicstrip::-webkit-scrollbar { display: none; }
+.relicstrip .relic { flex: 0 0 auto; }
+/* 지도: 층마다 고정 높이(겹치지 않게), 넘치면 화면이 위아래로 스크롤 */
+.mapscreen .mapwrap { flex: none; height: calc(var(--rows, 5) * 66px + 20px); min-height: 0; }
