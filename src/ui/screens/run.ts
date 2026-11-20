@@ -195,7 +195,8 @@ export function shopScreen(app: App): string {
     const right = it.sold ? '<b class="soldtag">SOLD</b>' : `<div class="shopbuy">
       ${hasTag ? `<button class="minibtn" data-act="pricetag" data-arg="${i}" aria-label="가격표" data-tip="가격표: 이 물건 50% 할인">🏷️</button>` : ''}
       <button class="pricebtn ${can ? '' : 'poor'}" data-act="buy" data-arg="${i}">${it.price}G${it.price !== it.basePrice ? `<s>${it.basePrice}</s>` : ''}</button></div>`;
-    return itemHtml(it.opt, `${it.sold ? 'sold' : ''} ${r === 'legendary' && !it.sold ? 'legend-glow' : ''} ${it.opt.kind === 'card' ? 'cardItem' : ''}`, right);
+    const info = optInfo(it.opt);
+    return itemHtml(it.opt, `${it.sold ? 'sold' : ''} ${r === 'legendary' && !it.sold ? 'legend-glow' : ''} ${it.opt.kind === 'card' ? 'cardItem' : ''}`, right, `data-tip="${esc(`${info.name}: ${info.desc}`)}"`);
   }).join('');
   const rp = removePrice(run);
   const canRm = !s.removeUsed && run.gold >= rp && canRemoveMore(run);

@@ -167,7 +167,13 @@ export class App {
         this.ui.infoKey = -1;
         if (!t || (t as HTMLButtonElement).disabled) { this.render(); return; }
       }
-      if (!t || (t as HTMLButtonElement).disabled) return;
+      if (!t) {
+        // 상점 물건 줄은 탭해도 전체 설명이 뜬다 (잘린 설명 보기)
+        const row = (ev.target as HTMLElement).closest<HTMLElement>('.shoplist .item[data-tip]');
+        if (row && !this.tipPinned) this.tipAt(row);
+        return;
+      }
+      if ((t as HTMLButtonElement).disabled) return;
       const act = t.dataset.act!;
       const arg = t.dataset.arg ?? '';
       if (this.ui.busy && !t.dataset.always) return;

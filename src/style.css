@@ -1289,3 +1289,9 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .upcol { display: grid; grid-row: span 3; grid-template-rows: subgrid; gap: 6px; align-items: stretch; }
 .upcol .uplabel { align-self: end; }
 .upcol > .dcard { height: 100%; }
+/* 잘린 설명은 끝에 … (눌러 보면 전체) */
+.shopscreen .item .ds { text-overflow: ellipsis; }
+.shopscreen .shoplist > .item[data-tip] { cursor: pointer; }
+/* 줄 높이가 2줄 설명에 모자라면 1줄로 줄이고 끝을 … 로 */
+.shopscreen .shoplist > .item { container-type: size; }
+@container (max-height: 46px) { .shopscreen .item .ds { -webkit-line-clamp: 1; } }
