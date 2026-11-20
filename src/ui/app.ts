@@ -8,6 +8,8 @@ import { settleRun, type SettleResult } from '../rules/meta';
 import { dailySetup, todayKey } from '../rules/daily';
 import { sfx, setSound, setTempo } from '../audio/sfx';
 import { burstAt, coinRain, dmgSize, floatAt, hitstop, initFx, setFx, shake, vibrate } from './fx/fx';
+import * as px from './fx/pixel';
+import { watchPixelIcons } from './pixelicon';
 import { BALANCE } from '../data/balance';
 import { HAND_BY_ID } from '../data/hands';
 import { fxRandom } from '../core/rng';
@@ -100,6 +102,8 @@ export class App {
     this.toasts.className = 'toasts';
     root.append(this.view, this.toasts);
     initFx(root);
+    px.initPixelFx(root, () => this.settings.speed);
+    watchPixelIcons(root);
     this.applySettings();
     this.bus.on((e) => this.queue.push(e));
     const saved = loadRun(SAVE_VERSION);
@@ -193,6 +197,51 @@ export class App {
     });
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
+    // 가로 슬라이드(.snap): 가운데 온 카드에 맞춰 점 표시
+    this.root.addEventListener('scroll', (ev) => {
+      const el = ev.target as HTMLElement;
+      if (!el.classList?.contains('snap')) return;
+      const kids = [...el.children] as HTMLElement[];
+      const mid = el.scrollLeft + el.clientWidth / 2;
+      const i = kids.reduce((b, k, j) => (Math.abs(k.offsetLeft + k.offsetWidth / 2 - mid) < Math.abs(kids[b].offsetLeft + kids[b].offsetWidth / 2 - mid) ? j : b), 0);
+      el.parentElement?.querySelectorAll('.snapdots i').forEach((d, j) => d.classList.toggle('on', j === i));
+    }, true);
+    // 주사위 테이블을 아래로 쓸어내리면 리롤 (버튼과 같은 동작)
+    // 탭이 있는 화면은 좌우로 쓸어 탭 넘기기
+    let swipe: { x: number; y: number } | null = null;
+    let hswipe: { x: number; y: number; tabs: HTMLElement } | null = null;
+    this.root.addEventListener('pointerdown', (ev) => {
+      const t = ev.target as HTMLElement;
+      swipe = t.closest('.combat .table') && !t.closest('.modal') ? { x: ev.clientX, y: ev.clientY } : null;
+      const scope = t.closest('.modal .box') ?? t.closest('.screen');
+      const tabs = scope?.querySelector<HTMLElement>('.tabs');
+      hswipe = tabs && !t.closest('.snap, .hand, .tabs, input') ? { x: ev.clientX, y: ev.clientY, tabs } : null;
+    });
+    this.root.addEventListener('pointerup', (ev) => {
+      if (hswipe) {
+        const dx = ev.clientX - hswipe.x, dy = ev.clientY - hswipe.y;
+        const btns = [...hswipe.tabs.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+        hswipe = null;
+        const cur = btns.findIndex((b) => b.classList.contains('on'));
+        if (Math.abs(dx) > 70 && Math.abs(dy) < 45 && cur >= 0 && !this.ui.busy) {
+          const nb = btns[cur + (dx < 0 ? 1 : -1)];
+          if (nb) {
+            handleAction(this, nb.dataset.act!, nb.dataset.arg ?? '');
+            this.suppressClick = true; // 손을 뗄 때 아래 버튼이 눌리지 않게
+            setTimeout(() => { this.suppressClick = false; }, 0);
+          }
+        }
+      }
+      if (!swipe) return;
+      const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
+      swipe = null;
+      const btn = this.view.querySelector<HTMLButtonElement>('[data-act="reroll"]');
+      if (dy < 48 || Math.abs(dx) > dy || !btn || btn.disabled || this.ui.busy) return;
+      clearTimeout(this.tipTimer);
+      this.suppressClick = true;
+      setTimeout(() => { this.suppressClick = false; }, 0);
+      handleAction(this, 'reroll', '');
+    });
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
@@ -327,6 +376,11 @@ export class App {
     this.lastRenderKey = key;
     this.view.innerHTML = renderScreen(this);
     if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
+    // 가로 슬라이드는 고른 카드가 가운데 오게
+    this.view.querySelectorAll<HTMLElement>('.snap').forEach((el) => {
+      const on = el.querySelector<HTMLElement>('.on, .sel');
+      if (on) el.scrollLeft = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2;
+    });
     this.reapplyRecent();
     this.applyHpTrails();
     drawCoach(this);
@@ -504,13 +558,8 @@ export class App {
     el.classList.add(cls);
   }
 
-  private slash(el: Element | null, crit?: boolean, dir = '') {
-    const host = this.anchor(el, 450);
-    if (!host) return;
-    const s = document.createElement('div');
-    s.className = `slash ${crit ? 'crit' : ''} ${dir}`;
-    host.appendChild(s);
-    setTimeout(() => s.remove(), 400 / this.settings.speed);
+  private slash(el: Element | null, crit?: boolean) {
+    px.cut(el?.querySelector('.em') ?? el, crit);
   }
 
   /** 이벤트 연출. 적의 턴(hp0 지정)이면 적 행동을 하나씩 순서대로 보여준다. 총 소요(ms, 배속 전) 반환 */
@@ -556,8 +605,8 @@ export class App {
           at(delay, () => {
             const el = this.el(`[data-uid="${e.uid}"]`);
             if (e.amount > 0 && e.src === '독') {
-              floatAt(el, `🧪-${e.amount}`, '#9be15d', dmgSize(e.amount) * 1.1);
-              burstAt(el, '#9be15d', 18);
+              floatAt(el, `-${e.amount}`, '#9be15d', dmgSize(e.amount) * 1.1);
+              px.poison(el?.querySelector('.em') ?? el);
               this.retrigger(el, 'poisontick');
               sfx.hurt();
               return;
@@ -578,7 +627,7 @@ export class App {
               if (e.weakHit) { floatAt(el, '약점!', '#f2b544', 18); this.retrigger(el?.querySelector('.weakpip') ?? null, 'pop'); }
               else if (e.src && !['독', '반사'].includes(e.src)) floatAt(el, e.src, '#ffe9a8', 13);
             } else if (e.blocked) {
-              this.enemyShield(el);
+              px.shieldHit(el?.querySelector('.eshb') ?? el, false);
               this.retrigger(el?.querySelector('.eshb') ?? null, 'clang');
               floatAt(el, `🛡 ${e.blocked} 막힘`, '#8cc6ff', 18);
               sfx.clang();
@@ -605,6 +654,7 @@ export class App {
           if (amt > 0) {
             at(delay + (blocked > 0 ? 420 : 160), () => {
               const plate = this.el('.player');
+              px.claw(plate?.querySelector('.hpbar') ?? plate);
               this.flashDamage();
               this.retrigger(plate, 'hurt');
               this.mark('.player', 'hurt');
@@ -620,14 +670,21 @@ export class App {
           if (enemyPhase) delay += 320; // 연속 공격은 한 대씩 따로 보이게
           break;
         }
-        case 'block': at(delay, () => { floatAt(this.el('.pblock'), `+${e.amount}🛡`, '#6cb8ff', 18); this.retrigger(this.el('.pblock'), 'pop'); sfx.block(); }); break;
+        case 'block': at(delay, () => { px.shieldUp(this.el('.pblock')); floatAt(this.el('.pblock'), `+${e.amount}`, '#6cb8ff', 18); this.retrigger(this.el('.pblock'), 'pop'); sfx.block(); }); break;
         case 'heal': {
           if (enemyPhase) hp += e.amount;
-          at(delay, () => { floatAt(this.el('.player .hpbar') ?? this.el('.hpbar'), `+${e.amount}`, '#3ddc84', 18); sfx.heal(); });
+          at(delay, () => { const bar = this.el('.player .hpbar') ?? this.el('.hpbar'); px.heal(bar); floatAt(bar, `+${e.amount}`, '#3ddc84', 18); sfx.heal(); });
           break;
         }
-        case 'gold': at(delay, () => { floatAt(this.el('.st-gold'), `${e.amount > 0 ? '+' : ''}${e.amount}G`, '#f5c542', 16); if (e.amount > 0) sfx.coin(); }); break;
-        case 'chips': at(delay, () => { floatAt(this.el('.st-chips'), `${e.amount > 0 ? '+' : ''}${e.amount}🎰`, '#ff9de2', 15); sfx.chip(); }); break;
+        case 'gold': at(delay, () => {
+          floatAt(this.el('.st-gold'), `${e.amount > 0 ? '+' : ''}${e.amount}G`, '#f5c542', 16);
+          if (e.amount > 0) { px.payout(this.el('.player') ?? this.el('.screen'), this.el('.st-gold'), Math.ceil(e.amount / 3)); sfx.coin(); }
+        }); break;
+        case 'chips': at(delay, () => {
+          floatAt(this.el('.st-chips'), `${e.amount > 0 ? '+' : ''}${e.amount}`, '#ff9de2', 15);
+          if (e.amount > 0) px.payout(this.el('.handbar') ?? this.el('.screen'), this.el('.st-chips'), e.amount * 2, 'chip');
+          sfx.chip();
+        }); break;
         case 'hand': at(delay + 650, () => this.handBanner(e.hand.id, e.hand.mult)); break;
         case 'yahtzee': if (this.yahtzeeKey !== this.turnKey()) { this.yahtzeeKey = this.turnKey(); at(delay + 700, () => this.yahtzeeFx()); } break;
         case 'heat': if (e.heat >= BALANCE.heatMax) at(delay, () => this.toast('🔥 온 파이어! 다음 굴림 주사위 1개 = 6', 'gold')); break;
@@ -638,7 +695,7 @@ export class App {
             const wait = events.some((x) => x.t === 'yahtzee') ? 2600 : 200; // 야찌 연출이 끝난 뒤
             at(delay + wait, () => this.bossDeathFx(e.uid));
             delay += wait + 2100;
-          } else at(delay + 150, () => { const el = this.el(`[data-uid="${e.uid}"]`); burstAt(el, '#ffd34d', 30); el?.classList.add('dying'); });
+          } else at(delay + 150, () => { const el = this.el(`[data-uid="${e.uid}"]`); px.dissolve(el?.querySelector('.em') ?? el); el?.classList.add('dying'); });
           break;
         }
         case 'enemyAct': {
@@ -656,7 +713,7 @@ export class App {
           at(delay + 120, () => {
             const el = this.el(`[data-uid="${uid}"]`);
             this.retrigger(el?.querySelector('.eshb') ?? null, 'gain');
-            this.enemyShield(el);
+            px.shieldUp(el?.querySelector('.eshb') ?? el);
             floatAt(el?.querySelector('.ehp') ?? el, `+${n}🛡`, '#8cc6ff', 18);
             sfx.block();
           });
@@ -704,6 +761,7 @@ export class App {
     d.innerHTML = `<div class="cfx-cards"><span class="cfx a">${a.icon}</span><span class="cfx b">${b.icon}</span></div>
       <div class="cfx-title">🔓 숨은 콤보 발견!</div><div class="cfx-name">${c.name}</div><div class="cfx-desc">${a.name} + ${b.name}<br>${c.desc}</div><div class="cfx-tap">화면을 눌러 닫기</div>`;
     this.root.appendChild(d);
+    setTimeout(() => px.chainLink(d.querySelector('.cfx-cards')), 50);
     sfx.jackpot();
     vibrate([30, 40, 60]);
     // 다 읽을 때까지 띄워 두고, 플레이어가 화면을 누르면 닫는다 (등장 직후의 연타는 무시)
@@ -719,18 +777,9 @@ export class App {
     d.className = 'tierfx';
     d.innerHTML = `<b>${t.icon} ${t.name} ${tier}단계!</b><span>${TAG_TIER_FX[tag as keyof typeof TAG_TIER_FX][tier - 1].desc}</span>`;
     this.root.appendChild(d);
+    px.twinkle(d, 'gold', 8);
     sfx.chip();
     setTimeout(() => d.remove(), 1800 / this.settings.speed);
-  }
-
-  private enemyShield(el: Element | null) {
-    const host = this.anchor(el, 550);
-    if (!host) return;
-    const sh = document.createElement('div');
-    sh.className = 'eshield';
-    sh.textContent = '🛡️';
-    host.appendChild(sh);
-    setTimeout(() => sh.remove(), 500 / this.settings.speed);
   }
 
   private setBlock(v: number) {
@@ -756,7 +805,7 @@ export class App {
     v.className = 'vignette blue';
     this.root.appendChild(v);
     setTimeout(() => v.remove(), 400 / this.settings.speed);
-    burstAt(plate.querySelector('.pblock') ?? plate, broke ? '#cfe6ff' : '#8cc6ff', broke ? 26 : 16);
+    px.shieldHit(plate.querySelector('.pblock') ?? plate, broke);
     shake(this.root, 3);
     if (broke) sfx.shieldBreak(); else sfx.clang();
     vibrate(broke ? [20, 30, 40] : 25);
@@ -764,20 +813,7 @@ export class App {
 
   /** 색종이 축하 */
   confetti(n: number) {
-    const colors = ['#f2b544', '#ff6b6b', '#6fdc9b', '#8cc4ff', '#b57cff', '#ffffff'];
-    const h = this.root.getBoundingClientRect();
-    for (let i = 0; i < n; i++) {
-      const c = document.createElement('i');
-      c.className = 'confetti';
-      c.style.left = `${fxRandom() * h.width}px`;
-      c.style.background = colors[i % colors.length];
-      c.style.setProperty('--dx', `${(fxRandom() - 0.5) * 120}px`);
-      c.style.setProperty('--rot', `${fxRandom() * 720}deg`);
-      c.style.animationDelay = `${fxRandom() * 0.4}s`;
-      c.style.animationDuration = `${(1.6 + fxRandom() * 1.2) / this.settings.speed}s`;
-      this.root.appendChild(c);
-      setTimeout(() => c.remove(), 3300 / this.settings.speed);
-    }
+    px.confettiFx(n);
   }
 
   private flash(cls = 'white') {
@@ -787,21 +823,10 @@ export class App {
     setTimeout(() => f.remove(), 400 / this.settings.speed);
   }
 
-  private ring(el: Element | null, color: string) {
-    const host = this.anchor(el, 650);
-    if (!host) return;
-    const r = document.createElement('div');
-    r.className = 'shockring';
-    r.style.borderColor = color;
-    host.appendChild(r);
-    setTimeout(() => r.remove(), 600 / this.settings.speed);
-  }
-
   /** 강타 (15+): 십자 베기 + 충격파 */
   private strongHit(el: Element | null, amt: number, crit?: boolean) {
-    this.slash(el, crit);
-    setTimeout(() => this.slash(el, true, 'rev'), 70 / this.settings.speed);
-    this.ring(el, '#ffb347');
+    this.slash(el, true);
+    px.impact(el?.querySelector('.em') ?? el, false);
     floatAt(el, `${crit ? '★' : ''}${amt}!`, '#ffb347', dmgSize(amt) * 1.6);
     floatAt(el, '강타!', '#ffd34d', 18);
     hitstop(this.root, 90);
@@ -816,11 +841,8 @@ export class App {
     this.flash('white');
     this.retrigger(this.root, 'punch');
     this.slash(el, true);
-    setTimeout(() => this.slash(el, true, 'rev'), 60 / this.settings.speed);
-    setTimeout(() => this.slash(el, true, 'flat'), 120 / this.settings.speed);
-    this.ring(el, '#ff5a3c');
-    setTimeout(() => this.ring(el, '#ffd34d'), 120 / this.settings.speed);
-    burstAt(el, '#ff9a3c', 34);
+    px.impact(el?.querySelector('.em') ?? el, true, 'fire');
+    setTimeout(() => px.impact(el?.querySelector('.em') ?? el, true), 120 / this.settings.speed);
     floatAt(el, `${crit ? '★' : ''}${amt}!!`, '#ff6a3d', dmgSize(amt) * 2.1);
     floatAt(el, '초강타!!', '#ffd34d', 22);
     hitstop(this.root, 160);
@@ -957,6 +979,7 @@ export class App {
         clearInterval(iv);
         el.innerHTML = final;
         el.classList.remove('rolling');
+        px.dust(el);
         sfx.tick();
       }, stopAt);
     });
@@ -1012,11 +1035,11 @@ export class App {
       setTimeout(() => d.remove(), (480 + i * 70) / this.settings.speed);
       if (target) {
         target.classList.remove('drawn');
-        setTimeout(() => { target.classList.add('drawn'); setTimeout(() => target.classList.remove('drawn'), 900); }, (380 + i * 70) / this.settings.speed);
+        setTimeout(() => { target.classList.add('drawn'); if (src !== 'turn') px.twinkle(target, 'steel', 3); setTimeout(() => target.classList.remove('drawn'), 900); }, (380 + i * 70) / this.settings.speed);
       }
     });
     if (src !== 'turn') {
-      floatAt(hand, `🂠 +${uids.length}장`, '#cfe7ff', 18);
+      floatAt(hand, `+${uids.length}장`, '#cfe7ff', 18);
       this.retrigger(pile, 'pop');
       vibrate(15);
     }
@@ -1046,10 +1069,9 @@ export class App {
       shake(this.root, 14);
       vibrate([80, 50, 80, 50, 200]);
       this.flash('gold');
-      coinRain(50);
-      this.confetti(90);
-      const r = this.root.getBoundingClientRect();
-      for (let i = 0; i < 5; i++) setTimeout(() => burstAtXY(r.width * (0.2 + fxRandom() * 0.6), r.height * (0.3 + fxRandom() * 0.3)), i * 150);
+      px.yahtzee();
+      coinRain(40);
+      this.confetti(70);
       setTimeout(() => fs.remove(), 1700 / this.settings.speed);
     }, 300 / this.settings.speed);
   }
@@ -1060,7 +1082,7 @@ export class App {
     fs.innerHTML = `<div class="big">MEGA<br>JACKPOT!</div><div class="gold" id="megaroll">0G</div>`;
     this.root.appendChild(fs);
     sfx.jackpot();
-    coinRain(90);
+    px.fountain(70);
     shake(this.root, 10);
     vibrate([100, 60, 100, 60, 300]);
     let n = 0;

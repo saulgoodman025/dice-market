@@ -191,12 +191,11 @@ export function combatScreen(app: App): string {
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>
-    <div class="dieinfo">${info || (ui.selCard !== null && cb.cards[ui.selCard] ? (() => { const d = resolveFor(run, cb.cards[ui.selCard]); return `<b>${esc(d.name)}</b> ${esc(cardDesc(d, oddsB))} · ${d.target === 'enemy' ? '🎯 적을 탭' : '✋ 위쪽을 탭'}`; })() : roll ? '🔒 탭해서 잠금 · 카드는 <b>끌어다 놓기</b>' : '🎯 카드 → 적 · ✋ 카드 → 위로')}</div>
+    <div class="dieinfo">${info || (ui.selCard !== null && cb.cards[ui.selCard] ? (() => { const d = resolveFor(run, cb.cards[ui.selCard]); return `<b>${esc(d.name)}</b> ${esc(cardDesc(d, oddsB))} · ${d.target === 'enemy' ? '🎯 적을 탭' : '✋ 위쪽을 탭'}`; })() : '')}</div>
     <div class="handrow">${piles}<div class="hand n${Math.min(n, 6)} ${n > 6 ? 'many' : ''}" style="--cw:${cw}px;--cm:${cm}px">${cards || '<span class="muted small">손패가 비었다</span>'}</div></div>
     <div class="actions">
-      <button class="btn" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}>🎲 리롤 ${roll ? cb.rerollsLeft : 0}</button>
-      <button class="btn" data-act="modal" data-arg="hands">📖 도움말</button>
-      <button class="btn primary ${moves ? '' : 'glow'}" data-act="endTurn">턴 종료 ▶</button>
+      <button class="btn reroll" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}><span>리롤</span><b>${roll ? cb.rerollsLeft : 0}</b></button>
+      <button class="btn primary endturn ${moves ? '' : 'glow'}" data-act="endTurn">턴 종료</button>
     </div>
   </div>
   ${pickerModal(app)}`;
@@ -217,8 +216,7 @@ export function handsModal(app: App): string {
     </div>`).join('')}</div>`;
   } else {
     const owned = new Set(app.run?.dice.map((d) => d.material) ?? []);
-    body = `<div class="small muted">주사위 왼쪽 아래 아이콘 = 재질 · <b>내 것</b> = 보유 중</div>
-    <div class="col" style="gap:4px">${MATERIALS.map((m) => `<div class="hrow ${owned.has(m.id) ? 'cur' : ''}">
+    body = `<div class="col" style="gap:4px">${MATERIALS.map((m) => `<div class="hrow ${owned.has(m.id) ? 'cur' : ''}">
       <div class="die small mat-${m.id}" style="flex-shrink:0">${pipsHtml(5)}${m.id !== 'wood' ? `<span class="matb">${m.icon}</span>` : ''}</div>
       <div class="grow"><b>${m.icon} ${m.name}</b>${owned.has(m.id) ? ' <span class="tag rare">내 것</span>' : ''}<div class="small">${esc(m.long)}</div></div>
     </div>`).join('')}</div>`;
@@ -231,9 +229,9 @@ export function handsModal(app: App): string {
 
 const TUT = [
   { e: '🎲', t: '주사위로 싸운다', d: '매 턴 주사위 5개가 굴러간다. 위쪽은 적(딜러), 아래쪽이 나다.' },
-  { e: '🔒', t: '잠그고 다시 굴리기', d: '마음에 드는 주사위를 탭하면 잠긴다.\n🎲 리롤을 누르면 나머지만 다시 굴린다 (턴당 2번).' },
-  { e: '🃏', t: '족보 = 배율', d: '같은 눈, 이어지는 눈을 모으면 족보!\n배율만큼 모든 효과가 세진다. 📖 족보 버튼으로 언제든 확인.' },
-  { e: '🃏', t: '카드를 끌어다 쓰기', d: '아래 스킬 카드를 끌어서 놓으면 알맞은 주사위로 발동!\n🎯 공격 카드는 적 위에, ✋ 방어·회복 카드는 테이블 아무 곳에.\n카드 위 숫자가 예상 결과 (⚔ 피해, 🛡 방어)' },
+  { e: '🔒', t: '잠그고 다시 굴리기', d: '마음에 드는 주사위를 탭하면 잠긴다.\n리롤 버튼을 누르거나 테이블을 아래로 쓸어내리면 나머지만 다시 굴린다 (턴당 2번).' },
+  { e: '🃏', t: '족보 = 배율', d: '같은 눈, 이어지는 눈을 모으면 족보!\n배율만큼 모든 효과가 세진다. 족보 이름을 누르면 언제든 확인.' },
+  { e: '🃏', t: '카드를 끌어다 쓰기', d: '아래 스킬 카드를 끌어서 놓으면 알맞은 주사위로 발동!\n공격 카드는 적 위에, 방어·회복 카드는 테이블 아무 곳에. 카드를 탭하면 설명이 나온다.\n카드 위 숫자가 예상 결과 (⚔ 피해, 🛡 방어)' },
   { e: '👀', t: '적의 다음 행동', d: '적 머리 위 ⚔️ 숫자만큼 이번 턴 끝에 공격해 온다.\n🛡 방어로 막고, 남은 주사위는 🐷 저금통 → 골드.\n할 게 없으면 턴 종료 버튼이 반짝인다.' },
 ];
 

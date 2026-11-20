@@ -107,7 +107,7 @@ export function pickEncounter(ctx: Ctx, tier: 'normal' | 'elite' | 'boss'): stri
 export const NODE_INFO: Record<NodeType, { emoji: string; name: string; desc: string }> = {
   combat: { emoji: '⚔️', name: '전투', desc: '일반 적과 싸운다' },
   elite: { emoji: '💀', name: '엘리트', desc: '강적. 유물 보상' },
-  shop: { emoji: '🛒', name: '상점', desc: '흥정하고 산다' },
+  shop: { emoji: '🏪', name: '상점', desc: '흥정하고 산다' },
   casino: { emoji: '🎰', name: '카지노', desc: '슬롯·룰렛·하이롤러' },
   event: { emoji: '❓', name: '이벤트', desc: '무슨 일이 생길까' },
   rest: { emoji: '🛏️', name: '휴식', desc: '회복 또는 강화' },

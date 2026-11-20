@@ -62,17 +62,17 @@ export const COACH: Step[] = [
     doLabel: '주사위 하나를 탭하세요', done: (a) => !!cb(a)?.hand.some((h) => h.locked && !h.used) || (cb(a)?.phase ?? 'roll') !== 'roll',
   },
   {
-    focus: () => ['[data-act="reroll"]', '.tray'], title: '④ 다시 굴리기', text: '🎲 리롤을 누르면 잠그지 않은 주사위만 다시 굴립니다. 한 턴에 2번까지 할 수 있습니다.',
+    focus: () => ['[data-act="reroll"]', '.tray'], title: '④ 다시 굴리기', text: '리롤을 누르거나 테이블을 아래로 쓸어내리면 잠그지 않은 주사위만 다시 굴립니다. 한 턴에 2번까지 할 수 있습니다.',
     doLabel: '리롤을 누르세요', done: (a) => { const c = cb(a); return !!c && (c.phase !== 'roll' || c.rerollsLeft < baseRerolls(a.ctx)); },
   },
   { focus: () => ['.handbar'], title: '⑤ 족보 = 배율', text: '같은 눈이나 이어지는 눈을 모으면 족보가 됩니다. 이번 턴 모든 공격과 방어에 ×배율이 곱해집니다. 누르면 족보표를 볼 수 있습니다.' },
   { focus: () => ['.chipstat', '.handbar'], title: '⑥ 족보 칩 🔶', text: '카드를 쓰려면 🔶 칩이 필요합니다(카드 왼쪽 위 숫자). 족보가 좋을수록 칩을 많이 받고, 남은 칩은 1개만 다음 턴으로 넘어가니, 어떤 카드에 칩을 쓸지 골라야 합니다.' },
   {
-    focus: (a) => [card(a, 'atk'), '.enemy:not(.dead)'], title: '⑦ 공격 카드', text: '빛나는 🎯 카드를 적에게 끌어다 놓으세요. 카드 오른쪽 위 숫자가 예상 피해입니다. (카드를 탭한 뒤 적을 탭해도 됩니다)',
+    focus: (a) => [card(a, 'atk'), '.enemy:not(.dead)'], title: '⑦ 공격 카드', text: '빛나는 공격 카드를 적에게 끌어다 놓으세요. 카드 오른쪽 위 숫자가 예상 피해입니다. 카드를 탭하면 설명이 나오고, 그다음 적을 탭해도 됩니다.',
     doLabel: '카드를 적에게 끌어다 놓으세요', done: (a) => usedKind(a, 'atk'),
   },
   {
-    focus: (a) => [card(a, 'def')], title: '⑧ 방어 카드', text: '✋ 카드는 대상이 없습니다. 위쪽으로 끌어올려 놓으면 씁니다. 얻은 🛡 방어도는 적의 공격을 먼저 막아줍니다.',
+    focus: (a) => [card(a, 'def')], title: '⑧ 방어 카드', text: '방어 카드는 대상이 없습니다. 위쪽으로 끌어올려 놓으면 씁니다. 얻은 🛡 방어도는 적의 공격을 먼저 막아줍니다.',
     doLabel: '방어 카드를 테이블로 끌어올리세요', done: (a) => usedKind(a, 'def'),
   },
   { focus: () => ['.piles', '.hand'], title: '⑨ 카드 뽑기', text: '매 턴 덱에서 카드 5장을 뽑고, 턴이 끝나면 손패는 모두 버립니다. 🂠 뽑을 카드가 떨어지면 🗑 버린 카드를 섞어 다시 씁니다. 족보가 투 페어 이상이면 1장 더!' },

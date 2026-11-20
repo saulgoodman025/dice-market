@@ -50,13 +50,12 @@ export function tagBar(app: App): string {
 
 export function consumablesRow(app: App): string {
   const r = app.run!;
-  const slots = Array.from({ length: BALANCE.maxConsumables }, (_, i) => {
-    const id = r.consumables[i];
-    if (!id) return `<button disabled style="opacity:.3">·</button>`;
+  // 빈 칸은 그리지 않는다 (가진 소모품만)
+  const slots = r.consumables.map((id, i) => {
     const d = CONSUMABLE_BY_ID[id];
     return `<button data-act="useCons" data-arg="${i}" data-tip="${esc(d.name + ': ' + d.desc)}">${d.emoji}</button>`;
   }).join('');
-  return `<div class="cons">${slots}</div>`;
+  return slots ? `<div class="cons">${slots}</div>` : '';
 }
 
 export function relicStrip(app: App): string {

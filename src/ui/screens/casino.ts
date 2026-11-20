@@ -48,7 +48,6 @@ export function casinoScreen(app: App): string {
     const o = slotOdds(run);
     const ticket = run.consumables.includes('freespin') ? ' (무료 스핀권 사용)' : '';
     body = `${slotMachine(app)}
-      <div class="row center"><span class="odds">같은 그림 3개 또는 2개 → 당첨 · 그 외 → 꽝 (📋 배당표에서 보상 확인)</span></div>
       <button class="btn primary big" data-act="spin" ${ui.slot.spinning ? 'disabled' : ''}>스핀 (칩 1)${ticket}</button>
       <button class="btn ghost" data-act="modal" data-arg="paytable">📋 배당표</button>`;
   } else if (ui.casinoTab === 'roulette') {
@@ -66,7 +65,7 @@ export function casinoScreen(app: App): string {
       <div class="row center"><span class="odds">공이 내가 건 칸에 멈추면 당첨 · 0이 나오면 0에 건 것만 당첨 (칩 ×36 + 잭팟 100%)</span></div>
       <div class="row"><button class="btn ghost" data-act="clearBets">베팅 취소</button><button class="btn primary grow" data-act="spinRoulette" ${totalBet ? '' : 'disabled'}>돌리기 (칩 ${totalBet})</button></div>`;
   } else {
-    if (run.act < 2) body = `<div class="card center">🚫 하이롤러 테이블은 2막부터 열린다.<br><span class="muted small">(초반 판을 망치지 않도록)</span></div>`;
+    if (run.act < 2) body = `<div class="card center">🚫 하이롤러 테이블은 2막부터 열린다.</div>`;
     else {
       const bonus = highrollerTierBonus(run, ddaHighrollerBonus(run));
       const h = ui.high;
@@ -82,11 +81,10 @@ export function casinoScreen(app: App): string {
     }
   }
   return `${topbar(app)}<div class="screen">
-    <h2 class="center">🎰 카지노 <span class="muted small">칩 ${run.chips}</span></h2>
+    <h2 class="center">카지노</h2>
     ${tabs}${body}
     <div class="grow"></div>
-    <div class="muted small center">칩은 상점에서 8G에 살 수 있다. 판이 끝나면 칩은 소멸한다.</div>
-    <button class="btn" data-act="leaveCasino" ${ui.slot.spinning || ui.roulette.spinning ? 'disabled' : ''}>카지노를 나간다 ▶</button>
+    <button class="btn" data-act="leaveCasino" ${ui.slot.spinning || ui.roulette.spinning ? 'disabled' : ''}>나가기</button>
   </div>`;
 }
 
@@ -230,7 +228,7 @@ export function mysteryModal(app: App): string {
   return `<div class="modal"><div class="box center">
     <h3>🎁 미스터리 박스</h3>
     <div class="odds">일반 ${pct(mo.common)} · 희귀 ${pct(mo.rare)} · 영웅 ${pct(mo.epic)} · 전설 ${pct(mo.legendary)}</div>
-    <div class="muted small">흔들림이 셀수록 좋은 것이 들었다 (실제 내용물과 일치)</div>
+    <div class="muted small">흔들림이 셀수록 좋은 것</div>
     ${m.opened ? `<div style="font-size:60px">${relic?.emoji ?? '💨'}</div><b>${relic ? esc(relic.name) : '빈 상자'}</b><div class="small">${relic ? esc(relic.desc) : ''}</div><button class="btn primary" data-act="closeModal">확인</button>`
       : `<div class="mbox s${lvl}" data-act="mysteryOpen">🎁</div><button class="btn primary" data-act="mysteryOpen">열기</button>`}
   </div></div>`;

@@ -11,7 +11,7 @@ import { esc, fmt, rarityTag } from '../components/parts';
 import { MATERIAL_BY_ID } from '../../data/materials';
 import { CARD_BY_ID, CARDS, isPoolCard, resolveCard } from '../../data/cards';
 import { COMBOS } from '../../data/sets';
-import { cardFace } from '../components/parts';
+import { cardFace, pipsHtml } from '../components/parts';
 import { RELIC_BY_ID } from '../../data/relics';
 import { FACE_BY_ID } from '../../data/faces';
 import { CHAR_BY_ID } from '../../data/characters';
@@ -25,23 +25,21 @@ export function titleScreen(app: App): string {
   const m = app.meta;
   const d = dailySetup(todayKey());
   const best = m.daily?.[d.key];
-  return `<div class="screen center" style="justify-content:center;gap:12px">
-    <div class="title-dice">🎲🎰🎲</div>
-    <div class="title-logo">DICE<br>MARKET</div>
-    <div class="muted center">하우스는 항상 이긴다. 정말 그럴까?</div>
-    <div class="col" style="width:100%;max-width:310px;margin:0 auto;gap:9px">
-      ${has ? `<button class="btn primary big" data-act="continue">▶ 이어하기 <span class="small">(${app.run!.act}막 ${app.run!.floor + 1}층)</span></button>` : ''}
-      <button class="btn ${has ? '' : 'primary'} big" data-act="new">${has ? '새 게임 (현재 판 포기)' : '▶ 새 게임'}</button>
-      <button class="item dailycard" data-act="daily">
-        <div class="ic">📅</div>
-        <div class="grow" style="text-align:left"><div class="tt">오늘의 도전 <span class="muted small">${d.key}</span></div>
-        <div class="ds">${CHAR_BY_ID[d.charId].emoji} ${CHAR_BY_ID[d.charId].name} · ${TABLE_BY_ID[d.tableId].icon} ${TABLE_BY_ID[d.tableId].name} · ${d.rule.name}</div>
-        <div class="ds gold">${best ? `오늘 최고 ${best}점` : '아직 도전하지 않았습니다'}</div></div>
-      </button>
-      <div class="row"><button class="btn grow" data-act="achievements">🏆 업적 ${m.achievements?.length ?? 0}/${ACHIEVEMENTS.length}</button><button class="btn grow" data-act="codex">📖 도감</button></div>
-      <button class="btn" data-act="settings">⚙️ 설정</button>
+  return `<div class="screen titlescreen">
+    <div class="tlogo">
+      <div class="tdice"><div class="die td1">${pipsHtml(6)}</div><div class="die td2">${pipsHtml(5)}</div></div>
+      <h1 class="tword"><span>DICE</span><span>MARKET</span></h1>
     </div>
-    <div class="muted small">판 ${m.stats.runs} · 클리어 ${m.stats.wins} · 야찌 ${m.stats.yahtzees}${m.bestEndless ? ` · 엔드리스 최고 ${m.bestEndless}막` : ''}</div>
+    <div class="tmenu">
+      ${has ? `<button class="btn primary big" data-act="continue">이어하기 <span class="tsub">${app.run!.act}막 ${app.run!.floor + 1}층</span></button>` : ''}
+      <button class="btn ${has ? '' : 'primary'} big" data-act="new">${has ? '새 게임' : '게임 시작'}</button>
+      <button class="tdaily" data-act="daily"><b>오늘의 도전</b><span>${CHAR_BY_ID[d.charId].name} · ${TABLE_BY_ID[d.tableId].name}</span>${best ? `<em>${best}점</em>` : '<em class="new">NEW</em>'}</button>
+      <nav class="tside">
+        <button data-act="achievements"><i>🏆</i>업적</button>
+        <button data-act="codex"><i>📖</i>도감</button>
+        <button data-act="settings"><i>⚙️</i>설정</button>
+      </nav>
+    </div>
   </div>`;
 }
 
@@ -49,14 +47,18 @@ export function charScreen(app: App): string {
   const m = app.meta;
   const cards = CHARACTERS.map((c) => {
     const unlocked = !c.unlock || m.flags[c.unlock];
-    return `<button class="item ${app.ui.charSel === c.id && unlocked ? 'charpick' : ''} ${unlocked ? '' : 'lockedchar'}" style="width:100%" ${unlocked ? `data-act="char" data-arg="${c.id}"` : 'disabled'}>
-      <div class="ic" style="font-size:34px">${unlocked ? c.emoji : '🔒'}</div>
-      <div class="grow" style="text-align:left"><div class="tt">${app.ui.charSel === c.id && unlocked ? '✔ ' : ''}${c.name} <span class="muted small">❤${c.hp}</span> <span class="lvl">Lv.${masteryLevel(m.mastery?.[c.id] ?? 0)}</span></div>
-      <div class="ds">${esc(c.desc)}</div>
-      <div class="ds">시작 덱: 베기×4 · 방패×4 · ${c.startCards.map((s) => CARD_BY_ID[s].icon + ' ' + CARD_BY_ID[s].name).join(' · ')}</div>
-      <div class="ds">주사위: ${[...new Set(c.dice)].map((m) => `${MATERIAL_BY_ID[m].icon} ${MATERIAL_BY_ID[m].name}×${c.dice.filter((x) => x === m).length}`).join(' ')}</div>
-      ${[...new Set(c.dice)].filter((m) => m !== 'wood').map((m) => `<div class="ds">${MATERIAL_BY_ID[m].icon} ${esc(MATERIAL_BY_ID[m].long)}</div>`).join('')}
-      ${unlocked ? '' : `<div class="ds red">해금: ${esc(c.unlockText)}</div>`}</div>
+    const on = app.ui.charSel === c.id && unlocked;
+    const mats = [...new Set(c.dice)];
+    return `<button class="charslide ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" ${unlocked ? `data-act="char" data-arg="${c.id}"` : 'disabled'}>
+      <div class="cs-art">${unlocked ? c.emoji : '🔒'}</div>
+      <div class="cs-name">${c.name}<span class="lvl">Lv.${masteryLevel(m.mastery?.[c.id] ?? 0)}</span></div>
+      <div class="cs-hp">❤ ${c.hp}</div>
+      <div class="cs-desc">${esc(c.desc)}</div>
+      ${unlocked ? `<div class="cs-rows">
+        <div><b>시작 카드</b>${c.startCards.map((s) => `${CARD_BY_ID[s].icon} ${CARD_BY_ID[s].name}`).join(' · ')}</div>
+        <div><b>주사위</b>${mats.map((mt) => `${MATERIAL_BY_ID[mt].icon} ${MATERIAL_BY_ID[mt].name}×${c.dice.filter((x) => x === mt).length}`).join(' ')}</div>
+        ${mats.filter((mt) => mt !== 'wood').map((mt) => `<div class="cs-mat">${MATERIAL_BY_ID[mt].icon} ${esc(MATERIAL_BY_ID[mt].long)}</div>`).join('')}
+      </div>` : `<div class="cs-lock">해금: ${esc(c.unlockText)}</div>`}
     </button>`;
   }).join('');
   const stakes = Array.from({ length: m.maxStake + 1 }, (_, i) => `<button class="btn ${app.ui.stakeSel === i ? 'primary' : 'ghost'}" style="min-width:44px;padding:4px" data-act="stake" data-arg="${i}">${i}</button>`).join('');
@@ -68,11 +70,12 @@ export function charScreen(app: App): string {
   const sdesc = app.ui.stakeSel ? STAKES.filter((s) => s.level <= app.ui.stakeSel).map((s) => s.desc).join(' · ') : '스테이지 0: 기본 난이도';
   return `<div class="screen">
     <div class="row"><button class="btn ghost" data-act="back">←</button><h2>캐릭터 선택</h2></div>
-    <div class="col">${cards}</div>
-    <div class="card col"><b>🎲 시작 테이블</b><div class="tablepick">${tables}</div><div class="small">${esc(TABLE_BY_ID[app.ui.tableSel]?.desc ?? '')}</div></div>
-    <div class="card"><div class="row" style="flex-wrap:wrap"><b>⚜ 난이도 스테이지</b>${stakes}</div><div class="muted small" style="margin-top:4px">${esc(sdesc)}${m.maxStake < 8 ? ' · 클리어하면 다음 스테이지가 열린다' : ''}</div></div>
+    <div class="charsnap snap">${cards}</div>
+    <div class="snapdots">${CHARACTERS.map((c) => `<i class="${app.ui.charSel === c.id ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="card col"><b>테이블</b><div class="tablepick">${tables}</div><div class="small">${esc(TABLE_BY_ID[app.ui.tableSel]?.desc ?? '')}</div></div>
+    <div class="card"><div class="row" style="flex-wrap:wrap"><b>스테이지</b>${stakes}</div><div class="small" style="margin-top:4px">${esc(sdesc)}</div></div>
     <div class="grow"></div>
-    <button class="btn primary big" data-act="start">하우스에 들어간다 ▶</button>
+    <button class="btn primary big" data-act="start">시작</button>
   </div>`;
 }
 
@@ -87,10 +90,8 @@ export function settingsScreen(app: App): string {
     ${tg('shake', '💥 화면 흔들림', s.shake)}
     <button class="item" style="width:100%" data-act="speed"><div class="grow tt" style="text-align:left">⏩ 연출 속도</div><b class="gold">×${s.speed}</b></button>
     <h3>🎨 꾸미기</h3>
-    <div class="small muted">업적과 캐릭터 숙련도로 더 열립니다.</div>
     <div class="cosrow">${SKINS.map((c) => cos(c.id, 'skin', c.name, c.preview, s.skin === c.id, c.id === 'ivory' || owned.includes('skin:' + c.id))).join('')}</div>
     <div class="cosrow">${FELTS.map((c) => cos(c.id, 'felt', c.name, c.preview, s.felt === c.id, c.id === 'green' || owned.includes('felt:' + c.id))).join('')}</div>
-    <div class="muted small">디버그 패널: 주소 뒤에 ?debug=1</div>
   </div>`;
 }
 
@@ -186,7 +187,7 @@ export function achievementsScreen(app: App): string {
   }
   return `<div class="screen">
     <div class="row"><button class="btn ghost" data-act="back">←</button><h2>업적 · 숙련도</h2></div>
-    <div class="muted small">${tab === 'ach' ? `${m.achievements?.length ?? 0}/${ACHIEVEMENTS.length} 달성 · 판이 끝날 때 확인합니다.` : '판을 할수록 경험치가 쌓입니다. (도달한 칸 + 보스×5 + 클리어 20)'}</div>
+    ${tab === 'ach' ? `<div class="small">${m.achievements?.length ?? 0}/${ACHIEVEMENTS.length} 달성</div>` : ''}
     ${tabs}<div class="col">${body}</div>
   </div>`;
 }
