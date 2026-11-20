@@ -2,7 +2,7 @@
 import type { Rarity, RunState } from '../core/state';
 import { RARITIES } from '../core/state';
 import {
-  DON, HAGGLE, HIGHROLLER, MYSTERY_WEIGHTS, ROULETTE_BETS, ROULETTE_RED, ROULETTE_SINGLE_PAYOUT,
+  DON, HIGHROLLER, MYSTERY_WEIGHTS, ROULETTE_BETS, ROULETTE_RED, ROULETTE_SINGLE_PAYOUT,
   SCRATCH_SYMBOLS, SLOT_PAY, SLOT_SYMBOLS, type RouletteBet,
 } from '../data/casino';
 import { BALANCE } from '../data/balance';
@@ -321,29 +321,6 @@ export function highroller(ctx: Ctx, optId: string, ddaBonus: number): { d: [num
   }
   gambleResult(ctx, 'highroller', win);
   return { d, win, prize };
-}
-
-// ───────────── 흥정 ─────────────
-export function haggleOdds(run: RunState) {
-  const keep = getMods(run).haggleKeepOnOne > 0;
-  const mults = [keep ? 1 : HAGGLE.oneMult, 0.9, 0.85, 0.8, 0.75, HAGGLE.six];
-  const ev = mults.reduce((a, b) => a + b, 0) / 6;
-  return { mults, ev };
-}
-
-export function haggle(ctx: Ctx, idx: number): number | null {
-  const shop = ctx.run.shop;
-  if (!shop) return null;
-  const it = shop.items[idx];
-  const max = 1 + getMods(ctx.run).haggleCount;
-  if (!it || it.sold || it.haggles >= max) return null;
-  const roll = rng(ctx, 'shop').die();
-  const { mults } = haggleOdds(ctx.run);
-  it.price = Math.max(0, Math.round(it.basePrice * mults[roll - 1]));
-  it.haggles++;
-  it.lastHaggle = roll;
-  gambleResult(ctx, 'haggle', roll > 1);
-  return roll;
 }
 
 // ───────────── 스크래치 ─────────────

@@ -16,7 +16,7 @@ import { CONSUMABLE_BY_ID } from '../../data/consumables';
 import { currentChoices } from '../../rules/run';
 import type { CardInst, RunState } from '../../core/state';
 import { NODE_INFO } from '../../rules/map';
-import { donMaxStreak, donMin, haggleOdds } from '../../rules/casino';
+import { donMaxStreak, donMin } from '../../rules/casino';
 import { getMods } from '../../rules/ctx';
 import { interestFor, itemRarity } from '../../rules/economy';
 import { cardFace, cardInstFace, dieFace, esc, fmt, itemHtml, optInfo, pipsHtml, RAR_NAME, rarityTag } from '../components/parts';
@@ -188,34 +188,29 @@ function comboHint(app: App, id: string): string {
 export function shopScreen(app: App): string {
   const run = app.run!;
   const s = run.shop!;
-  const m = getMods(run);
-  const maxH = 1 + m.haggleCount;
-  const ho = haggleOdds(run);
   const hasTag = run.consumables.includes('pricetag');
   const items = s.items.map((it, i) => {
     const r = itemRarity(it.opt);
     const can = run.gold >= it.price;
     const right = it.sold ? '<b class="soldtag">SOLD</b>' : `<div class="shopbuy">
-      ${it.haggles < maxH ? `<button class="hagglebtn" data-act="haggle" data-arg="${i}" aria-label="흥정" data-tip="흥정 주사위: 6 → 공짜, 2~5 → 눈×5% 할인, 1 → ${m.haggleKeepOnOne ? '가격 그대로(말굽)' : '50% 비싸짐'}">🎲</button>` : `<span class="hagglebtn done">${it.lastHaggle ?? ''}</span>`}
-      ${hasTag ? `<button class="hagglebtn" data-act="pricetag" data-arg="${i}" aria-label="가격표">🏷️</button>` : ''}
+      ${hasTag ? `<button class="minibtn" data-act="pricetag" data-arg="${i}" aria-label="가격표" data-tip="가격표: 이 물건 50% 할인">🏷️</button>` : ''}
       <button class="pricebtn ${can ? '' : 'poor'}" data-act="buy" data-arg="${i}">${it.price}G${it.price !== it.basePrice ? `<s>${it.basePrice}</s>` : ''}</button></div>`;
     return itemHtml(it.opt, `${it.sold ? 'sold' : ''} ${r === 'legendary' && !it.sold ? 'legend-glow' : ''} ${it.opt.kind === 'card' ? 'cardItem' : ''}`, right);
   }).join('');
   const rp = removePrice(run);
   const canRm = !s.removeUsed && run.gold >= rp && canRemoveMore(run);
-  const removeRow = `<div class="item"><div class="ic">🗑️</div><div class="grow"><div class="tt">카드 삭제 서비스</div><div class="ds">${s.removeUsed ? '이번 상점에서는 이미 썼다' : `덱에서 카드 1장 삭제 · 쓸 때마다 +${BALANCE.removeStep}G`}${canRemoveMore(run) ? '' : ` · 덱이 ${BALANCE.minDeck}장 미만이 될 수 없다`}</div></div>
+  const removeRow = `<div class="item"><div class="ic">🗑️</div><div class="grow"><div class="tt">카드 삭제 서비스</div><div class="ds">${s.removeUsed ? '이번 상점에서 사용함' : canRemoveMore(run) ? '덱에서 카드 1장 삭제' : `덱 최소 ${BALANCE.minDeck}장`}</div></div>
     <div class="shopbuy"><button class="pricebtn ${canRm ? '' : 'poor'}" data-act="shopRemove" ${canRm ? '' : 'disabled'}>${s.removeUsed ? '완료' : `${rp}G`}</button></div></div>`;
-  return `${topbar(app)}<div class="screen">
-    <h2 class="center">상점</h2>
-    <div class="col shoplist">${items}${removeRow}</div>
+  return `${topbar(app)}<div class="screen noscroll shopscreen">
+    <div class="shoplist">${items}${removeRow}</div>
     <div class="subtools">
       <button data-act="shopReroll" ${s.rerolls >= BALANCE.shopRerollMax ? 'disabled' : ''} data-tip="물건 전체 새로고침 (상점마다 1번, 🎲6이면 비용 환급)">🔄 <span>리롤</span><b>${s.rerolls >= BALANCE.shopRerollMax ? '끝' : s.rerollFree ? '무료' : s.rerollCost + 'G'}</b></button>
       <button data-act="buyChip" data-tip="카지노 칩 (판이 끝나면 사라짐)">🎰 <span>칩 1개</span><b>${BALANCE.chipPrice}G</b></button>
       <button data-act="shopEdit" class="${app.ui.shopEdit ? 'on' : ''}">🎲 <span>내 주사위</span></button>
     </div>
-    ${app.ui.shopEdit ? diceViewer(app, false) : ''}
     <div class="row">${consumablesRow(app)}<button class="btn primary grow" data-act="leaveShop">나가기</button></div>
-  </div>`;
+  </div>
+  ${app.ui.shopEdit ? `<div class="modal"><div class="box"><div class="row"><h3 class="grow">내 주사위</h3><button class="btn ghost" data-act="shopEdit">✕</button></div>${diceViewer(app, false)}</div></div>` : ''}`;
 }
 
 export function eventScreen(app: App): string {

@@ -24,8 +24,8 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'merchant', name: '상인', emoji: '💼', hp: 60,
     dice: ['gold', 'wood', 'wood', 'wood', 'wood'],
     startCards: ['collect', 'ledger'],
-    desc: '상품마다 흥정을 2번 할 수 있고, 이자 상한이 3 늘어납니다.',
-    mods: { haggleCount: 1, interestCap: 3 },
+    desc: '상점 가격이 15% 싸고, 이자 상한이 3 늘어납니다.',
+    mods: { shopDiscount: 0.15, interestCap: 3 },
     unlock: 'act1boss', unlockText: '1막 보스 처치',
   },
   {

@@ -62,4 +62,3 @@ export const HIGHROLLER = [
   { id: 'hp', label: '체력 15를 건다', stake: 15, kind: 'hp' as const, need: 8, prize: 'epic' as Rarity },
 ];
 
-export const HAGGLE = { oneMult: 1.5, perPipDiscount: 0.05, six: 0 };

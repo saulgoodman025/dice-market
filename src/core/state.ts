@@ -194,8 +194,6 @@ export interface ShopItem {
   opt: RewardOption;
   price: number;
   basePrice: number;
-  haggles: number;
-  lastHaggle: number | null;
   sold: boolean;
 }
 

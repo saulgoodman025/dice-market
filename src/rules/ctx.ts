@@ -32,8 +32,6 @@ export interface Mods {
   slotSevenWeight: number;
   rouletteZeroWeight: number;
   payoutEv: number;
-  haggleKeepOnOne: number;
-  haggleCount: number;
   highrollerTier: number;
   casinoChips: number;
   scratchCols: number;
@@ -122,7 +120,7 @@ export const ZERO_MODS = (): Mods => ({
   rerolls: 0, lockLimit: 0, handChips: 0, handAll: 0, handAdd: {}, smallLadder: 0, interestCap: 0, interestUnit: 0,
   piggyPct: 0, shopDiscount: 0, shopSlots: 0, shopPricePct: 0, donMaxStreak: 0, donMinDelta: 0,
   donFirstFailKeep: 0, slotPairMult: 0, slotSevenWeight: 0, rouletteZeroWeight: 0, payoutEv: 0,
-  haggleKeepOnOne: 0, haggleCount: 0, highrollerTier: 0, casinoChips: 0, scratchCols: 0,
+  highrollerTier: 0, casinoChips: 0, scratchCols: 0,
   shopFirstRerollFree: 0, heatDmgExtra: 0, startBlock: 0, preview: 0, enemyHpPct: 0, startHpDelta: 0,
   bossPhase2: 0, eliteWeight: 0, ddaHalfDown: 0, turnNudge: 0, turnGodhand: 0, locksmith: 0,
   tumble: 0, weighted: 0, stackdeck: 0, reflect: 0, goldPerKill: 0, firstTurnBlock: 0,

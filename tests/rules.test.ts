@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newRun, openShop, shopReroll } from '../src/rules/run';
 import { confirmHand, endTurn, playCard, reroll, startCombat, toggleLock } from '../src/rules/combat';
 import type { Ctx } from '../src/rules/ctx';
-import { donChance, donEV, rouletteOdds, slotOdds, haggleOdds } from '../src/rules/casino';
+import { donChance, donEV, rouletteOdds, slotOdds } from '../src/rules/casino';
 import { MANIP_SKILLS } from '../src/data/meta';
 import { CARDS } from '../src/data/cards';
 import { RELICS } from '../src/data/relics';
@@ -99,7 +99,6 @@ describe('카지노 기대값 (R2/R4)', () => {
     expect(donChance(run)).toBeCloseTo(0.5);
     expect(slotOdds(run).ev).toBeLessThanOrEqual(1.0);
     for (const r of rouletteOdds(run).rows) expect(r.ev).toBeLessThanOrEqual(1.0);
-    expect(haggleOdds(run).ev).toBeCloseTo(0.8);
   });
   it('빌드로 EV > 1.0 가능 (하우스의 열쇠)', () => {
     const { run } = mk(1, 'knight');

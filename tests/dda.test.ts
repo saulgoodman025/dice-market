@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newRun } from '../src/rules/run';
 import {
-  donChance, donEV, haggleOdds, mysteryOdds, rouletteOdds, scratchOdds, slotOdds, tumbleRoll, HIGHROLLER_P,
+  donChance, donEV, mysteryOdds, rouletteOdds, scratchOdds, slotOdds, tumbleRoll, HIGHROLLER_P,
 } from '../src/rules/casino';
 import {
   DDA_TOUCHES, DISPLAYED_PROBABILITIES, ddaEnemyHpMult, ddaNodeWeights, ddaRarityBonus, ddaEliteRewardMult,
@@ -13,7 +13,7 @@ import type { RunState } from '../src/core/state';
 
 function displayed(run: RunState) {
   return JSON.stringify({
-    slot: slotOdds(run), roulette: rouletteOdds(run), don: [donChance(run), donEV(run)], haggle: haggleOdds(run),
+    slot: slotOdds(run), roulette: rouletteOdds(run), don: [donChance(run), donEV(run)],
     scratch: scratchOdds(run), mystery: mysteryOdds(), high: HIGHROLLER_P,
   });
 }

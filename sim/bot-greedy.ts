@@ -18,7 +18,7 @@ import {
   canUpgradeCard, canRemoveMore, pickCardReward, removeCards, removePrice, restRemove, shopRemoveService, upgradeCard,
 } from '../src/rules/run';
 import type { RunState } from '../src/core/state';
-import { donEV, doubleOrNothing, haggle, haggleOdds, slotOdds, slotSpin } from '../src/rules/casino';
+import { donEV, doubleOrNothing, slotOdds, slotSpin } from '../src/rules/casino';
 import { itemRarity } from '../src/rules/economy';
 import { EVENT_BY_ID } from '../src/data/events';
 import { alive } from '../src/rules/ops';
@@ -273,7 +273,6 @@ export const greedyBot: Bot = {
   shop: (ctx) => {
     const run = ctx.run;
     const s = run.shop!;
-    if (haggleOdds(run).ev < 1) for (let i = 0; i < s.items.length; i++) haggle(ctx, i);
     const prio = (o: RewardOption) => {
       if (o.kind === 'consumable') return o.id === 'potion' && run.hp < run.maxHp * 0.6 ? 6 : 0;
       if (o.kind === 'material') return rIdx(o) >= 1 ? 2 + rIdx(o) : -1;

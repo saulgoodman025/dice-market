@@ -48,7 +48,7 @@ export const RELICS: RelicDef[] = [
   // ── 도박형 ──
   R({ id: 'luckycoin', name: '행운의 동전', emoji: '🍀', rarity: 'common', cat: 'gamble', desc: '더블 오어 낫싱 첫 도전에 실패해도 절반은 지킵니다.', mods: { donFirstFailKeep: 0.5 } }),
   R({ id: 'fuzzydice', name: '털 주사위', emoji: '🧸', rarity: 'common', cat: 'gamble', desc: '슬롯머신 2개 일치 보상이 2배가 됩니다.', mods: { slotPairMult: 1 } }),
-  R({ id: 'horseshoe', name: '말굽', emoji: '🧲', rarity: 'rare', cat: 'gamble', desc: '흥정 주사위가 1이 나와도 가격이 오르지 않습니다.', mods: { haggleKeepOnOne: 1 } }),
+  R({ id: 'horseshoe', name: '말굽', emoji: '🧲', rarity: 'rare', cat: 'gamble', desc: '카지노 파쇄기 성공 확률이 20%p 오릅니다.', mods: { casinoOdds: 20 } }),
   R({ id: 'loaded', name: '로디드 다이스', emoji: '🎲', rarity: 'rare', cat: 'gamble', desc: '더블 오어 낫싱 성공 눈이 하나 늘어납니다.', mods: { donMinDelta: -1 } }),
   R({ id: 'croupier', name: '딜러의 장갑', emoji: '🧤', rarity: 'rare', cat: 'gamble', desc: '룰렛에서 0이 나올 확률이 2배가 됩니다.', mods: { rouletteZeroWeight: 1 } }),
   R({ id: 'redchip', name: '빨간 칩', emoji: '🔴', rarity: 'rare', cat: 'gamble', desc: '카지노에 들어가면 카지노 칩을 2개 더 받습니다.', mods: { casinoChips: 2 } }),

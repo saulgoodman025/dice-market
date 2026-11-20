@@ -307,7 +307,7 @@ function shopItem(ctx: Ctx, kind: ItemKind, minRarity: 'common' | 'epic' = 'comm
   }
   if (!o) return null;
   const p = basePrice(run, o);
-  return { opt: o, price: p, basePrice: p, haggles: 0, lastHaggle: null, sold: false };
+  return { opt: o, price: p, basePrice: p, sold: false };
 }
 
 function fillShop(ctx: Ctx, seen: string[] = []): ShopItem[] {
@@ -331,7 +331,7 @@ function fillShop(ctx: Ctx, seen: string[] = []): ShopItem[] {
   if (ddaShopIncludesPotion(run)) {
     const ci = items.findIndex((x) => x.opt.kind === 'consumable');
     const p = basePrice(run, { kind: 'consumable', id: 'potion' });
-    const potion: ShopItem = { opt: { kind: 'consumable', id: 'potion' }, price: p, basePrice: p, haggles: 0, lastHaggle: null, sold: false };
+    const potion: ShopItem = { opt: { kind: 'consumable', id: 'potion' }, price: p, basePrice: p, sold: false };
     if (ci >= 0) items[ci] = potion; else items.push(potion);
   }
   const hasEpic = items.some((x) => x.opt.kind !== 'consumable' && ['epic', 'legendary'].includes(itemRarity(x.opt)));

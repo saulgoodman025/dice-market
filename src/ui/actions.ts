@@ -15,7 +15,7 @@ import {
   leaveReward, leaveShop, offerFaces, pickOffer, pickReward, restHeal, restUpgrade, shopApplyPricetag, shopBuy,
   shopReroll, useConsumableOutside, advance, continueEndless, pickCardReward, upgradeCard, removeCards, restRemove, shopRemoveService,
 } from '../rules/run';
-import { doubleOrNothing, haggle, openMystery, rouletteSpin, scratchCard, slotSpin } from '../rules/casino';
+import { doubleOrNothing, openMystery, rouletteSpin, scratchCard, slotSpin } from '../rules/casino';
 import type { RouletteBet } from '../data/casino';
 import { animateDon, animateRoulette, animateSlot } from './screens/casino';
 import { vibrate } from './fx/fx';
@@ -288,11 +288,6 @@ function runAction(app: App, act: string, arg: string, n: number) {
       break;
     }
     // ── 상점 ──
-    case 'haggle': {
-      const d = haggle(ctx, n);
-      if (d !== null) app.toast(`🎲 흥정 주사위 ${d}: ${d === 6 ? '공짜!' : d === 1 ? '바가지...' : `${d * 5}% 할인`}`, d === 6 ? 'gold' : d === 1 ? 'bad' : 'good');
-      break;
-    }
     case 'buy': if (!shopBuy(ctx, n)) { app.toast('골드가 부족하다', 'bad'); sfx.bad(); } break;
     case 'pricetag': shopApplyPricetag(ctx, n); break;
     case 'shopReroll': {

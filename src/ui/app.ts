@@ -162,6 +162,11 @@ export class App {
     this.root.addEventListener('click', (ev) => {
       if (this.suppressClick) { this.suppressClick = false; ev.preventDefault(); return; }
       const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
+      // 주사위 설명은 주사위가 아닌 곳을 누르면 닫힌다
+      if (this.ui.infoKey !== -1 && t?.dataset.act !== 'die') {
+        this.ui.infoKey = -1;
+        if (!t || (t as HTMLButtonElement).disabled) { this.render(); return; }
+      }
       if (!t || (t as HTMLButtonElement).disabled) return;
       const act = t.dataset.act!;
       const arg = t.dataset.arg ?? '';

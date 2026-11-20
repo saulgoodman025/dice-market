@@ -1,10 +1,10 @@
-// 동적 난이도 보정. 표시되는 확률(굴림/슬롯/룰렛/더블오어낫싱/흥정/스크래치/미스터리)은 절대 건드리지 않는다.
+// 동적 난이도 보정. 표시되는 확률(굴림/슬롯/룰렛/더블오어낫싱/스크래치/미스터리)은 절대 건드리지 않는다.
 import type { NodeType, RunState } from '../core/state';
 
 /** DDA가 바꿀 수 있는 값 */
 export const DDA_TOUCHES = ['shopRarityWeights', 'mapNodeWeights', 'enemyHp', 'eliteReward', 'highrollerRewardTier'] as const;
 /** 화면에 확률이 표시되는 값 (DDA 금지) */
-export const DISPLAYED_PROBABILITIES = ['combatDice', 'slot', 'roulette', 'doubleOrNothing', 'haggle', 'scratch', 'mysteryBox'] as const;
+export const DISPLAYED_PROBABILITIES = ['combatDice', 'slot', 'roulette', 'doubleOrNothing', 'scratch', 'mysteryBox'] as const;
 
 export type FlowBand = 'despair' | 'struggle' | 'flow' | 'cruise' | 'dominate';
 
