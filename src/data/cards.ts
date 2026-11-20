@@ -720,7 +720,9 @@ export function cardName(inst: { id: string; up: null | 'A' | 'B' }): string {
 
 /** 설명 문자열. oddsBonus는 도박 카드 확률 보정(%p) */
 export function cardDesc(rc: ResolvedCard, oddsBonus = 0): string {
-  return rc.desc.replace(/\{(\w+)\}/g, (_, k) => {
+  // "+{a}"처럼 강화 때만 붙는 보너스가 0이면 "+0"을 지운다
+  const base = rc.desc.replace(/\+\{(\w+)\}/g, (m, k) => (rc.n[k] === 0 ? '' : m));
+  return base.replace(/\{(\w+)\}/g, (_, k) => {
     let x = rc.n[k];
     if (x === undefined) return `{${k}}`;
     if (k === rc.odds) x = Math.max(0, Math.min(100, x + oddsBonus));
