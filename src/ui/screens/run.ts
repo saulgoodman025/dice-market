@@ -451,7 +451,7 @@ function augmentModal(app: App): string {
       <span class="augname">${esc(a.name)}</span>
       ${a.tag ? `<span class="augtag">${TAG_INFO[a.tag].icon} +1</span>` : '<span class="augtag muted">무색</span>'}
       <span class="augdesc">${esc(a.desc)}</span>
-    </button>${a.tag ? tagPreview(counts, a.tag) : ''}<button class="augrr" data-act="augReroll" data-arg="${i}" ${canRerollAugment(run, i) ? '' : 'disabled'} data-tip="이 자리만 다시 뽑기 (자리마다 1번, 등급 유지)">🔄 ${of.rerolled[i] ? '사용함' : '다시 뽑기'}</button></div>`;
+    </button>${a.tag ? tagPreview(counts, a.tag) : ''}<button class="augrr" data-act="augReroll" data-arg="${i}" ${canRerollAugment(run, i) ? '' : 'disabled'}>🔄 ${of.rerolled[i] ? '사용함' : '다시 뽑기'}</button></div>`;
   }).join('');
   const prism = of.tier === 'gold' && run.flags.prismRolled !== run.flags.augOffers
     ? `<button class="btn ghost prismbtn" data-act="prismRoll" ${run.chips >= PRISM_ROULETTE.chips ? '' : 'disabled'} data-tip="25% 프리즘 / 75% 실버로 다시 뽑기">🎰 프리즘 룰렛 <b>칩 ${PRISM_ROULETTE.chips}</b></button>` : '';
