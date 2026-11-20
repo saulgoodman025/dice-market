@@ -51,8 +51,7 @@ export function charScreen(app: App): string {
   const mats = [...new Set(c.dice)];
   const card = `<div class="charslide on ${unlocked ? '' : 'locked'}">
       <div class="cs-art">${unlocked ? c.emoji : '🔒'}</div>
-      <div class="cs-name">${c.name}<span class="lvl">Lv.${masteryLevel(m.mastery?.[c.id] ?? 0)}</span></div>
-      <div class="cs-hp">❤ ${c.hp}</div>
+      <div class="cs-name">${c.name}<span class="cs-hp">❤ ${c.hp}</span><span class="lvl">Lv.${masteryLevel(m.mastery?.[c.id] ?? 0)}</span></div>
       <div class="cs-desc">${esc(c.desc)}</div>
       ${unlocked ? `<div class="cs-rows">
         <div><b>시작 카드</b>${c.startCards.map((s) => `${CARD_BY_ID[s].icon} ${CARD_BY_ID[s].name}`).join(' · ')}</div>
@@ -67,7 +66,7 @@ export function charScreen(app: App): string {
     ? `<button class="tbl ${app.ui.tableSel === t.id ? 'on' : ''}" data-act="table" data-arg="${t.id}"><span>${t.icon}</span>${t.name.replace(' 테이블', '')}</button>`
     : `<button class="tbl locked" disabled data-tip="${esc('업적 「' + (ACH_BY_ID[t.unlock]?.name ?? '') + '」 달성 시 해금')}"><span>🔒</span>${t.name.replace(' 테이블', '')}</button>`).join('');
   const sdesc = app.ui.stakeSel ? STAKES.filter((s) => s.level <= app.ui.stakeSel).map((s) => s.desc).join(' · ') : '스테이지 0: 기본 난이도';
-  return `<div class="screen">
+  return `<div class="screen noscroll charscreen">
     <div class="row"><button class="btn ghost" data-act="back">←</button><h2>캐릭터 선택</h2></div>
     <div class="charpager">
       <button class="pgarrow" data-act="charNav" data-arg="-1" aria-label="이전 캐릭터">◀</button>
@@ -75,9 +74,8 @@ export function charScreen(app: App): string {
       <button class="pgarrow" data-act="charNav" data-arg="1" aria-label="다음 캐릭터">▶</button>
     </div>
     <div class="pgdots">${CHARACTERS.map((x) => `<i class="${x.id === c.id ? 'on' : ''}"></i>`).join('')}</div>
-    <div class="card col"><b>테이블</b><div class="tablepick">${tables}</div><div class="small">${esc(TABLE_BY_ID[app.ui.tableSel]?.desc ?? '')}</div></div>
-    <div class="card"><div class="row" style="flex-wrap:wrap"><b>스테이지</b>${stakes}</div><div class="small" style="margin-top:4px">${esc(sdesc)}</div></div>
-    <div class="grow"></div>
+    <div class="card col cs-opt"><b>테이블</b><div class="tablepick">${tables}</div><div class="small">${esc(TABLE_BY_ID[app.ui.tableSel]?.desc ?? '')}</div></div>
+    <div class="card col cs-opt"><div class="row"><b>스테이지</b><div class="row stakes">${stakes}</div></div><div class="small">${esc(sdesc)}</div></div>
     <button class="btn primary big" data-act="start" ${unlocked ? '' : 'disabled'}>${unlocked ? '시작' : '잠긴 캐릭터'}</button>
   </div>`;
 }

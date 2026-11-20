@@ -1254,3 +1254,20 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .combat .enemy:only-child { max-width: 280px; }
 .combat .table { padding-bottom: 12px; }
 .combat .enemies.n3 .enemy .em, .combat .enemies.n4 .enemy .em { font-size: 30px; }
+
+/* ── 캐릭터 선택: 스크롤 없이 한 화면 (캐릭터 카드가 남는 높이를 차지) ── */
+.charscreen { gap: 8px; padding-bottom: 12px; }
+.charscreen .charpager { flex: 1 1 auto; min-height: 0; }
+.charscreen .charslide { min-height: 0; overflow-y: auto; justify-content: center; gap: 5px; padding: 10px 12px; }
+.charscreen .cs-art { font-size: 44px; margin-top: 0; }
+.charscreen .cs-name { font-size: 18px; }
+.charscreen .cs-hp { font-size: 13px; color: #ff8a8a; font-weight: 400; }
+.charscreen .cs-desc { font-size: 12px; line-height: 1.45; }
+.charscreen .cs-rows { gap: 3px; padding-top: 6px; margin-top: 2px; }
+.charscreen .cs-opt { padding: 8px 10px; gap: 6px; flex-shrink: 0; }
+.charscreen .tablepick { grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.charscreen .tbl { min-height: 44px; font-size: 9px; padding: 2px 1px; white-space: nowrap; overflow: hidden; }
+.charscreen .tbl span { font-size: 16px; }
+.charscreen .stakes { gap: 4px; flex-wrap: wrap; }
+.charscreen .stakes .btn { min-height: 34px; min-width: 34px; font-size: 14px; padding: 2px 6px 6px; }
+.charscreen .btn.big { flex-shrink: 0; }
