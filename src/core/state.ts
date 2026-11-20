@@ -208,6 +208,7 @@ export interface ShopState {
   lastRerollDie: number | null;
   discountNext: boolean; // 할인 스티커
   removeUsed: boolean; // 카드 삭제 서비스 (상점당 1회)
+  seen?: string[]; // 이 상점에서 한 번이라도 뜬 물건 (리롤에서 다시 안 나옴)
 }
 
 export interface EventState {
@@ -235,6 +236,7 @@ export interface AugmentOffer {
   tier: 'silver' | 'gold' | 'prism';
   ids: string[];
   rerolled: boolean[];
+  seen?: string[]; // 이번 선택에서 한 번이라도 뜬 증강 (리롤에서 다시 안 나옴)
   then: 'map' | 'reward';
 }
 

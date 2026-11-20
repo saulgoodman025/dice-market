@@ -702,12 +702,13 @@ export class App {
     const d = document.createElement('div');
     d.className = 'combofx';
     d.innerHTML = `<div class="cfx-cards"><span class="cfx a">${a.icon}</span><span class="cfx b">${b.icon}</span></div>
-      <div class="cfx-title">🔓 숨은 콤보 발견!</div><div class="cfx-name">${c.name}</div><div class="cfx-desc">${a.name} + ${b.name}<br>${c.desc}</div>`;
+      <div class="cfx-title">🔓 숨은 콤보 발견!</div><div class="cfx-name">${c.name}</div><div class="cfx-desc">${a.name} + ${b.name}<br>${c.desc}</div><div class="cfx-tap">화면을 눌러 닫기</div>`;
     this.root.appendChild(d);
     sfx.jackpot();
     vibrate([30, 40, 60]);
-    d.addEventListener('click', () => d.remove());
-    setTimeout(() => d.remove(), 2600 / this.settings.speed);
+    // 다 읽을 때까지 띄워 두고, 플레이어가 화면을 누르면 닫는다 (등장 직후의 연타는 무시)
+    const t0 = Date.now();
+    d.addEventListener('click', () => { if (Date.now() - t0 > 600) d.remove(); });
   }
 
   /** 태그 단계 상승 배너 */

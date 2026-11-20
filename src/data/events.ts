@@ -192,6 +192,14 @@ export const EVENTS: EventDef[] = [
   },
   // ── 카드 삭제 이벤트 ──
   {
+    id: 'trainer', name: '지하 체육관', emoji: '🏋️', text: '"몸이 밑천이지. 단련하고 가."',
+    choices: [
+      { label: '골드 25: 단련 (최대 체력 +6, 그만큼 회복)', can: (c) => c.run.gold >= 25, run: (c) => { gainGold(c, -25); maxHpChange(c.run, 6); healPlayer(c, 6); return '땀을 흘렸다. 최대 체력 +6.'; } },
+      { label: '혹독한 단련: 체력 -10 → 최대 체력 +10', can: (c) => c.run.hp > 10, run: (c) => { c.run.hp -= 10; maxHpChange(c.run, 10); return '쓰러지기 직전까지 버텼다. 최대 체력 +10.'; } },
+      { label: '지나간다', run: () => '역기 소리가 멀어진다.' },
+    ],
+  },
+  {
     id: 'incinerator', name: '소각로', emoji: '🔥', text: '"필요 없는 건 태워 버려."',
     choices: [
       { label: '카드 1장 삭제', can: (c) => c.run.deck.length > BALANCE.minDeck, run: (c) => { c.run.pending = { kind: 'removeCard', then: 'event', count: 1 }; return '태울 카드를 고른다.'; } },

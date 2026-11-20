@@ -2,7 +2,7 @@ import type { Rarity } from '../core/state';
 import type { EffectSource } from '../rules/ctx';
 import { toast } from '../rules/ctx';
 import {
-  addHeat, addJackpot, alive, damageEnemy, gainBlock, gainGold, healPlayer,
+  addHeat, addJackpot, alive, damageEnemy, gainBlock, gainGold, healPlayer, maxHpChange,
 } from '../rules/ops';
 import { newDie } from '../rules/dice';
 import { BALANCE } from './balance';
@@ -77,6 +77,10 @@ export const RELICS: RelicDef[] = [
   R({ id: 'godhand', name: '신의 손', emoji: '🖐️', rarity: 'legendary', cat: 'manip', desc: '턴마다 1번, 주사위 하나를 원하는 눈으로 바꿀 수 있습니다.', mods: { turnGodhand: 1 } }),
   // ── 생존·전투형 ──
   R({ id: 'bandage', name: '붕대', emoji: '🩹', rarity: 'common', cat: 'survive', desc: '전투에서 이기면 체력을 4 회복합니다.', hooks: { onCombatEnd: (c, a) => { if (a.win) healPlayer(c, 4); } } }),
+  R({
+    id: 'ironheart', name: '강철 심장', emoji: '🫀', rarity: 'rare', cat: 'survive', desc: '얻을 때 최대 체력이 12 늘고 그만큼 회복합니다.',
+    hooks: { onAcquire: (c) => { maxHpChange(c.run, 12); healPlayer(c, 12); } },
+  }),
   R({ id: 'helmet', name: '투구', emoji: '⛑️', rarity: 'common', cat: 'survive', desc: '전투 첫 턴에 방어도를 8 얻습니다.', mods: { firstTurnBlock: 8 } }),
   R({ id: 'thornmail', name: '가시 갑옷', emoji: '🌵', rarity: 'rare', cat: 'survive', desc: '공격받을 때마다 2 피해를 되돌려줍니다.', mods: { reflect: 2 } }),
   R({ id: 'adrenaline', name: '아드레날린', emoji: '💉', rarity: 'rare', cat: 'survive', desc: '체력이 30% 이하면 주는 피해가 30% 늘어납니다.', dmgMult: (c) => (c.run.hp <= c.run.maxHp * 0.3 ? 1.3 : 1) }),

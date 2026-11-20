@@ -33,9 +33,9 @@ describe('콘텐츠 수량', () => {
     expect(CARDS.filter((c) => c.owner !== 'common').length).toBe(60);
     expect(FACES.length).toBe(20);
     expect(MATERIALS.length).toBe(9);
-    expect(RELICS.length).toBe(50);
+    expect(RELICS.length).toBe(51);
     expect(CONSUMABLES.length).toBe(16);
-    expect(EVENTS.length).toBe(15);
+    expect(EVENTS.length).toBe(16);
     expect(HANDS.length).toBe(10);
     expect(ENEMIES.filter((e) => e.tier === 'boss').length).toBe(3);
     for (const act of [1, 2, 3]) {
@@ -218,6 +218,19 @@ describe('상점 리롤 제한', () => {
     expect(shopReroll(ctx)).not.toBeNull();
     expect(shopReroll(ctx)).toBeNull();
     expect(run.shop!.rerolls).toBe(1);
+  });
+
+  it('상점 리롤: 산 칸도 새로 채우고, 이미 뜬 물건은 다시 안 나온다', () => {
+    for (let seed = 50; seed < 70; seed++) {
+      const { run, ctx } = mk(seed);
+      run.gold = 999;
+      openShop(ctx);
+      const before = run.shop!.items.map((it) => it.opt.id);
+      run.shop!.items[0].sold = true;
+      shopReroll(ctx);
+      expect(run.shop!.items.every((it) => !it.sold)).toBe(true);
+      expect(run.shop!.items.filter((it) => before.includes(it.opt.id) && it.opt.id !== 'potion')).toEqual([]);
+    }
   });
 });
 

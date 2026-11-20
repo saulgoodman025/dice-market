@@ -1089,6 +1089,7 @@ export interface CardPreview {
   dmg: number; // 실제로 깎이는 체력 합 (방어도에 막힌 부분 제외)
   blocked: number;
   block: number;
+  blockDmg: number; // 방어도를 얻어서 생긴 피해 (방패 3단계 등)
   heal: number;
   gold: number;
   piggy: number;
@@ -1102,7 +1103,7 @@ export interface CardPreview {
  * 족보·열기·약점·힘·약화·취약·적 특수 능력·방어도·유물·버프가 모두 반영된다.
  */
 export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: number | null = null): CardPreview {
-  const empty: CardPreview = { keys: null, dmg: 0, blocked: 0, block: 0, heal: 0, gold: 0, piggy: 0, draw: 0, chance: false, hits: [] };
+  const empty: CardPreview = { keys: null, dmg: 0, blocked: 0, block: 0, blockDmg: 0, heal: 0, gold: 0, piggy: 0, draw: 0, chance: false, hits: [] };
   const cb = ctx.run.combat;
   if (!cb || cb.phase === 'over' || !cb.cards[idx] || !cardUsable(ctx, idx)) return empty;
   const keys = canPlay(ctx, idx, prefer) ? prefer : autoPick(ctx, idx, prefer);
@@ -1123,6 +1124,7 @@ export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: 
   const g0 = run2.gold;
   const p0 = cb2.piggy;
   const n0 = cb2.cards.length;
+  cb2.turnCounters.pvBlockDmg = 0;
   playCard(c2, i2, keys);
   const hits: EnemyHit[] = [];
   for (const e of cb2.enemies) {
@@ -1138,6 +1140,7 @@ export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: 
     dmg: hits.reduce((s2, h) => s2 + h.hpLoss, 0),
     blocked: hits.reduce((s2, h) => s2 + h.blockLoss, 0),
     block: Math.max(0, cb2.block + cb2.keepBlock - b0),
+    blockDmg: cb2.turnCounters.pvBlockDmg ?? 0,
     heal: Math.max(0, run2.hp - h0),
     gold: Math.max(0, run2.gold - g0),
     piggy: Math.max(0, cb2.piggy - p0),

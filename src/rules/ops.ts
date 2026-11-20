@@ -140,7 +140,9 @@ export function gainBlock(ctx: Ctx, amount: number) {
   const pct = getMods(ctx.run).blockToDmgPct;
   if (pct && !cb.result) {
     const t = randomEnemy(ctx);
-    if (t) damageEnemy(ctx, t, Math.max(1, Math.round(a * pct / 100)), { source: '방패 반격' });
+    const d = Math.max(1, Math.round(a * pct / 100));
+    if (t) damageEnemy(ctx, t, d, { source: '방패 반격' });
+    if (t && cb.turnCounters.pvBlockDmg !== undefined) cb.turnCounters.pvBlockDmg += d; // 미리보기 전용 집계
   }
 }
 

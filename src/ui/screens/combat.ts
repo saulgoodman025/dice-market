@@ -114,6 +114,7 @@ export function combatScreen(app: App): string {
     let badge = '';
     if (pv?.keys) {
       if (pv.chance) badge = '<span class="pvb">🎲?</span>';
+      else if (pv.block && pv.dmg + pv.blocked <= pv.blockDmg) badge = `<span class="pvb blk">🛡${pv.block}</span>`; // 방어 카드의 부가 피해는 방어도로 표시
       else if (pv.dmg || pv.blocked) badge = `<span class="pvb dmg" title="">⚔${pv.dmg}${pv.blocked ? `<small>🛡${pv.blocked}</small>` : ''}</span>`;
       else if (pv.block) badge = `<span class="pvb blk">🛡${pv.block}</span>`;
       else if (pv.heal) badge = `<span class="pvb heal">❤${pv.heal}</span>`;

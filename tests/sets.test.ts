@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newRun, advance, removeCards, restRemove, openShop, shopRemoveService, removePrice, continueEndless } from '../src/rules/run';
-import { confirmHand, endTurn, playCard, startCombat } from '../src/rules/combat';
+import { confirmHand, endTurn, playCard, previewCard, startCombat } from '../src/rules/combat';
 import { addBuff, buffFx, playerStr } from '../src/rules/buffs';
 import { activeCombos, augmentOdds, offerAugment, pickAugment, prismRoulette, rerollAugment, shredder, shredderOdds, snapshotTiers, tagCounts, tierOf } from '../src/rules/sets';
 import { getMods, type Ctx } from '../src/rules/ctx';
@@ -285,3 +285,31 @@ describe('증강', () => {
     expect(run.screen).toBe('map');
   });
 });
+
+describe('증강 리롤 중복', () => {
+  it('한 번 뜬 증강은 리롤로 다시 나오지 않는다', () => {
+    for (let seed = 1; seed < 30; seed++) {
+      const { run, ctx } = mk(seed, 'gambler');
+      offerAugment(ctx, 'map');
+      const of = run.augmentOffer!;
+      const shown = [...of.ids];
+      for (let i = 0; i < of.ids.length; i++) {
+        rerollAugment(ctx, i);
+        if (of.rerolled[i]) { expect(shown).not.toContain(of.ids[i]); shown.push(of.ids[i]); }
+      }
+    }
+  });
+});
+
+describe('방패 3단계 미리보기', () => {
+  it('방어 카드는 반격 피해가 있어도 방어도 수치로 표시된다', () => {
+    const { run, ctx, cb } = combat(3);
+    run.flags.tier_shield = 3;
+    cb.cards.push({ uid: 9001, id: 'guard', up: null });
+    const pv = previewCard(ctx, cb.cards.length - 1, []);
+    expect(pv.block).toBeGreaterThan(0);
+    expect(pv.blockDmg).toBeGreaterThan(0);
+    expect(pv.dmg + pv.blocked).toBeLessThanOrEqual(pv.blockDmg);
+  });
+});
+

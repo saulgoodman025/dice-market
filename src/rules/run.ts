@@ -310,7 +310,7 @@ function shopItem(ctx: Ctx, kind: ItemKind, minRarity: 'common' | 'epic' = 'comm
   return { opt: o, price: p, basePrice: p, haggles: 0, lastHaggle: null, sold: false };
 }
 
-function fillShop(ctx: Ctx): ShopItem[] {
+function fillShop(ctx: Ctx, seen: string[] = []): ShopItem[] {
   const run = ctx.run;
   const m = getMods(run);
   // 카드 3칸 + 무작위 2칸 (유물 / 면 스티커·재질 / 소모품)
@@ -323,7 +323,8 @@ function fillShop(ctx: Ctx): ShopItem[] {
   const ex: string[] = [];
   const forceEpic = ddaForceShopEpic(run);
   kinds.forEach((k, i) => {
-    const it = shopItem(ctx, k, forceEpic && k === 'relic' ? 'epic' : 'common', ex);
+    // 이미 본 물건은 빼고 뽑는다. 그 종류가 다 떨어졌으면 본 물건도 허용
+    const it = shopItem(ctx, k, forceEpic && k === 'relic' ? 'epic' : 'common', [...ex, ...seen]) ?? shopItem(ctx, k, 'common', ex);
     if (it) { items.push(it); ex.push(it.opt.id); }
     void i;
   });
@@ -366,10 +367,10 @@ export function shopReroll(ctx: Ctx): number | null {
     gainGold(ctx, paid);
     toast(ctx, `🎲 6! 리롤 비용 ${paid}G 돌려받음`, 'gold');
   }
-  const kept = s.items.filter((i) => i.sold);
-  const fresh = fillShop(ctx).filter((_, i) => !s.items[i]?.sold);
-  s.items = s.items.map((it) => (it.sold ? it : fresh.shift() ?? it));
-  void kept;
+  // 산 칸까지 전부 새 물건으로 (이 상점에서 뜬 물건은 다시 안 나옴)
+  const seen = [...new Set([...(s.seen ?? []), ...s.items.map((it) => it.opt.id)])];
+  s.items = fillShop(ctx, seen);
+  s.seen = [...seen, ...s.items.map((it) => it.opt.id)];
   return d;
 }
 

@@ -145,10 +145,12 @@ export function rerollAugment(ctx: Ctx, i: number): boolean {
   const run = ctx.run;
   const of = run.augmentOffer;
   if (!of || !canRerollAugment(run, i)) return false;
-  const [id] = rollAugIds(ctx, of.tier, 1, of.ids);
+  const seen = [...new Set([...(of.seen ?? []), ...of.ids])];
+  const [id] = rollAugIds(ctx, of.tier, 1, seen);
   if (!id) return false;
   of.ids[i] = id;
   of.rerolled[i] = true;
+  of.seen = [...seen, id];
   run.flags.augRerolls = (run.flags.augRerolls ?? 0) + 1;
   return true;
 }

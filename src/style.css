@@ -1056,6 +1056,7 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .combofx .cfx-title { font-size: 15px; font-weight: 900; color: #c9b8ff; letter-spacing: 2px; }
 .combofx .cfx-name { font-size: 30px; font-weight: 900; color: #fff; text-shadow: 0 0 18px #b48cff; animation: bpop calc(.5s / var(--speed)) .5s both cubic-bezier(.2,1.6,.4,1); }
 .combofx .cfx-desc { font-size: 13px; color: #dcd0ff; max-width: 300px; }
+.combofx .cfx-tap { margin-top: 14px; font-size: 11px; color: #9c8cc8; animation: cfxin 1.2s 1s both; }
 .tierfx { position: absolute; left: 50%; top: 32%; transform: translateX(-50%); z-index: 260; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 18px; border-radius: 14px; background: rgba(20,16,6,.92); border: 2px solid var(--accent, #f2b544); box-shadow: 0 0 26px rgba(242,181,68,.6); pointer-events: none; animation: bpop calc(.45s / var(--speed)) cubic-bezier(.2,1.6,.4,1); white-space: nowrap; }
 .tierfx b { font-size: 20px; color: var(--accent, #f2b544); }
 .tierfx span { font-size: 12px; color: #f1e6c8; }
