@@ -192,7 +192,6 @@ function runAction(app: App, act: string, arg: string, n: number) {
     case 'openSet': ui.picker = { mode: 'set' }; app.render(); return;
     case 'openBurn': ui.picker = { mode: 'burn' }; app.render(); return;
     case 'openBank': ui.picker = { mode: 'bank' }; app.render(); return;
-    case 'pile': ui.modal = `pile:${arg}` as typeof ui.modal; break;
     case 'deck': ui.modal = 'deck'; break;
     case 'deckSort': ui.deckSort = arg as typeof ui.deckSort; break;
     case 'openNudge': ui.picker = { mode: 'nudge' }; app.render(); return;

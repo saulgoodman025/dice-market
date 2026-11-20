@@ -439,18 +439,6 @@ function groupCards(list: CardInst[]): [CardInst, number][] {
   return out;
 }
 
-/** 전투 중 더미 보기 */
-function pileModal(app: App, which: 'draw' | 'discard' | 'exhaust'): string {
-  const cb = app.run!.combat;
-  if (!cb) return '';
-  const list = which === 'draw' ? [...cb.drawPile].sort((a, b) => a.id.localeCompare(b.id)) : which === 'discard' ? cb.discard : cb.exhausted;
-  const title = { draw: '🂠 뽑을 카드 (순서는 비밀)', discard: '🗑 버린 카드', exhaust: '🔥 소멸한 카드' }[which];
-  return `<div class="modal"><div class="box wide">
-    <div class="row"><h3 class="grow">${title} ${list.length}장</h3><button class="btn ghost" data-act="closeModal" data-always="1">✕</button></div>
-    <div class="dgrid">${groupCards(list).map(([c, k]) => cardInstFace(c, { extra: k > 1 ? `<span class="dcount">×${k}</span>` : '' })).join('') || '<span class="muted">비었다</span>'}</div>
-  </div></div>`;
-}
-
 /** 증강 선택 */
 function augmentModal(app: App): string {
   const run = app.run!;
@@ -519,7 +507,6 @@ export function runModals(app: App, extra: { paytable: () => string; scratch: ()
   if (run.offer) return offerModal(app);
   if (run.pending) return pendingModal(app);
   if (ui.modal === 'deck') return deckModal(app);
-  if (ui.modal?.startsWith('pile:')) return pileModal(app, ui.modal.slice(5) as 'draw' | 'discard' | 'exhaust');
   if (run.augmentOffer && !ui.modal) return augmentModal(app);
   switch (ui.modal) {
     case 'bag': return bagModal(app);

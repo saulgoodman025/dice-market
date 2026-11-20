@@ -36,7 +36,7 @@ export interface Ui {
   picker: null | { mode: 'fate' | 'set' | 'nudge' | 'value' | 'otherDie' | 'pile' | 'burn' | 'bank'; slot?: number; keys?: number[]; target?: number; values?: number[] };
   casinoTab: 'slot' | 'roulette' | 'high' | 'shred';
   bets: Record<string, number>;
-  modal: null | 'paytable' | 'bag' | 'settings' | 'scratch' | 'mystery' | 'quit' | 'hands' | 'deck' | 'pile:draw' | 'pile:discard' | 'pile:exhaust';
+  modal: null | 'paytable' | 'bag' | 'settings' | 'scratch' | 'mystery' | 'quit' | 'hands' | 'deck';
   editDie: number;
   busy: boolean;
   charSel: string;
@@ -1002,7 +1002,7 @@ export class App {
   /** 카드 뽑기 연출: 뽑을 더미에서 카드 뒷면이 날아와 손패에 꽂히고, 새 카드가 빛난다 */
   private drawFx(uids: number[], src: 'turn' | 'hand' | 'card') {
     sfx.tick();
-    const pile = this.el('.pile[data-arg="draw"]');
+    const pile = this.el('.deckbtn'); // 카드는 위쪽 덱 버튼에서 날아온다
     const hand = this.el('.hand');
     if (!pile || !hand) return;
     const h = this.root.getBoundingClientRect();

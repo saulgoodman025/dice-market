@@ -128,7 +128,7 @@ export function combatScreen(app: App): string {
     const lift = Math.abs(i - mid) * (n > 6 ? 1.2 : 2.5);
     const desc = cardDesc(def, oddsB);
     const cond = def.cond.k === 'instant' ? '즉발' : condText(def.cond);
-    return `<div class="scard r-${def.rarity} ${state} ${def.unplayable ? 'cursed' : ''} ${ui.selCard === i ? 'chosen' : ''}" data-cuid="${inst.uid}" data-card="${i}" data-act="cardTap" data-arg="${i}" style="--rot:${rot}deg;--lift:${lift}px;z-index:${10 + i}" data-tip="${esc(`${def.name}${inst.up ? '+' + inst.up : ''} — ${cond}: ${desc}${def.exhaust ? ' (소멸)' : ''}${def.unplayable ? '' : def.target === 'enemy' ? ' (적에게 끌어다 놓기)' : ' (테이블에 끌어다 놓기)'}`)}">
+    return `<div class="scard r-${def.rarity} ${state} ${def.unplayable ? 'cursed' : ''} ${ui.selCard === i ? 'chosen' : ''}" data-cuid="${inst.uid}" data-card="${i}" data-act="cardTap" data-arg="${i}" style="--rot:${rot}deg;--lift:${lift}px;z-index:${10 + i}" data-tip="${esc(`${def.name}${inst.up ? '+' + inst.up : ''} — ${cond}: ${desc}${def.exhaust ? ' (소멸)' : ''}`)}">
       <span class="ccost ${cost > chipsNow ? 'short' : ''} ${cost < def.cost ? 'cheap' : ''}">${def.unplayable ? '✕' : cost}</span><span class="ccond">${esc(cond)}</span>${badge}
       ${inst.up ? `<span class="cup">${inst.up}</span>` : ''}
       <div class="cart">${def.icon}</div>
@@ -140,11 +140,6 @@ export function combatScreen(app: App): string {
   const W = 312; // 손패가 차지할 폭 (회전 여유 포함)
   const cw = n <= 5 ? 74 : Math.max(46, Math.floor(W / n) + 10);
   const cm = n <= 5 ? -4 : -Math.max(4, Math.ceil((cw * n - W) / (2 * n)));
-  const piles = `<div class="piles">
-    <button class="pile" data-act="pile" data-arg="draw" data-tip="뽑을 카드">🂠 <b>${cb.drawPile.length}</b></button>
-    ${cb.exhausted.length ? `<button class="pile" data-act="pile" data-arg="exhaust" data-tip="소멸한 카드 (이번 전투)">🔥 <b>${cb.exhausted.length}</b></button>` : ''}
-    <button class="pile" data-act="pile" data-arg="discard" data-tip="버린 카드">🗑 <b>${cb.discard.length}</b></button>
-  </div>`;
   const pBuffs = cb.buffs.filter((b) => b.owner === 'player').map((b) => { const d = BUFF_BY_ID[b.id]; return `<span class="st buff" data-tip="${esc(d.icon + ' ' + d.name + ': ' + d.desc(b))}">${d.icon}${b.value > 1 && b.value < 100 ? b.value : ''}${b.turns === Infinity ? '' : `<small>(${b.turns})</small>`}</span>`; }).join('');
 
   // ── 플레이어 패널 ──
@@ -190,7 +185,7 @@ export function combatScreen(app: App): string {
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>
-    <div class="handrow"><div class="dieinfo">${info || (ui.selCard !== null && cb.cards[ui.selCard] ? (() => { const d = resolveFor(run, cb.cards[ui.selCard]); return `<b>${esc(d.name)}</b> ${esc(cardDesc(d, oddsB))} · ${d.target === 'enemy' ? '🎯 적을 탭' : '✋ 위쪽을 탭'}`; })() : '')}</div>${piles}<div class="hand n${Math.min(n, 6)} ${n > 6 ? 'many' : ''}" style="--cw:${cw}px;--cm:${cm}px">${cards || '<span class="muted small">손패가 비었다</span>'}</div></div>
+    <div class="handrow"><div class="dieinfo">${info || (ui.selCard !== null && cb.cards[ui.selCard] ? (() => { const d = resolveFor(run, cb.cards[ui.selCard]); return `<b>${esc(d.name)}</b> ${esc(cardDesc(d, oddsB))}`; })() : '')}</div><div class="hand n${Math.min(n, 6)} ${n > 6 ? 'many' : ''}" style="--cw:${cw}px;--cm:${cm}px">${cards || '<span class="muted small">손패가 비었다</span>'}</div></div>
     <div class="actions">
       <button class="btn reroll" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}><span>리롤</span><b>${roll ? cb.rerollsLeft : 0}</b></button>
       <button class="btn primary endturn ${moves ? '' : 'glow'}" data-act="endTurn">턴 종료</button>
