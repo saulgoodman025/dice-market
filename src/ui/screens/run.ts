@@ -467,7 +467,7 @@ function augmentModal(app: App): string {
       <span class="augname">${esc(a.name)}</span>
       ${a.tag ? `<span class="augtag">${TAG_INFO[a.tag].icon} +1</span>` : '<span class="augtag muted">무색</span>'}
       <span class="augdesc">${esc(a.desc)}</span>
-    </button><button class="augrr" data-act="augReroll" data-arg="${i}" ${canRerollAugment(run, i) ? '' : 'disabled'} aria-label="이 자리 다시 뽑기" data-tip="이 자리만 다시 뽑기 (자리마다 1번, 등급 유지)">🔄</button>${a.tag ? tagPreview(counts, a.tag) : ''}</div>`;
+    </button>${a.tag ? tagPreview(counts, a.tag) : ''}<button class="augrr" data-act="augReroll" data-arg="${i}" ${canRerollAugment(run, i) ? '' : 'disabled'} data-tip="이 자리만 다시 뽑기 (자리마다 1번, 등급 유지)">🔄 ${of.rerolled[i] ? '사용함' : '다시 뽑기'}</button></div>`;
   }).join('');
   const prism = of.tier === 'gold' && run.flags.prismRolled !== run.flags.augOffers
     ? `<button class="btn ghost prismbtn" data-act="prismRoll" ${run.chips >= PRISM_ROULETTE.chips ? '' : 'disabled'} data-tip="25% 프리즘 / 75% 실버로 다시 뽑기">🎰 프리즘 룰렛 <b>칩 ${PRISM_ROULETTE.chips}</b></button>` : '';
@@ -475,8 +475,7 @@ function augmentModal(app: App): string {
   return `<div class="modal"><div class="box wide augbox t-${of.tier}">
     <h3 class="center" data-tip="${esc(`${odds.label}: 실버 ${odds.w[0]}% · 골드 ${odds.w[1]}% · 프리즘 ${odds.w[2]}%${odds.ceiling ? ' (천장: 프리즘 확정)' : ''}`)}">증강 선택 <span style="color:${ti.color}">${ti.name}</span></h3>
     ${owned ? `<div class="row augrow">${owned}</div>` : ''}
-    <div class="augs snap">${cards}</div>
-    <div class="snapdots">${of.ids.map((_, i) => `<i class="${i === (sel ?? 0) ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="augs">${cards}</div>
     ${prism}
     <button class="btn primary big" data-act="augPick" data-arg="${sel ?? -1}" ${sel === null ? 'disabled' : ''}>${sel === null ? '증강을 고르세요' : `「${esc(AUGMENT_BY_ID[of.ids[sel]].name)}」 선택`}</button>
   </div></div>`;

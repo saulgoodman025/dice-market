@@ -45,11 +45,11 @@ export function titleScreen(app: App): string {
 
 export function charScreen(app: App): string {
   const m = app.meta;
-  const cards = CHARACTERS.map((c) => {
-    const unlocked = !c.unlock || m.flags[c.unlock];
-    const on = app.ui.charSel === c.id && unlocked;
-    const mats = [...new Set(c.dice)];
-    return `<button class="charslide ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" ${unlocked ? `data-act="char" data-arg="${c.id}"` : 'disabled'}>
+  const ci = Math.max(0, CHARACTERS.findIndex((c) => c.id === app.ui.charSel));
+  const c = CHARACTERS[ci];
+  const unlocked = !c.unlock || m.flags[c.unlock];
+  const mats = [...new Set(c.dice)];
+  const card = `<div class="charslide on ${unlocked ? '' : 'locked'}">
       <div class="cs-art">${unlocked ? c.emoji : '🔒'}</div>
       <div class="cs-name">${c.name}<span class="lvl">Lv.${masteryLevel(m.mastery?.[c.id] ?? 0)}</span></div>
       <div class="cs-hp">❤ ${c.hp}</div>
@@ -59,8 +59,7 @@ export function charScreen(app: App): string {
         <div><b>주사위</b>${mats.map((mt) => `${MATERIAL_BY_ID[mt].icon} ${MATERIAL_BY_ID[mt].name}×${c.dice.filter((x) => x === mt).length}`).join(' ')}</div>
         ${mats.filter((mt) => mt !== 'wood').map((mt) => `<div class="cs-mat">${MATERIAL_BY_ID[mt].icon} ${esc(MATERIAL_BY_ID[mt].long)}</div>`).join('')}
       </div>` : `<div class="cs-lock">해금: ${esc(c.unlockText)}</div>`}
-    </button>`;
-  }).join('');
+    </div>`;
   const stakes = Array.from({ length: m.maxStake + 1 }, (_, i) => `<button class="btn ${app.ui.stakeSel === i ? 'primary' : 'ghost'}" style="min-width:44px;padding:4px" data-act="stake" data-arg="${i}">${i}</button>`).join('');
   const owned = (id: string) => id === 'classic' || (m.owned ?? []).includes('table:' + id);
   if (!owned(app.ui.tableSel)) app.ui.tableSel = 'classic';
@@ -70,12 +69,16 @@ export function charScreen(app: App): string {
   const sdesc = app.ui.stakeSel ? STAKES.filter((s) => s.level <= app.ui.stakeSel).map((s) => s.desc).join(' · ') : '스테이지 0: 기본 난이도';
   return `<div class="screen">
     <div class="row"><button class="btn ghost" data-act="back">←</button><h2>캐릭터 선택</h2></div>
-    <div class="charsnap snap">${cards}</div>
-    <div class="snapdots">${CHARACTERS.map((c) => `<i class="${app.ui.charSel === c.id ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="charpager">
+      <button class="pgarrow" data-act="charNav" data-arg="-1" aria-label="이전 캐릭터">◀</button>
+      ${card}
+      <button class="pgarrow" data-act="charNav" data-arg="1" aria-label="다음 캐릭터">▶</button>
+    </div>
+    <div class="pgdots">${CHARACTERS.map((x) => `<i class="${x.id === c.id ? 'on' : ''}"></i>`).join('')}</div>
     <div class="card col"><b>테이블</b><div class="tablepick">${tables}</div><div class="small">${esc(TABLE_BY_ID[app.ui.tableSel]?.desc ?? '')}</div></div>
     <div class="card"><div class="row" style="flex-wrap:wrap"><b>스테이지</b>${stakes}</div><div class="small" style="margin-top:4px">${esc(sdesc)}</div></div>
     <div class="grow"></div>
-    <button class="btn primary big" data-act="start">시작</button>
+    <button class="btn primary big" data-act="start" ${unlocked ? '' : 'disabled'}>${unlocked ? '시작' : '잠긴 캐릭터'}</button>
   </div>`;
 }
 

@@ -1,3 +1,4 @@
+import { CHARACTERS } from '../data/characters';
 import type { App } from './app';
 import { sfx } from '../audio/sfx';
 import { clearRun, saveMeta } from '../core/save';
@@ -37,7 +38,16 @@ export function handleAction(app: App, act: string, arg: string) {
     case 'codexTab': ui.codexTab = arg as typeof ui.codexTab; break;
     case 'char': ui.charSel = arg; break;
     case 'stake': ui.stakeSel = Math.max(0, Math.min(app.meta.maxStake, n)); break;
-    case 'start': app.startRun(ui.charSel, ui.stakeSel, ui.tableSel); ui.end = null; break;
+    case 'charNav': { // 좌우 화살표: 잠긴 캐릭터도 넘겨 보며 해금 조건을 본다
+      const i = CHARACTERS.findIndex((c) => c.id === ui.charSel);
+      ui.charSel = CHARACTERS[(i + n + CHARACTERS.length) % CHARACTERS.length].id;
+      break;
+    }
+    case 'start': {
+      const c = CHARACTERS.find((x) => x.id === ui.charSel);
+      if (!c || (c.unlock && !app.meta.flags[c.unlock])) return;
+      app.startRun(ui.charSel, ui.stakeSel, ui.tableSel); ui.end = null; break;
+    }
     case 'daily': app.startDaily(); ui.end = null; break;
     case 'achievements': ui.page = 'achievements'; break;
     case 'achTab': ui.achTab = arg as typeof ui.achTab; break;

@@ -197,15 +197,6 @@ export class App {
     });
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
-    // 가로 슬라이드(.snap): 가운데 온 카드에 맞춰 점 표시
-    this.root.addEventListener('scroll', (ev) => {
-      const el = ev.target as HTMLElement;
-      if (!el.classList?.contains('snap')) return;
-      const kids = [...el.children] as HTMLElement[];
-      const mid = el.scrollLeft + el.clientWidth / 2;
-      const i = kids.reduce((b, k, j) => (Math.abs(k.offsetLeft + k.offsetWidth / 2 - mid) < Math.abs(kids[b].offsetLeft + kids[b].offsetWidth / 2 - mid) ? j : b), 0);
-      el.parentElement?.querySelectorAll('.snapdots i').forEach((d, j) => d.classList.toggle('on', j === i));
-    }, true);
     // 주사위 테이블을 아래로 쓸어내리면 리롤 (버튼과 같은 동작)
     // 탭이 있는 화면은 좌우로 쓸어 탭 넘기기
     let swipe: { x: number; y: number } | null = null;
@@ -215,7 +206,7 @@ export class App {
       swipe = t.closest('.combat .table') && !t.closest('.modal') ? { x: ev.clientX, y: ev.clientY } : null;
       const scope = t.closest('.modal .box') ?? t.closest('.screen');
       const tabs = scope?.querySelector<HTMLElement>('.tabs');
-      hswipe = tabs && !t.closest('.snap, .hand, .tabs, input') ? { x: ev.clientX, y: ev.clientY, tabs } : null;
+      hswipe = tabs && !t.closest('.hand, .tabs, input') ? { x: ev.clientX, y: ev.clientY, tabs } : null;
     });
     this.root.addEventListener('pointerup', (ev) => {
       if (hswipe) {
@@ -376,11 +367,6 @@ export class App {
     this.lastRenderKey = key;
     this.view.innerHTML = renderScreen(this);
     if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
-    // 가로 슬라이드는 고른 카드가 가운데 오게
-    this.view.querySelectorAll<HTMLElement>('.snap').forEach((el) => {
-      const on = el.querySelector<HTMLElement>('.on, .sel');
-      if (on) el.scrollLeft = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2;
-    });
     this.reapplyRecent();
     this.applyHpTrails();
     drawCoach(this);

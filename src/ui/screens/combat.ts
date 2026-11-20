@@ -72,11 +72,10 @@ export function combatScreen(app: App): string {
     return `<div class="enemy ${isT ? 'target' : ''} ${e.hp <= 0 ? 'dead' : ''}" data-uid="${e.uid}" data-act="target" data-arg="${e.uid}" data-tip="${esc(def.name + (def.desc ? ': ' + def.desc : ''))}">
       <div class="intent ${it.cls}">${it.text}</div>${peek}
       <div class="em">${e.emoji}</div>
-      <div class="pips2"><span class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯<b>${e.weakPip}</b></span>${e.immunePip ? `<span class="immpip" data-tip="면역 눈: ${e.immunePip}(으)로 준 피해를 받지 않습니다">🚫<b>${e.immunePip}</b></span>` : ''}</div>
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
       <div class="ehp ${e.block && e.hp > 0 ? 'shielded' : ''}" data-hpk="e${e.uid}" data-pct="${hpPct}">${e.block && e.hp > 0 ? `<span class="eshb" data-blk="${e.block}" data-tip="방어도 ${e.block}: 체력보다 먼저 피해를 막습니다. 이 적의 다음 행동 때 사라집니다."><span class="n">${e.block}</span></span>` : ''}<span class="hpc"><s class="trail"></s><i style="width:${hpPct}%;${e.poison && e.hp > 0 ? `--pa:${(Math.max(0, e.hp - e.poison) / e.hp) * 100}%` : ''}"></i></span><b>${e.hp}/${e.maxHp}</b></div>
-      <div class="name">${esc(e.name)}${st ? ` <span class="status">${st}</span>` : ''}</div>
-      ${ENEMY_TRAIT[e.id] && e.hp > 0 ? `<button class="etrait" data-act="enemyInfo" data-arg="${e.uid}" data-tip="${esc(`${ENEMY_TRAIT[e.id]}: ${def.desc ?? ''}`)}">${esc(ENEMY_TRAIT[e.id])} <b>?</b></button>` : ''}
+      <div class="nrow"><span class="pips2"><span class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯<b>${e.weakPip}</b></span>${e.immunePip ? `<span class="immpip" data-tip="면역 눈: ${e.immunePip}(으)로 준 피해를 받지 않습니다">🚫<b>${e.immunePip}</b></span>` : ''}</span><span class="name">${esc(e.name)}</span>${ENEMY_TRAIT[e.id] && e.hp > 0 ? `<button class="etrait" data-act="enemyInfo" data-arg="${e.uid}" data-tip="${esc(`${ENEMY_TRAIT[e.id]}: ${def.desc ?? ''}`)}">${esc(ENEMY_TRAIT[e.id])}</button>` : ''}</div>
+      ${st ? `<div class="status">${st}</div>` : ''}
     </div>`;
   }).join('');
 
@@ -191,8 +190,7 @@ export function combatScreen(app: App): string {
       <span class="pblock ${blk ? '' : 'zero'}" data-tip="방어도: 적의 공격을 먼저 막는다 (다음 내 턴에 사라짐)">🛡${blk}</span>
       ${cons}
     </div>
-    <div class="dieinfo">${info || (ui.selCard !== null && cb.cards[ui.selCard] ? (() => { const d = resolveFor(run, cb.cards[ui.selCard]); return `<b>${esc(d.name)}</b> ${esc(cardDesc(d, oddsB))} · ${d.target === 'enemy' ? '🎯 적을 탭' : '✋ 위쪽을 탭'}`; })() : '')}</div>
-    <div class="handrow">${piles}<div class="hand n${Math.min(n, 6)} ${n > 6 ? 'many' : ''}" style="--cw:${cw}px;--cm:${cm}px">${cards || '<span class="muted small">손패가 비었다</span>'}</div></div>
+    <div class="handrow"><div class="dieinfo">${info || (ui.selCard !== null && cb.cards[ui.selCard] ? (() => { const d = resolveFor(run, cb.cards[ui.selCard]); return `<b>${esc(d.name)}</b> ${esc(cardDesc(d, oddsB))} · ${d.target === 'enemy' ? '🎯 적을 탭' : '✋ 위쪽을 탭'}`; })() : '')}</div>${piles}<div class="hand n${Math.min(n, 6)} ${n > 6 ? 'many' : ''}" style="--cw:${cw}px;--cm:${cm}px">${cards || '<span class="muted small">손패가 비었다</span>'}</div></div>
     <div class="actions">
       <button class="btn reroll" data-act="reroll" ${roll && cb.rerollsLeft > 0 ? '' : 'disabled'}><span>리롤</span><b>${roll ? cb.rerollsLeft : 0}</b></button>
       <button class="btn primary endturn ${moves ? '' : 'glow'}" data-act="endTurn">턴 종료</button>

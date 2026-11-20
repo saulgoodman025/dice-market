@@ -1171,20 +1171,9 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .btn.endturn { font-size: 18px; }
 .dieinfo:empty { visibility: hidden; }
 
-/* ── 가로 슬라이드 (증강 등) ── */
-.snap { display: flex !important; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding: 6px 14% 4px; margin: 0 -14px; scrollbar-width: none; }
-.snap::-webkit-scrollbar { display: none; }
-.snap > * { flex: 0 0 72%; scroll-snap-align: center; }
-.snapdots { display: flex; justify-content: center; gap: 6px; }
-.snapdots i { width: 6px; height: 6px; background: rgba(255,255,255,.25); }
-.snapdots i.on { background: #ffcf4a; width: 14px; }
-.augs.snap .augwrap { position: relative; display: flex; flex-direction: column; gap: 4px; }
-.augs.snap .augcard { min-height: 230px; padding: 30px 14px 14px; gap: 8px; }
-.augs.snap .augicon { font-size: 44px; }
-.augs.snap .augname { font-size: 18px; }
-.augs.snap .augdesc { font-size: 14px; line-height: 1.45; }
-.augrr { position: absolute; top: 26px; right: 6px; width: 34px; height: 34px; background: rgba(0,0,0,.45); font-size: 16px; display: flex; align-items: center; justify-content: center; z-index: 2; clip-path: var(--pxcorner); }
-.augrr:disabled { opacity: .25; }
+/* ── 증강: 세 장 한눈에, 리롤은 카드 아래 ── */
+.augrr { min-height: 32px; font-size: 11px; color: #cfd8d2; background: rgba(0,0,0,.3); clip-path: var(--pxcorner); }
+.augrr:disabled { opacity: .35; }
 .prismbtn { font-size: 13px; min-height: 38px; }
 .prismbtn b { color: #ff9de2; }
 
@@ -1220,9 +1209,10 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .mnode .ml { text-shadow: 1px 1px 0 #000, -1px 1px 0 #000; font-size: 11px; }
 
 
-/* ── 캐릭터 슬라이드 ── */
-.charsnap { padding-top: 4px; padding-bottom: 6px; }
-.charsnap > .charslide { flex-basis: 78%; }
+/* ── 캐릭터: 한 명씩, 좌우 화살표 ── */
+.charpager { display: grid; grid-template-columns: 36px 1fr 36px; align-items: stretch; gap: 6px; }
+.pgarrow { background: rgba(0,0,0,.28); color: #ffcf4a; font-size: 16px; clip-path: var(--pxcorner); }
+.pgarrow:active { transform: translateY(2px); }
 .charslide { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 14px; text-align: center; background: #10241d; box-shadow: inset 0 0 0 2px rgba(255,255,255,.1), 0 3px 0 rgba(0,0,0,.45); min-height: 300px; }
 .charslide.on { box-shadow: inset 0 0 0 3px #ffcf4a, 0 3px 0 rgba(0,0,0,.45); background: #1b3226; }
 .charslide.locked { opacity: .55; }
@@ -1248,3 +1238,25 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .bagfoot button.warn { color: #ff8a8a; }
 /* 작은 회색 글씨는 너무 흐리지 않게 (남은 것들은 꼭 필요한 정보) */
 .muted { color: #b3c2ba; }
+.pgdots { display: flex; justify-content: center; gap: 6px; }
+.pgdots i { width: 6px; height: 6px; background: rgba(255,255,255,.25); }
+.pgdots i.on { background: #ffcf4a; width: 14px; }
+
+/* ── 전투 테이블 간격: 적 줄 한 줄로, 족보·주사위·통계 사이를 띄운다 ── */
+.enemy .nrow { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+.enemy .nrow .pips2 { display: inline-flex; }
+.enemy .nrow .weakpip { margin: 0; }
+.enemy .nrow .etrait { margin: 0; }
+.enemy .nrow .name { font-size: 12px; }
+.combat .table { justify-content: space-evenly; gap: 6px; }
+.combat .handbar { margin: 2px auto; }
+.combat .tray { padding: 2px 0; }
+/* 설명 줄: 자리를 차지하지 않고 손패 위에 떠 있는 말풍선 */
+.handrow { position: relative; }
+.handrow .dieinfo { position: absolute; left: 6px; right: 6px; bottom: calc(100% + 30px); margin: 0; z-index: 85; padding: 6px 10px; background: rgba(8,14,12,.94); box-shadow: inset 0 0 0 2px rgba(255,207,74,.45); pointer-events: none; }
+.handrow .dieinfo:empty { display: none; }
+.combat .handrow { margin-top: 24px; }
+.combat .enemies { flex-shrink: 0; }
+.combat .enemy:only-child { max-width: 280px; }
+.combat .table { padding-bottom: 12px; }
+.combat .enemies.n3 .enemy .em, .combat .enemies.n4 .enemy .em { font-size: 30px; }
