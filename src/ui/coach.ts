@@ -62,7 +62,7 @@ export const COACH: Step[] = [
     doLabel: '주사위 하나를 탭하세요', done: (a) => !!cb(a)?.hand.some((h) => h.locked && !h.used) || (cb(a)?.phase ?? 'roll') !== 'roll',
   },
   {
-    focus: () => ['[data-act="reroll"]', '.tray'], title: '④ 다시 굴리기', text: '리롤을 누르거나 테이블을 아래로 쓸어내리면 잠그지 않은 주사위만 다시 굴립니다. 한 턴에 2번까지 할 수 있습니다.',
+    focus: () => ['[data-act="reroll"]', '.tray'], title: '④ 다시 굴리기', text: '리롤을 누르면 잠그지 않은 주사위만 다시 굴립니다. 한 턴에 2번까지 할 수 있습니다.',
     doLabel: '리롤을 누르세요', done: (a) => { const c = cb(a); return !!c && (c.phase !== 'roll' || c.rerollsLeft < baseRerolls(a.ctx)); },
   },
   { focus: () => ['.handbar'], title: '⑤ 족보 = 배율', text: '같은 눈이나 이어지는 눈을 모으면 족보가 됩니다. 이번 턴 모든 공격과 방어에 ×배율이 곱해집니다. 누르면 족보표를 볼 수 있습니다.' },

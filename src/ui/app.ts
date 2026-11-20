@@ -214,13 +214,10 @@ export class App {
     });
     this.root.addEventListener('pointerup', cancel);
     this.root.addEventListener('pointercancel', cancel);
-    // 주사위 테이블을 아래로 쓸어내리면 리롤 (버튼과 같은 동작)
     // 탭이 있는 화면은 좌우로 쓸어 탭 넘기기
-    let swipe: { x: number; y: number } | null = null;
     let hswipe: { x: number; y: number; tabs: HTMLElement } | null = null;
     this.root.addEventListener('pointerdown', (ev) => {
       const t = ev.target as HTMLElement;
-      swipe = t.closest('.combat .table') && !t.closest('.modal') ? { x: ev.clientX, y: ev.clientY } : null;
       const scope = t.closest('.modal .box') ?? t.closest('.screen');
       const tabs = scope?.querySelector<HTMLElement>('.tabs');
       hswipe = tabs && !t.closest('.hand, .tabs, input') ? { x: ev.clientX, y: ev.clientY, tabs } : null;
@@ -240,15 +237,6 @@ export class App {
           }
         }
       }
-      if (!swipe) return;
-      const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
-      swipe = null;
-      const btn = this.view.querySelector<HTMLButtonElement>('[data-act="reroll"]');
-      if (dy < 48 || Math.abs(dx) > dy || !btn || btn.disabled || this.ui.busy) return;
-      clearTimeout(this.tipTimer);
-      this.suppressClick = true;
-      setTimeout(() => { this.suppressClick = false; }, 0);
-      handleAction(this, 'reroll', '');
     });
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }
