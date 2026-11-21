@@ -1,7 +1,7 @@
 // 전투 규칙. UI를 모르는 순수 로직. 결과는 ctx.emit 이벤트로 알린다.
 import type { CardInst, CombatState, Enemy, HandDie, HandResult, Intent, IntentSpec } from '../core/state';
 import { BALANCE } from '../data/balance';
-import { ENEMY_BY_ID, JESTER_POOL } from '../data/enemies';
+import { ENDLESS_MUTATIONS, ENEMY_BY_ID, JESTER_POOL } from '../data/enemies';
 import { FACE_BY_ID } from '../data/faces';
 import { HAND_BY_ID } from '../data/hands';
 import { MATERIAL_BY_ID } from '../data/materials';
@@ -39,13 +39,36 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
   const endless = Math.max(0, run.act - 3);
   // 막 안에서 깊이 들어갈수록 적이 단단해진다 (긴 막에서 후반 층이 쉬워지지 않게)
   const depth = 1 + BALANCE.floorHpStep * run.floor;
-  const hpMult = BALANCE.enemyHpMult * depth * (1 + m.enemyHpPct) * ddaEnemyHpMult(run) * (1 + 0.4 * endless);
+  const EN = BALANCE.endless;
+  const hpMult = BALANCE.enemyHpMult * depth * (1 + m.enemyHpPct) * ddaEnemyHpMult(run) * Math.pow(EN.hpGrowth, endless);
+  const peak = run.flags.ach_max_hit ?? 0; // 이번 판 최고 한 방
+  const muts = endless ? rng(ctx, 'combat').shuffle(ENDLESS_MUTATIONS.map((x) => x.id)).slice(0, Math.min(ENDLESS_MUTATIONS.length, endless)) : [];
   const enemies: Enemy[] = [];
   const seen: Record<string, number> = {};
   for (const id of enemyIds) {
     seen[id] = (seen[id] ?? 0);
     const en = makeEnemy(ctx, id, hpMult, seen[id]);
-    en.stacks += 2 * endless; // 엔드리스: 공격력 +2/막
+    const tier = ENEMY_BY_ID[id].tier;
+    let hpFloor = 0;
+    en.atkMult = 1;
+    // 3막 최종 보스(엔드리스 보스 포함): 거의 깰 수 없는 난이도
+    if (tier === 'boss' && run.act >= 3) {
+      const FB = BALANCE.finalBoss;
+      const cm = FB.charMult[run.charId] ?? 1;
+      en.hp = en.maxHp = Math.round(en.maxHp * FB.hp * cm);
+      en.atkMult *= FB.atk * cm;
+      hpFloor = peak * FB.peakHits;
+    }
+    if (endless) {
+      en.stacks += EN.atkFlat * endless;
+      en.atkMult *= 1 + EN.atkPct * endless;
+      const k = (tier === 'boss' ? EN.peakBoss : tier === 'elite' ? EN.peakElite : EN.peakNormal) * (1 + EN.peakPerAct * (endless - 1));
+      hpFloor = Math.max(hpFloor, peak * k);
+      en.mut = muts;
+      if (muts.includes('armor')) en.hitCap = 0; // 아래에서 최종 체력 기준으로 정한다
+    }
+    if (hpFloor > en.maxHp) en.hp = en.maxHp = Math.round(hpFloor);
+    if (en.hitCap !== undefined) en.hitCap = Math.max(1, Math.round(en.maxHp * 0.2));
     enemies.push(en);
     seen[id]++;
     run.flags['seen_enemy_' + id] = 1;
@@ -72,7 +95,7 @@ export function startCombat(ctx: Ctx, kind: CombatState['kind'], enemyIds: strin
 function attackValue(ctx: Ctx, e: Enemy, base: number): number {
   const m = getMods(ctx.run);
   const cb = ctx.run.combat;
-  let v = (base * BALANCE.enemyAtkMult + e.stacks + e.str) * e.nextMult;
+  let v = (base * BALANCE.enemyAtkMult * (e.atkMult ?? 1) + e.stacks + e.str) * e.nextMult;
   if (e.enraged) v *= 1.5;
   if (e.phase >= 2 && m.bossPhase2 > 0 && ENEMY_BY_ID[e.id].tier === 'boss') v *= 1.25;
   if (e.frail > 0) v *= BALANCE.frailMult - m.frailExtra; // 적 약화
@@ -993,6 +1016,12 @@ export function enemyTurn(ctx: Ctx) {
     }
     e.block = 0;
     ctx.emit({ t: 'enemyAct', uid: e.uid });
+    // 엔드리스 변이
+    if (e.mut?.length) {
+      if (e.mut.includes('regen')) e.hp = Math.min(e.maxHp, e.hp + Math.round(e.maxHp * 0.08));
+      if (e.mut.includes('rage')) e.str += 3;
+      if (e.mut.includes('bulwark')) { const b = Math.round(e.maxHp * 0.1); e.block += b; ctx.emit({ t: 'eBlock', uid: e.uid, amount: b }); }
+    }
     const it = e.intent;
     const n = it.n ?? 0;
     switch (it.k) {

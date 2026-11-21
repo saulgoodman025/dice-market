@@ -66,6 +66,11 @@ export const BALANCE = {
   augmentFloor: 3, // 막마다 이 층에 오르면 증강 선택 (8층 지도의 앞쪽 절반)
   combatFloors: [0, 4], // 이 층은 전투(정예 포함)만: 어느 길로 가도 전투를 최소 2번 거친다
   floorHpStep: 0.04, // 층마다 적 체력 +4% (보스 층 +28%)
+  // 3막 최종 보스: 거의 깰 수 없게. 캐릭터 태생 강함(시뮬 클리어율)에 맞춰 배율을 다르게,
+  // 그리고 이번 판 최고 한 방 피해 × peakHits 이상의 체력 (폭주 빌드도 여러 번 때려야 한다)
+  finalBoss: { hp: 2.2, atk: 1.6, peakHits: 9, charMult: { gambler: 1.0, merchant: 1.15, knight: 1.35, sharp: 1.05 } as Record<string, number> },
+  // 엔드리스: 막마다 체력 ×1.8(지수), 공격 +35% +3, 최고 한 방 대비 체력 하한, 변이 능력
+  endless: { hpGrowth: 1.8, atkPct: 0.35, atkFlat: 3, peakNormal: 0.8, peakElite: 1.6, peakBoss: 8, peakPerAct: 0.5 },
 
   restHealPct: 0.3,
 

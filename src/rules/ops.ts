@@ -36,6 +36,7 @@ export function damageEnemy(ctx: Ctx, e: Enemy, amount: number, info: DmgInfo = 
   if (weakHit) { amt = Math.round(amt * BALANCE.weakMult); addJackpot(ctx, BALANCE.weakJackpot); }
   if (def.modIncoming) amt = Math.max(0, Math.round(def.modIncoming(ctx, e, amt, info)));
   if (e.enraged) amt = Math.round(amt * 1.0);
+  if (e.hitCap && amt > e.hitCap) amt = e.hitCap; // 엔드리스 철갑
   const blocked = Math.min(e.block, amt);
   e.block -= blocked;
   let dealt = amt - blocked;

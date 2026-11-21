@@ -182,6 +182,14 @@ export const ENEMIES: EnemyDef[] = [
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map((e) => [e.id, e])) as Record<string, EnemyDef>;
 
 /** 전투 화면에 항상 보이는 특수 능력 이름표 (탭하면 desc 전체 설명) */
+/** 엔드리스 전용 변이: 막마다 1개씩 늘어난다 (4막 1개 … 7막부터 4개 전부) */
+export const ENDLESS_MUTATIONS: { id: string; icon: string; name: string; desc: string }[] = [
+  { id: 'armor', icon: '🪨', name: '철갑', desc: '한 번에 받는 피해가 최대 체력의 20%를 넘지 않습니다.' },
+  { id: 'regen', icon: '💚', name: '재생', desc: '행동할 때마다 최대 체력의 8%를 회복합니다.' },
+  { id: 'rage', icon: '😤', name: '광분', desc: '행동할 때마다 힘 +3.' },
+  { id: 'bulwark', icon: '🧱', name: '보루', desc: '행동할 때마다 최대 체력의 10%만큼 방어도를 얻습니다.' },
+];
+
 export const ENEMY_TRAIT: Record<string, string> = {
   chiprat: '🎰 처치 시 칩',
   oddhater: '🚫 홀수 무효',

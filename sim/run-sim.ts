@@ -67,7 +67,7 @@ const lines: string[] = [];
 lines.push(`# DICE MARKET 밸런스 시뮬레이션 리포트`, '');
 lines.push(`- 판 수: 봇당 ${RUNS} · 캐릭터: ${CHAR} · 스테이크: ${STAKE} · 소요: ${((Date.now() - t0) / 1000).toFixed(1)}s`, '');
 lines.push('## 목표 지표 (§7.4)', '', '| 지표 | 목표 | 결과 | |', '| --- | --- | --- | --- |');
-lines.push(`| 숙련 봇 클리어율 | 35~50% | ${p1(grd.clear)} | ${target(grd.clear >= 0.35 && grd.clear <= 0.5)} |`);
+lines.push(`| 숙련 봇 클리어율 (최종 보스 극악) | 3~8% | ${p1(grd.clear)} | ${target(grd.clear >= 0.03 && grd.clear <= 0.08)} |`);
 lines.push(`| 랜덤 봇 평균 도달 노드 | 4~6 | ${f2(rnd.nodes)} | ${target(rnd.nodes >= 4 && rnd.nodes <= 6)} |`);
 lines.push(`| 숙련/랜덤 도달 노드 비율 (R5) | ≥ 1.8 | ${f2(ratio)} | ${target(ratio >= 1.8)} |`);
 lines.push(`| 판당 야찌 (숙련) | 0.3~0.6 | ${f2(grd.yahtzee)} | ${target(grd.yahtzee >= 0.3 && grd.yahtzee <= 0.6)} |`);

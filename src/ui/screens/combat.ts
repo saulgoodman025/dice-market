@@ -7,7 +7,7 @@ import { canBurn } from '../../rules/deck';
 import { canCentralBank } from '../../rules/sets';
 import { FACE_BY_ID } from '../../data/faces';
 import { MATERIAL_BY_ID, MATERIALS } from '../../data/materials';
-import { ENEMY_BY_ID, ENEMY_TRAIT, HOUSE_RULES } from '../../data/enemies';
+import { ENDLESS_MUTATIONS, ENEMY_BY_ID, ENEMY_TRAIT, HOUSE_RULES } from '../../data/enemies';
 import { HAND_BY_ID, HANDS } from '../../data/hands';
 import { CHAR_BY_ID } from '../../data/characters';
 import { CONSUMABLE_BY_ID } from '../../data/consumables';
@@ -75,7 +75,7 @@ export function combatScreen(app: App): string {
       ${e.poison ? `<div class="poisonbadge" data-tip="중독: 적의 턴마다 ${e.poison} 피해를 받고, 독이 1 줄어듭니다.">🧪 독 ${e.poison}</div>` : ''}
       <div class="ehp ${e.block && e.hp > 0 ? 'shielded' : ''}" data-hpk="e${e.uid}" data-pct="${hpPct}">${e.block && e.hp > 0 ? `<span class="eshb" data-blk="${e.block}" data-tip="방어도 ${e.block}: 체력보다 먼저 피해를 막습니다. 이 적의 다음 행동 때 사라집니다."><span class="n">${e.block}</span></span>` : ''}<span class="hpc"><s class="trail"></s><i style="width:${hpPct}%;${e.poison && e.hp > 0 ? `--pa:${(Math.max(0, e.hp - e.poison) / e.hp) * 100}%` : ''}"></i></span><b>${e.hp}/${e.maxHp}</b></div>
       <div class="ename"><span class="name">${esc(e.name)}</span></div>
-      <div class="nrow"><span class="pips2"><span class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯<b>${e.weakPip}</b></span>${e.immunePip ? `<span class="immpip" data-tip="면역 눈: ${e.immunePip}(으)로 준 피해를 받지 않습니다">🚫<b>${e.immunePip}</b></span>` : ''}</span>${ENEMY_TRAIT[e.id] && e.hp > 0 ? `<button class="etrait" data-act="enemyInfo" data-arg="${e.uid}" data-tip="${esc(`${ENEMY_TRAIT[e.id]}: ${def.desc ?? ''}`)}">${esc(ENEMY_TRAIT[e.id])}</button>` : ''}</div>
+      <div class="nrow"><span class="pips2"><span class="weakpip" data-tip="약점 눈: ${e.weakPip}이(가) 들어간 주사위로 공격하면 피해 ×${BALANCE.weakMult}">🎯<b>${e.weakPip}</b></span>${e.immunePip ? `<span class="immpip" data-tip="면역 눈: ${e.immunePip}(으)로 준 피해를 받지 않습니다">🚫<b>${e.immunePip}</b></span>` : ''}</span>${ENEMY_TRAIT[e.id] && e.hp > 0 ? `<button class="etrait" data-act="enemyInfo" data-arg="${e.uid}" data-tip="${esc(`${ENEMY_TRAIT[e.id]}: ${def.desc ?? ''}`)}">${esc(ENEMY_TRAIT[e.id])}</button>` : ''}${e.hp > 0 ? (e.mut ?? []).map((id) => { const mu = MUT_BY_ID[id]; return `<span class="emut" data-tip="${esc(`엔드리스 변이 · ${mu.name}: ${mu.desc}`)}">${mu.icon}${mu.name}</span>`; }).join('') : ''}</div>
       ${st ? `<div class="status">${st}</div>` : ''}
     </div>`;
   }).join('');
@@ -220,6 +220,8 @@ export function handsModal(app: App): string {
     ${tabs}${body}
   </div></div>`;
 }
+
+const MUT_BY_ID = Object.fromEntries(ENDLESS_MUTATIONS.map((x) => [x.id, x]));
 
 const TUT = [
   { e: '🎲', t: '주사위로 싸운다', d: '매 턴 주사위 5개가 굴러간다. 위쪽은 적(딜러), 아래쪽이 나다.' },

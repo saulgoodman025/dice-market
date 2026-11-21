@@ -1,3 +1,4 @@
+import { damageEnemy } from '../src/rules/ops';
 import { nodeWeights } from '../src/rules/map';
 import { BALANCE } from '../src/data/balance';
 import { describe, expect, it } from 'vitest';
@@ -307,3 +308,36 @@ describe('버프·디버프', () => {
     expect(e.vuln).toBe(0);
   });
 });
+
+describe('최종 보스 · 엔드리스', () => {
+  it('3막 보스는 캐릭터 배율과 최고 한 방 기준 체력 하한을 받는다', () => {
+    const { run, ctx } = mk(91, 'knight');
+    run.act = 3;
+    run.flags.ach_max_hit = 900;
+    const boss = ENEMIES.find((e) => e.tier === 'boss' && e.act === 3)!;
+    startCombat(ctx, 'boss', [boss.id]);
+    const e = run.combat!.enemies[0];
+    expect(e.maxHp).toBeGreaterThanOrEqual(900 * BALANCE.finalBoss.peakHits);
+    expect(e.atkMult).toBeCloseTo(BALANCE.finalBoss.atk * BALANCE.finalBoss.charMult.knight);
+  });
+  it('엔드리스: 막마다 체력이 지수로 늘고 변이가 하나씩 늘며, 철갑은 한 방 피해를 자른다', () => {
+    const hpAt = (act: number) => {
+      const { run, ctx } = mk(92, 'knight');
+      run.act = act; run.floor = 0;
+      startCombat(ctx, 'normal', ['golem']);
+      return run.combat!.enemies[0];
+    };
+    const a4 = hpAt(4), a6 = hpAt(6), a7 = hpAt(7);
+    expect(a6.maxHp / a4.maxHp).toBeCloseTo(BALANCE.endless.hpGrowth ** 2, 1);
+    expect(a4.mut!.length).toBe(1);
+    expect(a7.mut!.length).toBe(4);
+    const { run, ctx } = mk(93, 'knight');
+    run.act = 7; run.floor = 0;
+    startCombat(ctx, 'normal', ['golem']);
+    const e = run.combat!.enemies[0];
+    e.block = 0;
+    const dealt = damageEnemy(ctx, e, 99999);
+    expect(dealt).toBe(e.hitCap);
+  });
+});
+

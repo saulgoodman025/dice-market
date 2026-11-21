@@ -1357,3 +1357,5 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .enemy .nrow .weakpip, .enemy .nrow .immpip { font-size: 10px; padding: 1px 4px; gap: 2px; line-height: 1.4; min-height: 0; border-width: 1px; }
 .enemy .nrow .weakpip b, .enemy .nrow .immpip b { font-size: 11px; padding: 0 3px; margin-left: 1px; }
 .enemy .nrow .etrait { font-size: 10px; padding: 1px 5px; line-height: 1.4; }
+/* 엔드리스 변이 칩 */
+.enemy .emut { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; padding: 1px 4px; line-height: 1.4; color: #ffd0d0; background: rgba(120,10,30,.6); box-shadow: inset 0 0 0 1px rgba(255,90,110,.6); white-space: nowrap; }

@@ -96,6 +96,9 @@ export interface Enemy {
   vuln: number; // 💔 취약: 받는 피해 +50% (남은 턴)
   frail: number; // 🥀 약화: 주는 피해 -25% (남은 턴)
   immunePip: number; // 🚫 이 눈으로 준 피해 무효 (0 = 없음)
+  atkMult?: number; // 최종 보스·엔드리스 공격 배율
+  mut?: string[]; // 엔드리스 변이
+  hitCap?: number; // 철갑: 한 번에 받는 피해 상한
 }
 
 export interface HandResult {
