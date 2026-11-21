@@ -570,8 +570,16 @@ h1, h2, h3 { margin: 0; }
 .drag-enemy .enemy:not(.dead) { outline: 2px dashed rgba(255,107,107,.8); outline-offset: 2px; }
 .enemy.aim { background: rgba(255,60,60,.18) !important; box-shadow: inset 0 0 0 3px #ff4d4d !important; }
 .enemy.aim .em { transform: scale(1.12); }
-.enemy.aim::after { content: '🎯'; position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; opacity: .85; pointer-events: none; animation: aimpulse .6s ease-in-out infinite; }
-@keyframes aimpulse { 50% { transform: translate(-50%, -50%) scale(1.2); } }
+.enemy.aim::after { content: ''; position: absolute; inset: 2px; pointer-events: none; z-index: 4;
+  --c: #ff4d4d; --l: 14px; --t: 4px;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--l) var(--t), linear-gradient(var(--c), var(--c)) top left / var(--t) var(--l),
+    linear-gradient(var(--c), var(--c)) top right / var(--l) var(--t), linear-gradient(var(--c), var(--c)) top right / var(--t) var(--l),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--l) var(--t), linear-gradient(var(--c), var(--c)) bottom left / var(--t) var(--l),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--l) var(--t), linear-gradient(var(--c), var(--c)) bottom right / var(--t) var(--l);
+  background-repeat: no-repeat; animation: aimlock calc(.22s / var(--speed)) steps(3) both, aimpix 0.5s steps(2) .22s infinite; }
+@keyframes aimlock { from { inset: -14px; opacity: 0; } to { inset: 2px; opacity: 1; } }
+@keyframes aimpix { 50% { inset: 5px; } }
 .fullscreen, .blackout, .bossdown, .turnbanner { pointer-events: none; }
 
 /* 손패가 아래 버튼을 가리지 않게 */
@@ -857,7 +865,7 @@ h1, h2, h3, .tt, .cname, .tutorial, .tuttext, .coach .ctext { text-wrap: balance
 .st.frail { background: rgba(170,140,90,.25); color: #e6cf9c; }
 .player .st { font-size: 13px; flex-shrink: 0; }
 .ehp .hpc > u.psn { top: -2px; bottom: -2px; border-radius: 3px; background: repeating-linear-gradient(135deg, #7fe03a 0 4px, #c6ff7a 4px 8px); box-shadow: 0 0 8px #9be15d; }
-.enemy.aim::after { font-size: 30px; opacity: .3; top: 30%; }
+
 .hplabel { bottom: calc(100% + 4px); z-index: 8; }
 .hplabel b { font-size: 18px; padding: 1px 8px; border: 2px solid #fff; }
 
@@ -1302,3 +1310,42 @@ h1, h2, h3, .btn, b, strong { font-weight: 700; }
 .relicstrip .relic { flex: 0 0 auto; }
 /* 지도: 층마다 고정 높이(겹치지 않게), 넘치면 화면이 위아래로 스크롤 */
 .mapscreen .mapwrap { flex: none; height: calc(var(--rows, 5) * 66px + 20px); min-height: 0; }
+
+/* ═════════════ 게임 주스 ═════════════ */
+/* 화면 전환: 살짝 아래에서 밀려 올라온다 */
+.screen.scr-in { animation: scrin calc(.22s / var(--speed)) cubic-bezier(.2,.9,.3,1.2) both; }
+@keyframes scrin { from { opacity: 0; translate: 0 14px; } }
+/* 버튼: 누르면 찌그러지고 놓으면 튕긴다 */
+.btn, .pricebtn, .minibtn, .tside button, .subtools button, .tdaily, .pgarrow, .augrr, .mnode.choice { transition: scale .09s ease-out; }
+.btn:active, .pricebtn:active, .minibtn:active, .tside button:active, .subtools button:active, .tdaily:active, .pgarrow:active, .augrr:active { scale: .95 1.0; }
+/* 골드·칩 숫자 튕김 */
+.topbar .stat.bump { animation: statbump calc(.35s / var(--speed)) cubic-bezier(.2,1.8,.4,1); }
+@keyframes statbump { 30% { scale: 1.35; } }
+/* 주사위 착지: 찌그러졌다 펴짐 */
+.die.land { animation: dland calc(.28s / var(--speed)) ease-out; }
+@keyframes dland { 0% { scale: 1.18 .78; } 45% { scale: .92 1.1; } 75% { scale: 1.04 .97; } 100% { scale: 1 1; } }
+/* 적: 숨쉬듯 살짝 오르내림 (픽셀 느낌으로 계단식) */
+/* :where로 우선순위를 낮춰 맞음·공격 등 다른 적 애니메이션이 항상 이긴다 */
+:where(.enemy:not(.dead):not(.dying)) .em { animation: ebreathe 2.2s steps(4) var(--bd, 0s) infinite; }
+.enemies .enemy:nth-child(2) { --bd: -.7s; } .enemies .enemy:nth-child(3) { --bd: -1.4s; }
+@keyframes ebreathe { 50% { translate: 0 -3px; scale: 1.03 .98; } }
+/* 쓸 수 있는 카드: 차례로 살짝 들썩 */
+:where(.hand .scard.ready:not(.chosen):not(.aiming):not(.lifted)) { animation: cbob 1.6s steps(2) var(--bd, 0s) infinite; }
+.hand .scard:nth-child(2n) { --bd: -.4s; } .hand .scard:nth-child(3n) { --bd: -.8s; }
+@keyframes cbob { 50% { translate: 0 -2px; } }
+/* 회복: 체력바 초록 번쩍 */
+.hpbar.healpop { animation: healpop calc(.4s / var(--speed)) ease-out; }
+@keyframes healpop { 30% { filter: brightness(1.6) saturate(1.4) hue-rotate(90deg); scale: 1.03; } }
+
+/* 크게 맞음 */
+.screenflash.red { background: radial-gradient(circle, rgba(255,90,90,.25), rgba(170,0,20,.7)); }
+.vignette.heavy { box-shadow: inset 0 0 140px 60px rgba(210,10,25,.92); animation-duration: calc(.85s / var(--speed)); }
+#app.hurtsplit .screen { animation: hsplit calc(.3s / var(--speed)) steps(4); }
+@keyframes hsplit { 0%, 100% { filter: none; translate: 0 0; } 25% { filter: drop-shadow(4px 0 0 rgba(255,0,60,.7)) drop-shadow(-4px 0 0 rgba(0,210,255,.6)); translate: -3px 0; } 60% { filter: drop-shadow(-3px 0 0 rgba(255,0,60,.6)) drop-shadow(3px 0 0 rgba(0,210,255,.5)); translate: 3px 0; } }
+/* 위기 (체력 30% 이하): 심장박동처럼 가장자리가 붉게 */
+#app.lowhp::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 84; box-shadow: inset 0 0 60px 14px rgba(200,10,25,.55); animation: heartbeat 1.1s ease-in-out infinite; }
+@keyframes heartbeat { 0%, 100% { opacity: .25; } 12% { opacity: 1; } 24% { opacity: .45; } 36% { opacity: .9; } 60% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) {
+  :where(.enemy) .em, :where(.hand .scard.ready), #app.lowhp::after { animation: none !important; }
+}
+

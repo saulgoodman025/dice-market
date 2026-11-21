@@ -372,6 +372,10 @@ export class App {
     this.lastRenderKey = key;
     this.view.innerHTML = renderScreen(this);
     if (keep) this.view.querySelectorAll<HTMLElement>('.screen, .modal .box').forEach((el, i) => { if (saved[i]) el.scrollTop = saved[i]; });
+    // 화면이 바뀔 때 살짝 밀려 들어온다
+    if (!keep) this.view.querySelector('.screen')?.classList.add('scr-in');
+    // 전투 중 체력 30% 이하: 화면 가장자리가 심장박동처럼 붉게 뛴다
+    this.root.classList.toggle('lowhp', !!run?.combat && run.combat.phase !== 'over' && run.hp > 0 && run.hp <= run.maxHp * 0.3);
     // 지도에 처음 들어오면 지금 고를 수 있는 층이 화면 가운데 오게
     if (!keep) this.view.querySelector('.mapscreen .mnode.choice')?.scrollIntoView({ block: 'center' });
     this.reapplyRecent();
@@ -466,6 +470,7 @@ export class App {
   private setHp(v: number) {
     const run = this.run;
     if (!run) return;
+    this.root.classList.toggle('lowhp', v > 0 && v <= run.maxHp * 0.3);
     const bar = this.view.querySelector<HTMLElement>('.player .hpbar');
     const val = this.view.querySelector('.player .hpval');
     if (bar) this.trailTo(bar, 'p', Math.max(0, (v / run.maxHp) * 100));
@@ -651,10 +656,13 @@ export class App {
               this.flashDamage();
               this.retrigger(plate, 'hurt');
               this.mark('.player', 'hurt');
-              floatAt(this.el('.player .hpbar'), `-${amt}`, '#ff5a5f', dmgSize(amt) * 1.2);
-              shake(this.root, Math.min(10, 3 + amt / 3));
+              // 최대 체력 대비 비율로 큰 피해를 구분 (12%↑ 큰 피해, 25%↑ 치명상)
+              const frac = amt / Math.max(1, this.run?.maxHp ?? 50);
+              const tier = frac >= 0.25 ? 2 : frac >= 0.12 ? 1 : 0;
+              floatAt(this.el('.player .hpbar'), `-${amt}`, '#ff5a5f', dmgSize(amt) * (1.2 + tier * 0.35));
+              if (tier) this.bigHurt(tier, plate);
+              else { shake(this.root, Math.min(10, 3 + amt / 3)); vibrate(60); }
               sfx.hurt();
-              vibrate(60);
               if (enemyPhase) this.setHp(shownHp);
             });
             if (blocked > 0) delay += 260;
@@ -666,15 +674,17 @@ export class App {
         case 'block': at(delay, () => { px.shieldUp(this.el('.pblock')); floatAt(this.el('.pblock'), `+${e.amount}`, '#6cb8ff', 18); this.retrigger(this.el('.pblock'), 'pop'); sfx.block(); }); break;
         case 'heal': {
           if (enemyPhase) hp += e.amount;
-          at(delay, () => { const bar = this.el('.player .hpbar') ?? this.el('.hpbar'); px.heal(bar); floatAt(bar, `+${e.amount}`, '#3ddc84', 18); sfx.heal(); });
+          at(delay, () => { const bar = this.el('.player .hpbar') ?? this.el('.hpbar'); px.heal(bar); this.retrigger(bar, 'healpop'); floatAt(bar, `+${e.amount}`, '#3ddc84', 18); sfx.heal(); });
           break;
         }
         case 'gold': at(delay, () => {
           floatAt(this.el('.st-gold'), `${e.amount > 0 ? '+' : ''}${e.amount}G`, '#f5c542', 16);
+          this.retrigger(this.el('.st-gold'), 'bump');
           if (e.amount > 0) { px.payout(this.el('.player') ?? this.el('.screen'), this.el('.st-gold'), Math.ceil(e.amount / 3)); sfx.coin(); }
         }); break;
         case 'chips': at(delay, () => {
           floatAt(this.el('.st-chips'), `${e.amount > 0 ? '+' : ''}${e.amount}`, '#ff9de2', 15);
+          this.retrigger(this.el('.st-chips'), 'bump');
           if (e.amount > 0) px.payout(this.el('.handbar') ?? this.el('.screen'), this.el('.st-chips'), e.amount * 2, 'chip');
           sfx.chip();
         }); break;
@@ -802,6 +812,27 @@ export class App {
     shake(this.root, 3);
     if (broke) sfx.shieldBreak(); else sfx.clang();
     vibrate(broke ? [20, 30, 40] : 25);
+  }
+
+  /** 내가 크게 맞음: 붉은 섬광 + 짙은 비네트 + 강한 흔들림, 치명상은 줌 펀치와 색 분리까지 */
+  private bigHurt(tier: number, plate: Element | null) {
+    const sp = this.settings.speed;
+    this.flash('red');
+    const v = document.createElement('div');
+    v.className = 'vignette heavy';
+    this.root.appendChild(v);
+    setTimeout(() => v.remove(), 900 / sp);
+    px.impact(plate?.querySelector('.hpbar') ?? plate, tier === 2, 'blood');
+    hitstop(this.root, tier === 2 ? 150 : 80);
+    setTimeout(() => shake(this.root, tier === 2 ? 18 : 11, tier === 2 ? 650 : 420), (tier === 2 ? 150 : 80) / sp);
+    vibrate(tier === 2 ? [120, 40, 180] : [70, 30, 90]);
+    if (tier === 2) {
+      this.retrigger(this.root, 'punch');
+      this.retrigger(this.root, 'hurtsplit');
+      setTimeout(() => this.root.classList.remove('hurtsplit'), 320 / sp);
+      floatAt(plate, '치명상!', '#ff3b3b', 24);
+      sfx.heavy();
+    }
   }
 
   /** 색종이 축하 */
@@ -972,6 +1003,7 @@ export class App {
         clearInterval(iv);
         el.innerHTML = final;
         el.classList.remove('rolling');
+        this.retrigger(el, 'land');
         px.dust(el);
         sfx.tick();
       }, stopAt);
