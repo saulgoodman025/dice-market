@@ -1088,7 +1088,7 @@ export interface EnemyHit {
 
 export interface CardPreview {
   keys: number[] | null;
-  dmg: number; // 실제로 깎이는 체력 합 (방어도에 막힌 부분 제외)
+  dmg: number; // 카드가 준 피해 합 (방어도에 막힌 부분 제외, 남은 체력으로 자르지 않음)
   blocked: number;
   block: number;
   blockDmg: number; // 방어도를 얻어서 생긴 피해 (방패 3단계 등)
@@ -1113,7 +1113,10 @@ export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: 
   const rc = resolveFor(ctx.run, cb.cards[idx]);
   if (rc.choose) return { ...empty, keys };
   const run2 = structuredClone(ctx.run);
-  const c2: Ctx = { run: run2, emit: () => {} };
+  // 카드가 낸 피해는 이벤트로 센다: 적의 남은 체력에 잘리지 않은 실제 피해량 (체력이 1 남아도 40이면 40)
+  let rec = false;
+  let rawDmg = 0, rawBlocked = 0;
+  const c2: Ctx = { run: run2, emit: (ev) => { if (rec && ev.t === 'dmgEnemy') { rawDmg += ev.amount; rawBlocked += ev.blocked ?? 0; } } };
   const cb2 = run2.combat!;
   if (targetUid !== null && cb2.enemies.some((e) => e.uid === targetUid && e.hp > 0)) cb2.target = targetUid;
   if (cb2.phase === 'roll' && !rc.rollOnly) confirmHand(c2);
@@ -1127,6 +1130,7 @@ export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: 
   const p0 = cb2.piggy;
   const n0 = cb2.cards.length;
   cb2.turnCounters.pvBlockDmg = 0;
+  rec = true;
   playCard(c2, i2, keys);
   const hits: EnemyHit[] = [];
   for (const e of cb2.enemies) {
@@ -1139,8 +1143,8 @@ export function previewCard(ctx: Ctx, idx: number, prefer: number[], targetUid: 
   }
   return {
     keys,
-    dmg: hits.reduce((s2, h) => s2 + h.hpLoss, 0),
-    blocked: hits.reduce((s2, h) => s2 + h.blockLoss, 0),
+    dmg: rawDmg,
+    blocked: rawBlocked,
     block: Math.max(0, cb2.block + cb2.keepBlock - b0),
     blockDmg: cb2.turnCounters.pvBlockDmg ?? 0,
     heal: Math.max(0, run2.hp - h0),
